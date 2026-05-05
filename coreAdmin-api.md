@@ -1,23 +1,47 @@
-# coreAdmin-api — Prompt Suite
+# coreAdmin-api — Project Prompt
 
-## Global contract for every phase
+## What this project is
+
+coreAdmin is a FastAPI-based, registry-driven admin backend for multi-tenant SaaS applications.
+
+A developer registers their SQLAlchemy models once. coreAdmin generates dynamic CRUD endpoints, a stable admin contract, a lightweight built-in UI, and optionally serves external clients (e.g. a Flutter app) — all without requiring per-model UI code.
+
+### Core capabilities
+
+- Registry-driven CRUD with schema builder, serializer, and filter builder
+- JWT authentication with refresh tokens, logout, and token blacklist
+- Fine-grained authorization: field-level visibility/editability, record-level restrictions, action gating
+- Structured audit logging, impersonation, break-glass editing
+- Optional multi-tenancy with PostgreSQL schema isolation
+- Approval workflows for high-risk admin changes
+- Tenant billing (invoicing tenants for usage)
+- Session management, rate limiting, security headers, and observability
+- A stable, versioned admin contract for external renderer clients
+- A built-in lightweight admin UI as an optional package extra
+- A plugin/extension architecture for optional features
+
+---
+
+## Global contract
 
 ### Instruction priority
+
 1. Security invariants
-2. Current phase objective and acceptance criteria
-3. Locked and stable constraints from earlier phases
-4. Compatibility requirements
-5. Reference notes
-6. Build order
+2. Feature objective and acceptance criteria
+3. Compatibility requirements
+4. Reference notes
 
 ### Security invariants
+
 - Never expose secrets, hashed secrets, token internals, database credentials, or protected internal fields in any response schema or serialized payload.
 - Passwords, hashed passwords, PIN hashes, shared secrets, tenant salts, setup codes, QR bootstrap tokens, and equivalent protected fields must never appear in list, detail, create, or update response payloads.
 - Read-only fields must be enforced at the API boundary, not only at UI or registry level.
-- Superadmin-only routes must reject impersonation tokens unless a phase explicitly allows them.
+- Superadmin-only routes must reject impersonation tokens.
 - Audit failure must never change the functional response path.
+- Billing data must be tenant-scoped and never leak across tenant boundaries.
 
 ### Compatibility contract
+
 - Python 3.11+
 - Async request and database paths by default
 - SQLAlchemy 2.x style
@@ -25,1240 +49,623 @@
 - UUID primary keys server-side
 - UTC timestamps
 - Absolute imports only
-- Public collection endpoints return `PaginatedResponse[T]` unless the current phase explicitly exempts an endpoint
-
-### Stability classes
-- **Locked**: do not change unless the current phase explicitly allows it.
-- **Stable**: minimal internal changes allowed only if required for correctness, compatibility, security, or tests.
-- **Open**: free to add or refine within the phase scope.
+- Public collection endpoints return `PaginatedResponse[T]`
 
 ### Conflict handling
+
 If requirements conflict:
 1. preserve security invariants
 2. preserve external API behavior already established
-3. satisfy current phase acceptance criteria
+3. satisfy current feature acceptance criteria
 4. choose the smallest internal change
 5. leave a brief code comment where a compromise was necessary
 
 ### Forbidden shortcuts
+
 - Do not treat SQLite-only success as proof for PostgreSQL-critical behavior.
-- Do not use `create_all()` as the only verification path once migrations become mandatory.
+- Do not use `create_all()` as the only migration verification path.
 - Do not expose raw ORM objects via `__dict__`, implicit dumps, or unfiltered generic serialization.
 - Do not silently fall back from tenant-scoped access to shared data access.
 - Do not weaken protected-field filtering to satisfy generic CRUD generation.
-- Do not skip regression tests for earlier phase behavior.
+- Do not skip regression tests for existing behavior.
 - Do not assume reference snippets are correct if framework constraints or tests prove otherwise.
 
 ### Test layers
+
 - **fast**: no Docker required; lightweight isolated DB allowed; used for pure logic, serializers, builders, request validation, auth flow basics, router behavior, and protected-field filtering when PostgreSQL semantics are not essential.
 - **integration**: real PostgreSQL required; run migrations; used for constraints, Alembic behavior, tenant schemas, schema scoping, transaction behavior, UUID/JSON/PostgreSQL-specific behavior.
-- **e2e**: a few end-to-end flows through the real app stack; used only for high-value critical paths.
-
-### Test rules by phase
-- Phase 0: fast only
-- Phase 1: fast required; integration optional
-- Phase 2: fast required; integration recommended for persistence and constraints
-- Phase 3: fast required; integration required
-- Phase 4: fast required; integration required for compatibility with tenant and PostgreSQL behavior
-- Phase 5: fast required; integration required; a few e2e flows required
+- **e2e**: end-to-end flows through the real app stack; used only for high-value critical paths.
 
 ### Migration test rule
-From Phase 3 onward, PostgreSQL integration tests must apply Alembic migrations. Metadata-only setup is insufficient for tenant and migration verification.
+
+PostgreSQL integration tests must apply Alembic migrations. Metadata-only setup is insufficient for tenant and migration verification.
 
 ### Output discipline
+
 - Prefer concise code comments over prose.
 - Prefer measurable acceptance criteria over qualitative claims.
 - Reference snippets are illustrative, not authoritative.
 
 ---
 
-# Phase 0 — Development foundation
-
-## Objective
-Create the project skeleton, tooling, configuration, migration layout, and local development baseline. No application logic.
-
-## Locked
-None.
-
-## Stable
-None.
-
-## Open
-Project structure, tooling files, migration scaffolding, dev workflow files.
-
-## Deliverables
-- `coreAdmin_api/` package root with empty `__init__.py`
-- `tests/` package root with empty `__init__.py`
-- shared and tenant Alembic directories with env files, templates, and empty versions directories
-- `pyproject.toml`
-- `alembic_shared.ini`
-- `alembic_tenant.ini`
-- `docker-compose.yml`
-- `Makefile`
-- `.env.example`
-- `.gitignore`
-- `README.md`
-
-## Hard requirements
-- Use Python 3.11+
-- Configure FastAPI, SQLAlchemy async, Alembic, Pydantic settings, Typer, test dependencies
-- Shared and tenant migration environments must exist from the beginning
-- Local dev must support a PostgreSQL service through Docker Compose
-- `.env.example` must contain all configuration keys required by later phases
-
-## Acceptance criteria
-- project structure matches the requested layout
-- editable install works
-- `pytest` runs successfully even if zero tests exist
-- `make install` succeeds
-- `docker-compose up` starts PostgreSQL cleanly
-- both Alembic environments exist and are invokable
-- no app logic files are created beyond basic placeholders
-
-## Tests
-- fast only
-- verify importability and basic command success where practical
-
-## Build order
-1. folders and empty package files
-2. `pyproject.toml`
-3. Alembic ini files
-4. migration env files and templates
-5. Docker Compose and Makefile
-6. `.env.example`
-7. `.gitignore`
-8. install and smoke-check commands
+## Feature areas
 
 ---
 
-# Phase 1 — Core shared app foundation
+### Foundation
 
-## Objective
-Implement shared settings, database session management, base models, user model, auth basics, health endpoint, error handling, pagination schema, and seed CLI.
+**Objective**: settings, database session management, base models, user model, JWT auth, health endpoint, error handling, pagination schema, seed CLI.
 
-## Locked
-- Phase 0 migration env structure and tooling files
-
-## Stable
-- Phase 0 package layout
-
-## Open
-- shared app modules
-- tests for auth and health
-
-## Deliverables
+**Deliverables**
 - `settings.py`
 - `database.py`
 - `main.py`
 - `cli.py`
-- `models/base.py`
-- `models/user.py`
-- `schemas/common.py`
-- `schemas/auth.py`
-- `schemas/user.py`
-- `routers/auth.py`
-- `routers/health.py`
+- `models/base.py`, `models/user.py`
+- `schemas/common.py`, `schemas/auth.py`, `schemas/user.py`
+- `routers/auth.py`, `routers/health.py`
 - `middleware/errors.py`
 - `dependencies.py`
-- tests for auth and health
 
-## Hard requirements
-- shared DB session dependency with rollback on exception
+**Hard requirements**
+- Shared DB session dependency with rollback on exception
 - JWT access and refresh tokens
 - `/api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/auth/me`
-- `/health`
-- structured validation and HTTP error responses
-- CORS wired from settings
-- pagination schema defined for future list endpoints
-- CLI command to create first superadmin
-- shared Alembic metadata must include shared models
-
-## Acceptance criteria
-- `UserPublic` excludes password and hash fields
-- invalid credentials return 401
-- inactive user cannot authenticate
-- refresh accepts only refresh tokens
-- `/me` returns authenticated user only
 - `/health` reports degraded status if DB check fails
-- validation errors return normalized JSON shape
-- existing response payloads do not include secrets or hashes
-- all Phase 1 tests pass
+- CORS wired from settings
+- Pagination schema defined for all list endpoints
+- CLI command `coreadmin create-superadmin`
+- Shared Alembic metadata includes shared models
 
-## Tests
-- fast required
-- integration optional
-- cover success and failure cases for login, refresh, me, health, validation, and no-traceback error handling
-- add at least one regression assertion that protected fields are absent from responses
-
-## Build order
-1. settings
-2. base and user model
-3. shared DB layer
-4. shared migration metadata wiring
-5. schemas
-6. dependencies
-7. health router
-8. auth router
-9. error middleware
-10. app entrypoint
-11. CLI
-12. fast tests
+**Acceptance criteria**
+- `UserPublic` excludes password and hash fields
+- Invalid credentials return 401
+- Inactive user cannot authenticate
+- Refresh accepts only refresh tokens
+- `/me` returns authenticated user only
+- Validation errors return normalized JSON shape
 
 ---
 
-# Phase 2 — Shared admin foundation: users, roles, logging
+### User and role management
 
-## Objective
-Add user CRUD, simplified roles, role checks, superadmin checks, and structured request logging.
+**Objective**: user CRUD, role model, role checks, superadmin checks, request logging.
 
-## Locked
-- Phase 0 tooling and migration envs
-- Phase 1 public auth endpoints and response contracts
-
-## Stable
-- `settings.py`
-- `database.py`
-- `models/base.py`
-- `models/user.py`
-- `routers/health.py`
-- `tests/conftest.py` existing fixtures
-
-## Open
-- role model and schemas
-- user and role routers
-- logging middleware
-- new tests
-
-## Deliverables
-- `models/role.py`
-- `schemas/role.py`
-- extend `schemas/user.py` with create and update schemas
-- extend `dependencies.py` with `require_role` and `require_superadmin`
-- `routers/users.py`
-- `routers/roles.py`
+**Deliverables**
+- `models/role.py`, `schemas/role.py`
+- Extended `schemas/user.py`
+- Extended `dependencies.py` with `require_role` and `require_superadmin`
+- `routers/users.py`, `routers/roles.py`
 - `middleware/logging.py`
-- tests for users and roles
 
-## Hard requirements
-- roles are names only, no permission matrix
-- superadmin bypasses role checks
-- user list and role list endpoints paginate
-- duplicate emails and duplicate role assignments are rejected cleanly
-- logging middleware must emit request id and set `X-Request-ID`
-- logging must not change successful endpoint behavior
+**Hard requirements**
+- Roles are names only — no permission matrix at this layer
+- Superadmin bypasses role checks
+- User list and role list endpoints paginate
+- Duplicate emails and duplicate role assignments are rejected cleanly
+- Logging middleware emits request ID and sets `X-Request-ID`
+- Logging must not change successful endpoint behavior
 
-## Acceptance criteria
-- superadmin can create, read, update, and soft-delete users
-- non-superadmin cannot access superadmin-only routes
-- duplicate email creation returns conflict
-- role can be created, assigned, removed, and listed
-- `require_role("manager")` returns 403 without role and succeeds with role
-- structured logs are emitted for requests
-- `X-Request-ID` is present on responses
-- all Phase 1 tests still pass unchanged
-- all new Phase 2 tests pass
-
-## Tests
-- fast required
-- integration recommended for DB constraints and duplicate handling
-- add regression tests for auth endpoints after middleware wiring
-- assert soft-delete means `is_active=False`, not physical deletion
-
-## Build order
-1. role model
-2. migration and upgrade
-3. role schema and user schema extension
-4. dependencies extension
-5. users router
-6. roles router
-7. logging middleware
-8. app wiring
-9. fast tests
-10. optional integration tests
+**Acceptance criteria**
+- Superadmin can create, read, update, and soft-delete users
+- Non-superadmin cannot access superadmin-only routes
+- Duplicate email creation returns 409
+- Role can be created, assigned, removed, and listed
+- `require_role("manager")` returns 403 without the role and passes with it
+- Soft-delete means `is_active=False`, not physical deletion
 
 ---
 
-# Phase 3 — Multi-tenancy behind feature flag
+### Multi-tenancy
 
-## Objective
-Add multi-tenancy behind `MULTI_TENANT` while preserving zero regressions when the flag is false.
+**Objective**: optional multi-tenancy behind `MULTI_TENANT` flag; zero regressions when false.
 
-## Locked
-- all Phase 0 tooling
-- Phase 1 auth endpoint contracts
-- Phase 2 router contracts unless explicitly extended
-
-## Stable
-- `settings.py` except explicitly allowed additions
-- `database.py`
-- `tests/conftest.py` existing fixtures
-
-## Open
-- tenant model, schema, router, middleware
-- database tenant support
-- CLI tenant migration commands
-- tenant tests
-
-## Deliverables
-- `models/tenant.py`
-- `schemas/tenant.py`
+**Deliverables**
+- `models/tenant.py`, `schemas/tenant.py`
 - `routers/tenants.py`
 - `middleware/tenant.py`
-- extend `database.py` with tenant engine cache and tenant DB dependency
-- extend `dependencies.py` only as needed for tenant DB use
-- extend `cli.py` with tenant migration commands
-- tests for tenant CRUD, resolution, and isolation
+- Extended `database.py` with tenant engine cache and tenant DB dependency
+- Extended `cli.py` with tenant migration commands (`coreadmin tenant migrate`, `coreadmin tenant upgrade --all`)
 
-## Hard requirements
-- when `MULTI_TENANT=false`, shared mode must behave exactly as before
-- when `MULTI_TENANT=true`, tenant-scoped access must require resolved tenant context
-- tenant resolution must support explicit header strategy and host-based strategy if enabled by the prompt
-- tenant-scoped DB access must never silently fall back to shared data
-- PostgreSQL schema scoping must be implemented for shared-database tenants
-- tenant routes must remain superadmin-only unless explicitly stated otherwise
-- user model may add tenant foreign key in this phase only
+**Hard requirements**
+- When `MULTI_TENANT=false`, shared mode must behave exactly as before
+- When `MULTI_TENANT=true`, tenant-scoped access must require resolved tenant context
+- Tenant resolution supports explicit header strategy (`X-Tenant-Slug`) and host-based strategy
+- Tenant-scoped DB access must never silently fall back to shared data
+- PostgreSQL schema scoping for shared-database tenants
+- Tenant routes remain superadmin-only
 
-## Acceptance criteria
-- tenant create, read, update, disable, and migrate flows work
-- invalid slug returns validation failure
-- duplicate slug returns conflict
-- disabled tenant is rejected by tenant middleware
-- requests missing tenant context in multi-tenant mode fail explicitly
-- tenant A data is not visible under tenant B context
-- single-tenant tests from earlier phases still pass unchanged when flag is false
-- integration tests run against real PostgreSQL with Alembic migrations
-
-## Tests
-- fast required for resolution logic, middleware branching, and schema validation
-- integration required for migrations, schema creation, schema scoping, tenant isolation, transaction behavior
-- e2e not required yet
-- add regression tests proving single-tenant compatibility remains intact
-
-## Build order
-1. tenant model
-2. user tenant FK change
-3. migration and upgrade
-4. tenant schema
-5. database tenant support
-6. tenant middleware
-7. tenant router
-8. CLI tenant migration commands
-9. app wiring
-10. fast tests
-11. PostgreSQL integration tests with migrations
+**Acceptance criteria**
+- Tenant create, read, update, disable, and migrate flows work
+- Invalid slug returns 422; duplicate slug returns 409
+- Disabled tenant is rejected by tenant middleware
+- Requests missing tenant context in multi-tenant mode fail with 400
+- Tenant A data is not visible under tenant B context
+- Single-tenant tests still pass unchanged when flag is false
 
 ---
 
-# Phase 4 — Registry-driven admin CRUD
+### Registry-driven admin CRUD
 
-## Objective
-Add the model registry, schema builder, filter builder, serializer, and dynamic admin CRUD routes.
+**Objective**: model registry, schema builder, filter builder, serializer, and dynamic admin CRUD routes.
 
-## Locked
-- Phase 0 to 3 public behaviors
-- tenant middleware behavior
-- shared and tenant DB semantics
-
-## Stable
-- existing routers, models, middleware, and tests
-- admin integration points may extend but must not weaken prior guarantees
-
-## Open
-- admin package
-- registry schemas
-- example integration
-- new tests
-
-## Deliverables
+**Deliverables**
 - `admin/model_admin.py`
 - `admin/registry.py`
 - `admin/schema_builder.py`
 - `admin/filter_builder.py`
 - `admin/serializer.py`
 - `admin/router.py`
-- registry-related schema module if needed
-- package exports for `admin_site`, `ModelAdmin`, `create_coreadmin`
-- example registration files
-- tests for schema builder, registry, admin CRUD
+- Package exports: `admin_site`, `ModelAdmin`, `create_coreadmin`
 
-## Hard requirements
-- build and test `schema_builder.py` before wiring dynamic router behavior
-- schema generation must filter protected fields globally and per-admin config
-- generated create schemas must exclude auto and read-only fields
-- generated update schemas must make fields optional
-- dynamic CRUD must use filtered schemas, not raw ORM dumps
-- registry metadata must not expose protected fields as editable fields
-- tenant-scoped admin models must honor tenant context in multi-tenant mode
-- readonly field mutation attempts must fail explicitly
+**Hard requirements**
+- Schema generation must filter protected fields globally and per-admin config
+- Generated create schemas exclude auto and read-only fields
+- Generated update schemas make fields optional
+- Dynamic CRUD uses filtered schemas, not raw ORM dumps
+- Registry metadata must not expose protected fields as editable fields
+- Tenant-scoped admin models honor tenant context in multi-tenant mode
+- Readonly field mutation attempts return 422
 
-## Acceptance criteria
-- schema builder tests cover multiple distinct model configurations
-- protected fields are absent from list, detail, create, and update schemas
-- readonly fields produce 422 on attempted mutation
-- dynamic list endpoints paginate and respect filtering, search, and ordering
-- dynamic detail endpoints do not leak protected fields
-- tenant-scoped models return only rows for the active tenant in multi-tenant mode
-- registry output reflects list display, filters, ordering, readonly fields, and actions without exposing protected internals
-- all Phase 1 to 3 tests still pass unchanged
-- integration tests confirm compatibility with PostgreSQL and tenant scoping
-
-## Tests
-- fast required for schema builder, filter builder, serializer, registry behavior
-- integration required for admin CRUD compatibility with PostgreSQL and tenant scoping
-- add explicit regression tests that registry-driven CRUD does not bypass security rules from earlier phases
-
-## Build order
-1. model admin and registry
-2. schema builder
-3. schema builder tests only; must pass before continuing
-4. filter builder
-5. serializer
-6. registry schema if needed
-7. admin router
-8. package exports and app integration
-9. example registration files
-10. fast tests
-11. integration tests
+**Acceptance criteria**
+- Protected fields are absent from list, detail, create, and update schemas
+- Readonly fields produce 422 on attempted mutation
+- Dynamic list endpoints paginate and respect filtering, search, and ordering
+- Dynamic detail endpoints do not leak protected fields
+- Tenant-scoped models return only rows for the active tenant
 
 ---
 
-# Phase 5 — Audit, impersonation, break-glass, logout
+### Admin contract and capability model
 
-## Objective
-Complete V1 with audit logging, impersonation, break-glass editing, token blacklist logout, and revocation flows.
+**Objective**: renderer-independent admin contract exposing resource metadata, field metadata, permissions, capabilities, and tenant context explicitly for any UI client.
 
-## Locked
-- Phase 0 to 4 public contracts and security invariants
-- admin schema builder, registry, and router public behavior unless a narrow extension is required
+**Deliverables**
+- `admin/contract.py`, `admin/capabilities.py`, `admin/navigation.py`
+- `schemas/admin_contract.py`, `schemas/capabilities.py`, `schemas/navigation.py`
+- `schemas/client_config.py`
+- Endpoints: `/admin/context`, `/admin/navigation`, `/admin/capabilities`, `/admin/registry`, `/admin/registry/{model}/meta`, `/admin/{model}/lookup`, `/admin/client-config`, `/admin/compatibility`
 
-## Stable
-- existing middleware and router structure
-- `routers/auth.py` may only be extended for logout and explicit token restrictions required by this phase
+**Hard requirements**
+- Admin metadata must be explicit and renderer-independent
+- Built-in UI and external clients must consume the same admin contract
+- Protected, internal, and server-only fields must never appear in UI metadata
+- Clients must not require ORM inspection, `__dict__`, model reflection, or hidden conventions
+- Model metadata must distinguish list, detail, create, update, filter, and action presentation
+- Tenant-scoped models clearly marked in metadata
+- Capability metadata exposes allowed operations for current user and tenant context in UI-safe form
+- Field metadata exposes readonly, required, nullable, default-present, sortable, filterable, searchable, and relation flags
+- Relation fields expose enough metadata for generic selection and display without leaking backend internals
+- Action metadata includes label, danger state, confirmation requirement, bulk/single applicability, and permission gating
+- Admin context exposes current user, tenant context, impersonation state, enabled features, and visible navigation in UI-safe format
+- Contract versioned; breaking changes increment the major version
+- Additive changes (new optional fields) do not increment the major version; clients must ignore unknown fields
 
-## Open
-- audit and impersonation models
-- token blacklist module
-- audit and break-glass routers and middleware
-- tenant router extensions for impersonation and revocation
-- related schemas and tests
+**Acceptance criteria**
+- `/admin/context` returns authenticated admin context without exposing secrets
+- `/admin/capabilities` correctly differs for superadmin, scoped user, impersonated user, and denied user
+- Protected fields are absent from all admin contract responses
+- Metadata is sufficient to render generic list, detail, create, update, filter, and action screens
 
-## Deliverables
-- `models/audit_log.py`
-- `models/impersonation_log.py`
+---
+
+### Built-in admin UI
+
+**Objective**: optional lightweight built-in web admin UI consuming the admin contract as its single source of truth.
+
+**Deliverables**
+- `routers/admin_ui.py`
+- `templates/admin/` (login, nav, list, detail, create, update, confirm_delete, break_glass)
+- `static/admin/`
+- `admin/ui_renderer.py`, `admin/ui_helpers.py`
+- Renderer support matrix
+
+**Hard requirements**
+- Built-in UI is optional; disabling it must not affect API behavior
+- Built-in UI consumes the admin contract rather than duplicating backend model logic
+- Unsupported metadata-driven features degrade safely with explicit non-breaking fallback UI
+- Built-in UI must not expose secrets, protected fields, or raw ORM internals
+- Built-in UI respects tenant context, impersonation visibility, readonly fields, protected fields, filtering, search, ordering, and pagination
+- Delete and dangerous actions require explicit confirmation UX where metadata marks them dangerous
+- Built-in UI clearly shows impersonation state and tenant context
+- Break-glass initiation requires reason capture and must not bypass readonly or protected-field rules
+- Validation and authorization failures render clearly without leaking backend internals
+- Personal UI preferences (visible columns, sorting, density, navigation favorites) can be saved and restored without overriding server-enforced permissions
+
+**Acceptance criteria**
+- Admin login shell loads successfully
+- Registered models appear in built-in navigation according to user visibility rules
+- Generic list, detail, create, and update pages render from contract metadata
+- Basic search, filter, ordering, and pagination work
+- Protected fields are absent from all rendered pages
+- Unsupported advanced features render a safe fallback state
+
+---
+
+### Audit, impersonation, break-glass, logout
+
+**Objective**: audit logging, impersonation, break-glass editing, token blacklist logout, revocation flows.
+
+**Deliverables**
+- `models/audit_log.py`, `models/impersonation_log.py`
 - `token_blacklist.py`
-- extend `dependencies.py` with blacklist and impersonation state
-- extend `routers/auth.py` with logout and refresh restrictions
-- extend tenant router with impersonation and revoke flows
-- `routers/audit.py`
-- `routers/break_glass.py`
+- Extended `dependencies.py` with blacklist and impersonation state
+- Extended `routers/auth.py` with logout and refresh restrictions
+- Extended tenant router with impersonation and revoke flows
+- `routers/audit.py`, `routers/break_glass.py`
 - `middleware/audit.py`
-- related schemas
-- tests for audit, impersonation, break-glass, logout
 
-## Hard requirements
-- logout must revoke the current access token by JTI
-- refresh must reject non-renewable tokens
-- impersonation tokens must be non-renewable and rejected by superadmin-only routes unless explicitly allowed
-- audit middleware must never break the main request flow if audit write fails
-- if diff capture is not robust, a minimal audit record is still mandatory
-- break-glass must require a meaningful reason and must write both master and tenant audit records where applicable
-- break-glass must reject protected and read-only fields
-- impersonation revocation must blacklist the impersonation token
+**Hard requirements**
+- Logout must revoke the current access token by JTI
+- Refresh must reject non-renewable tokens
+- Impersonation tokens must be non-renewable and rejected by superadmin-only routes
+- Audit middleware must never break the main request flow if audit write fails
+- Break-glass must require a meaningful reason and write both master and tenant audit records
+- Break-glass must reject protected and read-only fields
+- Impersonation revocation must blacklist the impersonation token
 
-## Acceptance criteria
-- logout invalidates the current access token
-- refresh still works with a valid refresh token after logout unless refresh blacklisting is explicitly implemented
-- impersonation token cannot be refreshed
-- impersonation token is rejected by direct superadmin-only routes
-- audit log records method, path, status, user, tenant, action, and object identifier whenever derivable
-- successful break-glass returns evidence of dual audit writes
-- short or missing break-glass reason returns validation failure
-- protected or readonly break-glass edits are rejected
-- all earlier phase tests still pass unchanged
-- integration tests run against PostgreSQL with migrations
-- a few e2e flows verify critical V1 behavior
+**Acceptance criteria**
+- Logout invalidates the current access token
+- Impersonation token cannot be refreshed
+- Impersonation token is rejected by direct superadmin-only routes
+- Audit log records method, path, status, user, tenant, action, and object identifier
+- Break-glass returns evidence of dual audit writes
+- Short or missing break-glass reason returns 422
+- Protected or readonly break-glass edits are rejected
 
-## Required e2e flows
-1. login -> logout -> same access token rejected
-2. tenant creation -> tenant migration -> impersonation -> scoped action -> revoke -> scoped token rejected
-3. break-glass edit -> dual audit presence verified
-
-## Tests
-- fast required for blacklist logic, token restrictions, and request validation
-- integration required for audit persistence, impersonation log persistence, break-glass dual writes, and PostgreSQL-backed flows
-- e2e required for the critical flows listed above
-
-## Build order
-1. audit and impersonation models
-2. migration and upgrade
-3. token blacklist
-4. dependency extensions
-5. auth router extension
-6. audit router
-7. tenant router impersonation extensions
-8. break-glass router
-9. audit middleware and app wiring
-10. related schemas
-11. fast tests
-12. integration tests
-13. e2e tests
+**Required e2e flows**
+1. login → logout → same access token rejected
+2. tenant creation → tenant migration → impersonation → scoped action → revoke → scoped token rejected
+3. break-glass edit → dual audit presence verified
 
 ---
 
-# Phase 6 — Stable admin contract and capability model
+### Fine-grained authorization
 
-## Objective
-Stabilize a renderer-independent admin contract that exposes resource metadata, field metadata, permissions, capabilities, and tenant context explicitly for any UI client.
+**Objective**: policy engine for resource, field, action, and record-level authorization beyond simple role checks.
 
-## Locked
-- Phase 0–5 public API behavior
-- security invariants from earlier phases
-- auth, tenant, audit, impersonation, break-glass, and protected-field filtering semantics
-- existing dynamic CRUD endpoint behavior unless explicitly extended
+**Deliverables**
+- `authz/policy_engine.py`, `authz/rules.py`
+- `schemas/policy.py`
+- Extended `dependencies.py` with policy evaluation helpers
+- Extended `admin/capabilities.py` and `admin/contract.py`
 
-## Stable
-- `admin/model_admin.py`
-- `admin/registry.py`
-- `admin/router.py`
-- existing registry output shape may be extended but must not silently remove previously exposed safe metadata
-- existing schemas and routers may be extended minimally for UI-contract support
+**Hard requirements**
+- Policy enforcement supports more than route-level allow or deny
+- Field visibility and field editability are separately representable and enforceable
+- Record-level restrictions are enforced server-side — not relying on UI hiding
+- Superadmin bypass remains explicit and narrowly controlled
+- Impersonation tokens must not gain access beyond the impersonated identity
+- Policy failures return explicit authorization errors without leaking hidden resource details
+- Tenant-scoped access is not weakened by policy abstractions
 
-## Open
-- admin contract schemas
-- capability and policy metadata
-- admin context endpoints
-- navigation metadata
-- field widget hints and relation metadata
-- tests for contract stability and filtering
-
-## Deliverables
-- extend `admin/model_admin.py`
-- extend `admin/registry.py`
-- extend `admin/router.py`
-- new `schemas/admin_contract.py`
-- new `schemas/navigation.py`
-- new `schemas/capabilities.py`
-- new `admin/contract.py`
-- new `admin/navigation.py`
-- new `admin/capabilities.py`
-- new `/admin/context` endpoint
-- new `/admin/navigation` endpoint
-- new `/admin/capabilities` endpoint
-- new `/admin/registry/{model}` endpoint or equivalent detailed metadata endpoint
-- tests for contract, capabilities, metadata filtering, relation metadata, and admin context
-
-## Hard requirements
-- admin metadata must be explicit and renderer-independent
-- built-in web UI and future external clients must consume the same admin contract
-- protected, internal, and server-only fields must never appear in UI metadata
-- clients must never require ORM inspection, `__dict__`, model reflection, or hidden conventions
-- model metadata must distinguish list, detail, create, update, filter, and action presentation
-- tenant-scoped models must be clearly marked in metadata
-- capability metadata must expose allowed operations for the current user and tenant context in UI-safe form
-- field metadata must expose readonly, required, nullable, default-present, sortable, filterable, searchable, and relation flags where applicable
-- relation fields must expose enough metadata for generic selection and display without leaking backend internals
-- action metadata must include label, danger state, confirmation requirement, bulk/single applicability, and permission gating
-- admin context must expose current user, tenant context, impersonation state, and visible navigation/resources in a UI-safe format
-- contract changes that affect clients must be snapshot-testable
-- no model-specific UI logic may be required to render baseline generic list, detail, and form views
-
-## Acceptance criteria
-- `/admin/context` returns authenticated admin context without exposing secrets, token internals, or protected fields
-- `/admin/navigation` returns visible navigation structure for the current user and tenant context
-- `/admin/capabilities` returns UI-safe capability metadata for the current user and active context
-- `/admin/registry` and detailed model metadata endpoints expose labels, field groups, filters, ordering, actions, relation metadata, and tenant scope flags
-- protected fields are absent from CRUD schemas and from all admin contract responses
-- metadata is sufficient to render generic list, detail, create, update, filter, and action screens without ORM inspection
-- action metadata includes confirmation and danger metadata where applicable
-- capability metadata correctly differs for superadmin, privileged non-superadmin, impersonated user, and denied user scenarios
-- all Phase 0–5 tests still pass unchanged
-- all new Phase 6 tests pass
-
-## Tests
-- fast required
-- integration required
-- e2e not required
-- fast tests must cover contract generation, protected-field filtering, capability serialization, relation metadata, action metadata, and admin context shape
-- integration tests must verify contract correctness under PostgreSQL and tenant-scoped conditions
-- regression tests must prove that existing CRUD, auth, tenant, and audit behavior remains unchanged
-- add contract snapshot tests for at least two representative models with different field and permission characteristics
-
-## Build order
-1. extend `ModelAdmin` metadata surface
-2. add contract, capability, and navigation schemas
-3. add admin context, navigation, and capability endpoints
-4. extend registry and model metadata endpoints
-5. add fast tests for contract and filtering
-6. add integration tests for tenant and PostgreSQL compatibility
-7. add contract snapshot tests
+**Acceptance criteria**
+- A user can view but not edit a field on the same resource
+- A user can edit some records but not others for the same model
+- Denied actions are absent or disabled in capability metadata and rejected server-side if attempted directly
+- Record-level restrictions are enforced in list, detail, update, delete, and action flows
+- Protected fields remain absent regardless of policy grants
 
 ---
 
-# Phase 7 — Lightweight built-in admin UI
+### Workflows and approval flows
 
-## Objective
-Provide an optional lightweight built-in web admin UI that covers the core operational flows and uses the Phase 6 admin contract as its single source of truth.
+**Objective**: reviewable, staged, and reversible administrative changes for higher-risk operations.
 
-## Locked
-- Phase 0–6 public API behavior
-- security invariants
-- protected-field filtering
-- auth, tenant, impersonation, audit, and break-glass backend semantics
-- Phase 6 admin contract endpoints as the authoritative UI interface
+**Deliverables**
+- `models/change_request.py`, `schemas/change_request.py`
+- `services/workflow.py`
+- `routers/workflow.py`
+- Extended metadata and capability exposure for workflow
+- Built-in UI support for review, approve, reject, and revert flows
 
-## Stable
-- `admin/router.py`
-- `admin/registry.py`
-- `admin/contract.py`
-- existing CRUD endpoints
-- auth flows may be extended minimally only if required for UI bootstrap
+**Hard requirements**
+- Workflow support is optional per model or action, driven by explicit admin metadata (`requires_approval`)
+- Reviewed changes record requester, reviewer, timestamps, decision, and reason
+- Approval and rejection actions are policy-gated and auditable
+- Draft changes must not bypass existing validation, readonly, protected-field, or tenant restrictions
+- Revert or rollback support limited to safe, explicit, auditable paths
+- Built-in UI and external clients discover workflow requirements through metadata or capability endpoints
 
-## Open
-- built-in admin UI router
-- templates and static assets
-- lightweight UI shell
-- metadata-driven list/detail/form rendering
-- UI configuration and mounting
-- UI support matrix and fallback behavior
-- UI smoke tests
-
-## Deliverables
-- new `routers/admin_ui.py`
-- new `templates/admin/` directory
-- new `static/admin/` directory
-- optional `admin/ui_renderer.py`
-- optional `admin/ui_helpers.py`
-- app integration to mount the built-in UI
-- optional UI settings such as `ENABLE_BUILTIN_ADMIN_UI` and mount path
-- generic admin pages for:
-  - login shell
-  - navigation
-  - list
-  - detail
-  - create
-  - update
-- new lightweight support-matrix metadata or equivalent renderer capability map
-- tests for built-in UI rendering and basic flows
-
-## Hard requirements
-- built-in admin UI must be optional and package-provided
-- built-in UI must consume the Phase 6 contract rather than duplicating backend model logic
-- the built-in UI is intentionally lightweight and does not need full feature parity with future enterprise clients
-- built-in UI must support only baseline generic admin flows in this phase
-- unsupported metadata-driven features must degrade safely with explicit non-breaking fallback UI
-- built-in UI must expose an explicit renderer support matrix so unsupported features are discoverable instead of silently ignored
-- disabling built-in UI must not affect API behavior
-- built-in UI must not expose secrets, protected fields, raw ORM internals, or hidden server-side metadata
-- built-in UI must respect tenant context, impersonation visibility, readonly fields, protected fields, filtering, search, ordering, and pagination where supported in the baseline renderer
-- delete and dangerous actions may be deferred to later phases if metadata-driven confirmation UX is not yet implemented
-- built-in UI must remain accessible for baseline keyboard navigation and basic labeling
-- built-in UI text and labels must be structured so later localization is possible without backend contract rewrites
-
-## Acceptance criteria
-- enabling the built-in UI exposes a working admin UI route
-- admin login shell loads successfully
-- registered models appear in built-in navigation according to user visibility rules
-- generic list pages render from contract metadata
-- detail pages render without exposing protected fields
-- create and update forms render from metadata and enforce readonly and protected rules
-- basic search, filter, ordering, and pagination work for supported models
-- tenant context is visible and respected in tenant-scoped views
-- unsupported advanced features render a safe fallback state rather than failing hard
-- a renderer support matrix or equivalent capability indicator is available for the built-in UI
-- disabling built-in UI leaves all existing API tests green
-- all Phase 0–6 tests still pass unchanged
-- all new Phase 7 tests pass
-
-## Tests
-- fast required
-- integration required
-- e2e required
-- fast tests must cover route mounting, template helpers, support-matrix exposure, and lightweight rendering behavior
-- integration tests must verify built-in UI behavior against PostgreSQL-backed admin flows and tenant context
-- e2e tests must cover login, model navigation, generic list/detail/create/update flow, and basic filter/search behavior
-- regression tests must prove API-only mode remains unchanged when built-in UI is disabled
-
-## Build order
-1. add built-in admin UI router
-2. add templates and static assets
-3. wire UI mount and configuration
-4. render generic navigation, list, detail, create, and update views from contract metadata
-5. add fallback handling for unsupported metadata hints and support-matrix exposure
-6. add fast tests
-7. add integration tests
-8. add e2e smoke flows
+**Acceptance criteria**
+- A configured model or action requires approval before applying a state-changing operation
+- A reviewer can approve or reject a pending change with an auditable reason
+- A rejected change is not applied
+- A reverted change creates a new auditable event rather than mutating history invisibly
+- Metadata and capability responses expose whether approval or revert flows are available
+- Models without workflow enabled continue to behave normally
 
 ---
 
-# Phase 8 — Built-in UI completeness for core admin operations
+### Billing
 
-## Objective
-Expand the lightweight built-in admin UI to cover the most important operational features without trying to become the final enterprise-grade client.
+**Objective**: tenant billing — track usage and generate invoices per tenant.
 
-## Locked
-- Phase 0–7 public contracts
-- security invariants
-- built-in UI optionality
-- Phase 6 contract as the primary renderer interface
-- tenant and audit semantics
+**Deliverables**
+- `models/billing.py` (invoice, line item, billing period)
+- `schemas/billing.py`
+- `services/billing.py`
+- `routers/billing.py`
+- Tenant billing admin registration
 
-## Stable
-- built-in UI shell and routing
-- registry and metadata endpoints
-- baseline generic CRUD behavior
-- existing `ModelAdmin` metadata may be extended but not weakened
+**Hard requirements**
+- Billing records are strictly tenant-scoped and never leak across tenant boundaries
+- Billing data must not expose other tenants' data in any response
+- Billing admin is superadmin-only by default
+- Invoice generation must be idempotent per billing period per tenant
+- Billing status (outstanding, paid, overdue) must be representable and queryable
+- Protected billing fields (payment tokens, external processor IDs) must follow protected-field rules
+- Billing must work when `MULTI_TENANT=false` (single-tenant billing against the shared context)
 
-## Open
-- delete and dangerous action UX
-- break-glass UX
-- audit visibility in UI-safe form
-- richer validation and error presentation
-- UI confirmation flows
-- improved metadata fallback rendering
-- personal UI preferences
-- tests for operator-critical flows
-
-## Deliverables
-- extend built-in UI templates and helpers
-- extend UI rendering for delete and action confirmation flows
-- extend built-in UI to surface audit-related and impersonation-related safe context indicators
-- extend UI to handle break-glass initiation where allowed
-- new personal UI preference persistence or equivalent state layer for supported preferences
-- tests for confirmation flows, validation handling, operator-critical pages, and preference persistence
-
-## Hard requirements
-- built-in UI must remain metadata-driven and renderer-independent at the backend contract layer
-- dangerous actions must require explicit confirmation UX where metadata marks them as dangerous or confirm-required
-- built-in UI must clearly show impersonation state and tenant context in UI-safe form
-- break-glass initiation must require reason capture and must not bypass readonly or protected-field rules
-- validation and authorization failures must render clearly without leaking backend internals
-- built-in UI still does not need to implement every future feature from later phases
-- unsupported advanced workflows must still degrade safely
-- supported personal UI preferences may include visible columns, sorting, density, navigation favorites, and similar non-security preferences
-- preference persistence must never override server-enforced permissions, field visibility, or protected-field filtering
-
-## Acceptance criteria
-- delete and supported dangerous actions require explicit confirmation in the built-in UI
-- impersonation state is visible in UI-safe form where applicable
-- break-glass flows can be initiated only where metadata and permissions allow
-- validation failures render useful field-level or operation-level feedback
-- audit-related safe indicators are visible where relevant
-- supported personal UI preferences can be saved and restored for the current user
-- all Phase 0–7 tests still pass unchanged
-- all new Phase 8 tests pass
-
-## Tests
-- fast required
-- integration required
-- e2e required
-- fast tests must cover confirmation rendering, error mapping, break-glass form handling, and preference serialization
-- integration tests must verify dangerous action execution, break-glass initiation, preference persistence, and tenant-safe UI behavior under PostgreSQL
-- e2e tests must cover delete confirmation, dangerous action confirmation, impersonation indicator visibility, break-glass reason submission, and preference roundtrip for at least one supported preference
-- regression tests must prove baseline Phase 7 CRUD flows still work
-
-## Build order
-1. extend UI action and delete rendering
-2. add confirmation flows
-3. surface impersonation and tenant indicators
-4. add break-glass initiation UX
-5. add personal UI preference persistence for a small supported set
-6. improve validation and error rendering
-7. add fast tests
-8. add integration tests
-9. add e2e tests
+**Acceptance criteria**
+- Invoice can be created, read, and listed for a tenant
+- Invoice line items can be added and are scoped to the parent invoice
+- Cross-tenant data is never visible in billing responses
+- Duplicate invoice for the same billing period returns 409
+- Billing status transitions are auditable
 
 ---
 
-# Phase 9 — External client contract stabilization
+### Security hardening and sessions
 
-## Objective
-Version and stabilize the admin contract so a separate external client such as Flutter can fully consume it without built-in-UI assumptions.
+**Objective**: stronger session controls, step-up security, rate limits, and secure headers.
 
-## Locked
-- Phase 0–8 security invariants and API semantics
-- built-in UI behavior as a valid reference implementation
-- admin contract endpoints as the source of truth for renderer clients
-- tenant, audit, impersonation, break-glass, and protected-field semantics
+**Deliverables**
+- Extended `routers/auth.py`
+- `schemas/session.py`
+- `services/session_security.py`
+- `middleware/security_headers.py`
+- `middleware/rate_limit.py`
+- Optional session listing and revocation endpoints
+- Optional step-up auth challenge flow
 
-## Stable
-- metadata endpoint families
-- built-in UI integration
-- `ModelAdmin` metadata fields
-- auth and admin context endpoints
-- capability and navigation structures may be extended minimally for external-client readiness
+**Hard requirements**
+- Critical admin actions can require recent authentication or step-up proof
+- Built-in UI security model handles CSRF, cookie/session strategy, or token transport without ambiguity
+- Rate limiting or brute-force mitigation protects login and abuse-prone endpoints
+- Session handling supports explicit revocation beyond single-token logout
+- Admin responses include safe security headers appropriate for the built-in UI delivery model
+- Security hardening must not weaken impersonation restrictions, superadmin protections, or policy enforcement
 
-## Open
-- contract versioning
-- optional client configuration endpoint
-- external-renderer metadata refinements
-- compatibility policy and documentation
-- relation lookup contract
-- tests for contract stability and multi-client compatibility
-
-## Deliverables
-- explicit contract versioning for admin metadata endpoints
-- optional `/admin/client-config` endpoint
-- extend `/admin/capabilities` if needed for renderer/client feature flags
-- extend contract schemas for external renderer hints
-- explicit compatibility documentation for lists, detail views, forms, filters, actions, audit indicators, tenant context, dangerous-flow confirmations, and relation rendering
-- explicit deprecation and compatibility policy for client-facing contract evolution
-- relation lookup metadata and endpoints for generic async selection flows
-- tests for contract stability, relation lookup behavior, and external-client compatibility
-- optional example integration notes for Flutter
-
-## Hard requirements
-- built-in UI and external clients must use the same core admin contract
-- external clients must not require ORM inspection, server internals, undocumented conventions, or built-in-UI-specific assumptions
-- contract changes affecting clients must be versioned or compatibility-scoped
-- the project must define what constitutes a breaking change versus an additive change for client-facing metadata
-- metadata must be explicit enough for external rendering of generic list, detail, form, filter, action, context, and relation-selection flows
-- relation fields must expose enough metadata for generic label resolution, async lookup, pagination, and tenant-safe option retrieval
-- disabling built-in UI must not affect external-client support
-- protected-field, tenant-isolation, and policy-related guarantees already established must remain unchanged
-- contract snapshot tests must be usable as a release gate for representative models and contexts
-
-## Acceptance criteria
-- admin contract is explicitly versioned or compatibility-scoped for client consumption
-- `/admin/context`, `/admin/navigation`, `/admin/capabilities`, registry/model metadata, relation lookup endpoints, and optional client-config endpoints are sufficient for an external client to render generic admin flows
-- built-in UI and external-client contract expose consistent labels, field flags, capability metadata, action metadata, and tenant-scope information
-- no protected fields appear in any external-client-facing metadata or capability response
-- relation lookups function for at least one representative searchable relation and one paginated relation
-- contract deprecation rules are documented and testable
-- built-in UI can be disabled without breaking external-client metadata flows
-- all Phase 0–8 tests still pass unchanged
-- all new Phase 9 tests pass
-
-## Tests
-- fast required
-- integration required
-- e2e recommended
-- fast tests must cover contract schemas, version negotiation or version selection behavior, deprecation metadata, relation metadata, and client-config/capability metadata
-- integration tests must verify contract correctness under PostgreSQL and tenant-scoped scenarios, including relation lookup endpoints
-- e2e tests should cover one built-in-UI flow and one external-client-style metadata-driven flow against the same backend
-- regression tests must prove built-in UI and API-only modes remain functional
-- contract snapshot tests must cover at least two representative models under at least three contexts such as superadmin, scoped user, and tenant-scoped user
-
-## Build order
-1. stabilize and version the admin contract
-2. define and document deprecation and compatibility rules
-3. add client-config and compatibility metadata if needed
-4. add relation lookup metadata and endpoints
-5. extend schemas for external rendering hints
-6. write compatibility documentation and example Flutter consumption notes
-7. add fast tests and snapshot gates
-8. add integration tests
-9. add optional e2e compatibility tests
+**Acceptance criteria**
+- At least one critical action path requires recent-auth or step-up enforcement
+- Login abuse protection rejects repeated invalid attempts according to configured policy
+- Active admin sessions can be listed and selectively revoked
+- Built-in UI responses include configured security headers
 
 ---
 
-# Phase 10 — Fine-grained authorization and policy engine
+### Observability
 
-## Objective
-Add explicit fine-grained authorization so resources, fields, actions, and records can be governed beyond simple role checks.
+**Objective**: metrics and alert-ready telemetry for admin operations.
 
-## Locked
-- Phase 0–9 public contracts and security invariants
-- protected-field filtering rules
-- tenant isolation semantics
-- auth token restrictions, impersonation restrictions, and break-glass guarantees
+**Deliverables**
+- `observability/admin_metrics.py`
+- Metrics for: admin request counts, failures, latencies, action outcomes, audit-write failures, contract-version usage
 
-## Stable
-- existing role model and role checks
-- admin contract endpoints may be extended but must not remove existing safe metadata
-- dynamic CRUD router structure
-- built-in UI and external-client integration points
+**Hard requirements**
+- Metrics exist for admin request counts, failures, latencies, action outcomes, and audit-write failures
+- Telemetry should distinguish built-in UI and external clients where safely derivable
+- Telemetry must not expose secrets, token internals, or protected field content
+- Operational failures in metrics must not change primary endpoint success semantics
 
-## Open
-- policy engine
-- capability evaluation layer
-- field-level visibility and editability rules
-- record-level access constraints
-- policy metadata exposure to clients
-- tests for policy enforcement
-
-## Deliverables
-- new `authz/policy_engine.py`
-- new `authz/rules.py`
-- new `schemas/policy.py`
-- extend `dependencies.py` with policy evaluation helpers
-- extend `admin/capabilities.py`
-- extend `admin/contract.py`
-- optional `models/policy_assignment.py` if persistence is needed
-- tests for policy evaluation, field visibility, action permissions, and row-level restrictions
-
-## Hard requirements
-- policy enforcement must support more than route-level allow or deny
-- field visibility and field editability must be separately representable and enforceable
-- record-level restrictions must be enforceable server-side and must not rely on UI hiding
-- capability metadata must reflect effective permissions for the current user and context in UI-safe form
-- superadmin bypass must remain explicit and narrowly controlled
-- impersonation tokens must not gain access beyond the impersonated identity and phase-specific restrictions
-- policy failures must return explicit authorization errors without leaking hidden resource details beyond established API behavior
-- break-glass must remain separately auditable and must not silently bypass protected-field or readonly protections unless a later phase explicitly allows it
-- field and action permissions must remain consistent between API enforcement and admin contract exposure
-- tenant-scoped access must not be weakened by policy abstractions
-
-## Acceptance criteria
-- a user can be allowed to view but not edit a field on the same resource
-- a user can be allowed to edit some records but not others for the same model
-- denied actions are absent or disabled in capability metadata and are rejected server-side if attempted directly
-- record-level restrictions are enforced in list, detail, update, delete, and action flows
-- policy evaluation correctly differentiates superadmin, role-based user, policy-granted user, impersonated user, and denied user scenarios
-- protected fields remain absent regardless of policy grants
-- all Phase 0–9 tests still pass unchanged
-- all new Phase 10 tests pass
-
-## Tests
-- fast required
-- integration required
-- e2e required
-- fast tests must cover policy resolution, field visibility and editability, action gating, and capability serialization
-- integration tests must verify record-level restrictions, policy-backed list filtering, and tenant-safe enforcement under PostgreSQL
-- e2e tests must cover visible-but-readonly field scenarios, denied bulk action scenarios, and policy-scoped record access
-- regression tests must prove that prior role-based and superadmin flows still work
-
-## Build order
-1. add policy engine and evaluation helpers
-2. extend capabilities and contract metadata
-3. wire policy checks into CRUD and action paths
-4. add fast tests for policy logic
-5. add integration tests for record-level enforcement
-6. add e2e tests for UI and direct API authorization flows
+**Acceptance criteria**
+- Metrics capture admin request, action, and client-contract usage counters without changing functional behavior
+- Audit write failure metrics are emitted when audit persistence fails
 
 ---
 
-# Phase 11 — Jobs, import/export, and bulk operation safety
+### External client contract stabilization
 
-## Objective
-Support realistic admin workflows through asynchronous jobs, safe bulk operations, and production-grade import/export flows.
+**Objective**: version and stabilize the admin contract so a separate external client (e.g. Flutter) can fully consume it without built-in-UI assumptions.
 
-## Locked
-- Phase 0–10 public contracts and security invariants
-- audit semantics and request logging behavior
-- policy engine semantics and tenant isolation
+**Deliverables**
+- Explicit contract versioning for admin metadata endpoints
+- `/admin/client-config` endpoint
+- Extended `/admin/capabilities` for renderer/client feature flags
+- Relation lookup endpoints for generic async selection flows
+- Compatibility documentation for baseline, advanced, and client-specific flows
+- Explicit deprecation and compatibility policy
 
-## Stable
-- action execution model
-- built-in UI structure
-- external-client contract
-- admin contract and capability endpoints
-- CRUD routes may be extended but not broken
+**Hard requirements**
+- Built-in UI and external clients must use the same core admin contract
+- External clients must not require ORM inspection, server internals, or built-in-UI-specific assumptions
+- Contract changes affecting clients must be versioned or compatibility-scoped
+- Relation fields expose enough metadata for generic label resolution, async lookup, pagination, and tenant-safe option retrieval
+- Disabling built-in UI must not affect external-client support
+- Contract snapshot tests are usable as release gates
 
-## Open
-- job model and runner integration
-- async action execution
-- import/export framework
-- bulk operation safeguards
-- result artifact handling
-- idempotency and retry semantics
-- tests for jobs and data movement flows
-
-## Deliverables
-- new `models/job.py`
-- new `schemas/job.py`
-- new `services/jobs.py`
-- new `services/import_export.py`
-- new `routers/jobs.py`
-- extend action metadata and execution flow for async operation support
-- import endpoints and export endpoints
-- optional artifact storage abstraction
-- idempotency key support or equivalent duplicate-execution protection for supported actions and jobs
-- tests for jobs, import/export, retries, and bulk safeguards
-
-## Hard requirements
-- long-running admin operations must not require synchronous request completion
-- actions must be able to declare synchronous or asynchronous execution mode
-- jobs must expose status, progress, initiator, timestamps, tenant context, audit linkage, and result or failure summary in UI-safe form
-- imports must support dry-run validation before commit
-- imports must support row-level error reporting without leaking protected fields
-- exports must honor effective permissions, field visibility rules, tenant scope, and protected-field filtering
-- bulk operations must support explicit confirmation metadata and safe execution semantics
-- destructive or high-impact bulk actions must support preview or impact summary before execution
-- job execution failures must be visible without breaking unrelated request paths
-- retries and repeated submissions must not create unsafe duplicate execution for operations declared idempotent or protected by idempotency keys
-- audit records must link initiated jobs and resulting state-changing operations where derivable
-- file or artifact outputs generated by import or export flows must remain permission-scoped and tenant-safe
-
-## Acceptance criteria
-- a supported bulk action can run asynchronously and expose job status transitions
-- import dry-run returns validation results without mutating data
-- confirmed import persists only allowed fields and rejects protected or readonly fields
-- export output excludes hidden and protected fields for the effective user context
-- high-impact bulk actions expose preview or confirmation metadata and reject execution without required confirmation
-- a repeated supported request using the same idempotency key does not create duplicate execution
-- job status, result summary, and failure summary are visible through API and built-in UI where supported
-- all Phase 0–10 tests still pass unchanged
-- all new Phase 11 tests pass
-
-## Tests
-- fast required
-- integration required
-- e2e required
-- fast tests must cover job state transitions, import validation, export field filtering, idempotency handling, and bulk confirmation logic
-- integration tests must verify persisted jobs, import commit behavior, export scope correctness, tenant-safe bulk execution, and idempotent retry behavior under PostgreSQL
-- e2e tests must cover async bulk action initiation, job progress visibility, import dry-run plus commit, export initiation, and at least one duplicate-submission protection scenario
-- regression tests must prove existing synchronous actions still work where unchanged
-
-## Build order
-1. add job model and schemas
-2. add job service and async action support
-3. add import/export service and endpoints
-4. extend action metadata for preview, async execution, and idempotency handling
-5. add built-in UI job views and import/export flows where appropriate
-6. add fast tests
-7. add integration tests
-8. add e2e tests
+**Acceptance criteria**
+- `/admin/context`, `/admin/navigation`, `/admin/capabilities`, registry/model metadata, relation lookup endpoints, and `/admin/client-config` are sufficient for an external client to render generic admin flows
+- No protected fields appear in any external-client-facing metadata
+- Relation lookups function for at least one representative searchable relation and one paginated relation
+- Deprecation rules are documented and testable
 
 ---
 
-# Phase 12 — Security hardening, sessions, and operational observability
+### Package structure and extension architecture
 
-## Objective
-Make the admin operationally safe in production with stronger session controls, step-up security, rate limits, metrics, and alert-ready observability.
+**Objective**: maintainable, adoptable Python package with clean core/extension/parked boundaries, typed config, and developer tooling.
 
-## Locked
-- Phase 0–11 public contracts and security invariants
-- auth, tenant, audit, impersonation, break-glass, and policy enforcement semantics
-- protected-field filtering and export restrictions
+**Package layers**
 
-## Stable
-- auth router structure
-- built-in UI routing
-- external-client contract
-- admin contract endpoints may be extended but must not break prior consumers
-- job and action semantics
+```
+coreAdmin_api/
+  core/            typed config model
+  admin/           registry, schema builder, serializer, contract, UI
+  models/          shared SQLAlchemy models
+  schemas/         Pydantic schemas
+  routers/         core API routers
+  middleware/      error, logging, tenant, audit, security, rate-limit
+  authz/           policy engine
+  services/        workflow, billing, session security
+  observability/   metrics
+  extensions/
+    jobs/          (if retained)
+    import_export/ (if retained)
+    workflows/
+    enterprise_client/
+  parked/
+    billing/       (promote to billing/ when ready)
+    usage_metering/
+    seat_limits/
+    white_labeling/
+    scim_saml/
+    flutter_offline_cache/
+  experimental/
+```
 
-## Open
-- MFA and step-up controls
-- session or device management
-- rate limiting and brute-force protection
-- admin metrics and observability hooks
-- secure-header configuration
-- tests for hardening and telemetry behavior
+**`CoreAdminConfig`**
 
-## Deliverables
-- extend `routers/auth.py`
-- new `schemas/session.py`
-- new `services/session_security.py`
-- new `middleware/security_headers.py`
-- new `middleware/rate_limit.py` or equivalent integration point
-- new `observability/admin_metrics.py`
-- optional session listing and revocation endpoints
-- optional step-up auth endpoints or challenge flow
-- tests for session controls, hardening, and observability
+```python
+CoreAdminConfig(
+    enable_builtin_ui=True,
+    enable_multi_tenant=False,
+    enable_basic_audit=True,
+    enable_workflows=False,
+    enable_billing=False,
+    extensions=[...],
+)
+```
 
-## Hard requirements
-- critical admin actions must be able to require recent authentication or equivalent step-up proof
-- built-in UI security model must explicitly handle CSRF, cookie or session strategy, or token transport strategy without ambiguity
-- rate limiting or brute-force mitigation must protect login and other abuse-prone admin endpoints
-- session handling must support explicit revocation beyond single-token logout where applicable
-- admin responses must include safe security headers appropriate for the built-in UI delivery model
-- metrics must exist for admin request counts, failures, latencies, action outcomes, job outcomes, audit-write failures, and contract-version usage where measurable
-- telemetry should distinguish built-in UI and external clients where safely derivable
-- telemetry must not expose secrets, token internals, or protected field content
-- security hardening must not weaken impersonation restrictions, superadmin protections, or policy enforcement
-- operational failures in metrics or telemetry must not change primary endpoint success semantics
+- Defaults produce a minimal core installation
+- Disabled features do not mount routers, expose metadata, or import heavy dependencies
+- Config validation fails early for inconsistent combinations
+- `/admin/context` and `/admin/capabilities` reflect enabled features
 
-## Acceptance criteria
-- at least one critical action path can require recent-auth or equivalent step-up enforcement
-- login abuse protection rejects repeated invalid attempts according to configured policy
-- active admin sessions can be listed and selectively revoked where the session model supports it
-- built-in UI responses include configured security headers
-- metrics capture admin request, action, job, and client-contract usage counters without changing functional behavior
-- audit write failure metrics are emitted when audit persistence fails in controlled tests
-- all Phase 0–11 tests still pass unchanged
-- all new Phase 12 tests pass
+**`ExtensionBase` interface**
 
-## Tests
-- fast required
-- integration required
-- e2e required
-- fast tests must cover rate-limit logic, session security helpers, recent-auth checks, header middleware behavior, and client-dimension metric labeling where applicable
-- integration tests must verify session revocation, telemetry emission, and safe failure behavior under PostgreSQL-backed flows
-- e2e tests must cover protected action step-up, session revocation flow, built-in UI security header presence, and at least one client-distinguishable observability path if surfaced externally
-- regression tests must prove ordinary authenticated CRUD and admin flows remain functional
+Each extension declares: routers to mount, models and migration metadata, admin registry contributions, capability metadata, settings schema, startup checks, health checks.
 
-## Build order
-1. add session security and step-up primitives
-2. add rate limiting and security header middleware
-3. add metrics hooks and observability integration
-4. extend auth and session endpoints
-5. wire built-in UI security model
-6. add fast tests
-7. add integration tests
-8. add e2e tests
+- Extension loading order is deterministic (registration order)
+- Extension failure must fail loudly at startup unless marked optional
+- Extensions must not bypass protected-field filtering, tenant isolation, policy checks, or audit rules
 
----
+**Optional extras (`pyproject.toml`)**
 
-# Phase 13 — Workflow, approvals, and reversible admin changes
+| Extra            | Installs                                 |
+|------------------|------------------------------------------|
+| `[ui]`           | built-in admin UI deps (jinja2, aiofiles)|
+| `[postgres]`     | asyncpg, alembic                         |
+| `[dev]`          | pytest, httpx, aiosqlite                 |
 
-## Objective
-Support reviewable, staged, and reversible administrative changes for higher-risk operational environments.
+**CLI commands**
 
-## Locked
-- Phase 0–12 public contracts and security invariants
-- audit, history, policy, jobs, and hardening semantics
-- tenant isolation and protected-field restrictions
+Required:
+- `coreadmin init` — create minimal working app scaffold
+- `coreadmin create-superadmin`
+- `coreadmin inspect-registry` — report models, fields, actions, protected fields, contract readiness
+- `coreadmin doctor` — check DB, migrations, extensions, missing deps, contract generation
+- `coreadmin db check`
+- `coreadmin db upgrade [--env shared|tenant]`
+- `coreadmin tenant migrate <slug>`
+- `coreadmin tenant upgrade --all`
+- `coreadmin extensions list`
+- `coreadmin extensions check`
 
-## Stable
-- dynamic CRUD core
-- action execution framework
-- history endpoints
-- built-in UI core navigation and form rendering
-- external-client contract
+Optional:
+- `coreadmin config show`
+- `coreadmin routes list`
+- `coreadmin contract snapshot`
 
-## Open
-- approval workflow model
-- draft and review flow
-- rollback and revert helpers
-- scheduled activation or publish flow if needed
-- tests for reviewable change management
+**Hard requirements**
+- Core package import must remain lightweight
+- Disabled optional features must not import heavy dependencies or mount routes
+- Parked modules must not be imported by default
+- Extension architecture must preserve all security invariants
+- Configuration must be typed, validated, and reflected in admin metadata
+- CLI commands must be safe to run repeatedly
 
-## Deliverables
-- new `models/change_request.py`
-- new `schemas/change_request.py`
-- new `services/workflow.py`
-- new `routers/workflow.py`
-- extend history or audit correlation where needed
-- built-in UI support for review, approve, reject, and revert flows where appropriate
-- tests for workflow and reversible change semantics
-
-## Hard requirements
-- workflow support must be optional per model or action and driven by explicit admin metadata
-- reviewed changes must record requester, reviewer, timestamps, decision, and reason where applicable
-- approval and rejection actions must be policy-gated and auditable
-- draft or staged changes must not silently bypass existing validation, readonly, protected-field, or tenant restrictions
-- revert or rollback support must be limited to safe, explicit, auditable paths
-- scheduled or deferred activation, if supported, must remain auditable and permission-checked
-- built-in UI and external clients must be able to discover workflow requirements through metadata or capability endpoints
-- workflow failures must return explicit validation or authorization errors
-
-## Acceptance criteria
-- a configured model or action can require approval before applying a state-changing operation
-- a reviewer can approve or reject a pending change with an auditable reason path where configured
-- a rejected change is not applied
-- a reverted change creates a new auditable event rather than mutating history invisibly
-- metadata and capability responses expose whether approval or revert flows are available
-- all Phase 0–12 tests still pass unchanged
-- all new Phase 13 tests pass
-
-## Tests
-- fast required
-- integration required
-- e2e required
-- fast tests must cover workflow state transitions, approval gating, and metadata exposure
-- integration tests must verify pending-change persistence, approval application, rejection behavior, and revert audit linkage under PostgreSQL
-- e2e tests must cover submit-for-review, approve, reject, and revert flows
-- regression tests must prove models without workflow enabled continue to behave normally
-
-## Build order
-1. add workflow models and schemas
-2. add workflow service and policy integration
-3. extend metadata and capability exposure for workflow
-4. add workflow endpoints and built-in UI flows
-5. add fast tests
-6. add integration tests
-7. add e2e tests
+**Acceptance criteria**
+- A new user can install the core package and run the minimal example without billing, artifact, or Flutter dependencies
+- `coreadmin init` creates a minimal working app skeleton
+- `coreadmin inspect-registry` reports registered models with fields, actions, protected fields, and contract readiness
+- `coreadmin doctor` reports DB state, migration state, enabled extensions, missing dependencies, and contract generation status
+- Optional extensions can be enabled explicitly and are absent when disabled
+- Parked modules are not imported during normal app startup
+- Built-in UI baseline still works when enabled
+- API-only mode still works when built-in UI is disabled
+- Multi-tenancy remains optional and explicit
 
 ---
 
-# Phase 14 — Enterprise client and multi-surface delivery
+## Test requirements
 
-## Objective
-Add a separate enterprise-grade external client surface such as Flutter while keeping the built-in UI lightweight and the shared admin contract authoritative.
+### Layers required per feature area
 
-## Locked
-- Phase 0–13 public contracts and security invariants
-- built-in UI remains optional and lightweight by design
-- admin contract endpoints remain the source of truth for all clients
-- tenant, audit, impersonation, break-glass, policy, jobs, workflow, and hardening semantics
+| Feature area                    | fast | integration | e2e |
+|---------------------------------|------|-------------|-----|
+| Foundation                      | ✓    | optional    |     |
+| User and role management        | ✓    | recommended |     |
+| Multi-tenancy                   | ✓    | required    |     |
+| Registry-driven admin CRUD      | ✓    | required    |     |
+| Admin contract and capabilities | ✓    | required    |     |
+| Built-in admin UI               | ✓    | required    | ✓   |
+| Audit, impersonation, break-glass | ✓  | required    | ✓   |
+| Fine-grained authorization      | ✓    | required    | ✓   |
+| Workflows                       | ✓    | required    | ✓   |
+| Billing                         | ✓    | required    |     |
+| Security hardening              | ✓    | required    | ✓   |
+| Observability                   | ✓    | required    |     |
+| External client contract        | ✓    | required    | recommended |
+| Package structure               | ✓    | required    | ✓   |
 
-## Stable
-- built-in UI renderer and support matrix
-- contract versioning and deprecation rules
-- external-client-facing metadata endpoints
-- auth and admin context endpoints may be extended minimally for enterprise-client usability
+### Cross-cutting regression rules
 
-## Open
-- enterprise client integration guidance
-- client-specific capability negotiation
-- richer widget mapping for advanced clients
-- multi-surface compatibility testing
-- enterprise-client support policy
-- optional file and attachment UX contract refinements
-
-## Deliverables
-- explicit multi-client compatibility guidance for built-in UI versus enterprise client responsibilities
-- optional enterprise client capability negotiation via `/admin/client-config` or equivalent
-- extend contract schemas for advanced renderer hints where safe and additive
-- optional attachment and file-field metadata refinements for enterprise clients if file handling is in scope
-- compatibility documentation for built-in UI, enterprise Flutter client, and API-only usage
-- tests for multi-surface compatibility and advanced-client readiness
-
-## Hard requirements
-- the enterprise client must consume the same core admin contract as the built-in UI
-- enterprise-client additions must remain additive or versioned and must not silently break the lightweight built-in UI
-- the built-in UI must not be forced into full feature parity with enterprise-only UX requirements
-- client-specific enhancements must be expressed through explicit capabilities, widget hints, support matrices, or versioned contract extensions
-- file, attachment, or artifact handling exposed to enterprise clients must remain permission-scoped, tenant-safe, and protected-field safe
-- contract compatibility across multiple client surfaces must be release-testable
-
-## Acceptance criteria
-- an enterprise client can negotiate or consume the supported contract capabilities without built-in-UI assumptions
-- built-in UI remains functional and lightweight after enterprise-client metadata extensions
-- multi-surface compatibility documentation clearly states which flows are baseline, advanced, or client-specific
-- advanced renderer hints do not leak protected or internal backend details
-- all Phase 0–13 tests still pass unchanged
-- all new Phase 14 tests pass
-
-## Tests
-- fast required
-- integration required
-- e2e recommended
-- fast tests must cover advanced-client capability metadata, support-matrix consistency, and additive contract extension behavior
-- integration tests must verify contract correctness under PostgreSQL, tenant-scoped, policy-enforced, job-enabled, and workflow-enabled scenarios for multiple client profiles
-- e2e tests should cover one built-in UI flow and one enterprise-client-style metadata-driven flow against the same backend
-- regression tests must prove built-in UI is not broken by enterprise-client extensions
-
-## Build order
-1. define built-in UI versus enterprise-client responsibility boundaries
-2. extend capability negotiation and advanced renderer hints where needed
-3. refine attachment or file metadata if in scope
-4. write multi-surface compatibility documentation
-5. add fast tests
-6. add integration tests
-7. add optional e2e compatibility tests
+- Existing auth, tenant, audit, and admin contract behavior must remain unchanged when adding new features
+- Protected-field filtering must be re-verified after every change to registry or contract logic
+- Tenant isolation must be re-verified after every change to DB session or middleware logic
+- Contract snapshot tests must be usable as release gates for at least two representative models under at least three contexts (superadmin, scoped user, tenant-scoped user)
 
 ---
 
-# Minimal meta-prompt template for any future phase
+## Flutter enterprise UI boundary
 
-Use this when creating a new phase prompt.
+The Flutter enterprise UI should be a **separate repository** — different toolchain, release cadence, testing stack, and distribution model.
 
-## Objective
+**What the Python package must provide for Flutter**
+- Stable versioned admin contract
+- `/admin/context`, `/admin/navigation`, `/admin/capabilities`, `/admin/client-config`
+- Registry/model metadata endpoints
+- Relation lookup endpoints
+- Action metadata and execution endpoints
+- Workflow metadata where the workflow extension is enabled
+- Consistent error response formats
+- Contract snapshot fixtures for representative contexts
+
+**What the Flutter app needs (outside this repo)**
+- App shell with responsive layout
+- Authenticated routing and route guards
+- Generated or hand-written API client for the versioned admin contract
+- Tenant switcher and context handling
+- Generic metadata-driven list/detail/create/update screens
+- Relation selector widgets
+- Dangerous-action confirmation UX
+- Validation and authorization error rendering
+- Audit log views
+- Workflow inbox where the workflow extension is enabled
+
+---
+
+## Minimal meta-prompt template
+
+Use this when adding a new feature.
+
+### Objective
 State the single main goal.
 
-## Locked
-List files or behaviors that must not change.
-
-## Stable
-List files or behaviors that may change only minimally.
-
-## Open
-List new files or areas allowed to evolve.
-
-## Deliverables
+### Deliverables
 List exact files and explicit extensions.
 
-## Hard requirements
+### Hard requirements
 List the non-negotiable functional and security rules.
 
-## Acceptance criteria
+### Acceptance criteria
 Use measurable statements only.
 
-## Tests
-State exactly which of fast, integration, and e2e are required.
+### Tests
+State which of fast, integration, and e2e are required.
 State what must be covered and what regressions must remain green.
 
-## Build order
+### Build order
 Keep it short and execution-oriented.

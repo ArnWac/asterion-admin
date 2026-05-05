@@ -1,3 +1,4 @@
+import bcrypt as _bcrypt
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
@@ -16,8 +17,14 @@ from coreAdmin_api.models.role import Role  # noqa: F401 — register table
 from coreAdmin_api.models.tenant import Tenant  # noqa: F401 — register table
 from coreAdmin_api.models.audit_log import AuditLog  # noqa: F401 — register table
 from coreAdmin_api.models.impersonation_log import ImpersonationLog  # noqa: F401 — register table
+from coreAdmin_api.extensions.jobs.models import Job  # noqa: F401 — register table
+from coreAdmin_api.models.change_request import ChangeRequest  # noqa: F401 — register table
 from coreAdmin_api.auth import hash_password
 from coreAdmin_api.token_blacklist import clear_blacklist
+
+# Use bcrypt rounds=4 in tests (vs default 12) — 256× faster, still valid hashes
+_orig_gensalt = _bcrypt.gensalt
+_bcrypt.gensalt = lambda rounds=4, prefix=b"2b": _orig_gensalt(rounds=4, prefix=prefix)
 
 
 # ---------------------------------------------------------------------------
@@ -36,6 +43,16 @@ async def db_engine() -> AsyncEngine:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()
+
+
+@pytest_asyncio.fixture(scope="session")
+async def session_factory(db_engine: AsyncEngine) -> async_sessionmaker:
+    import coreAdmin_api.database as _db
+    factory = async_sessionmaker(db_engine, expire_on_commit=False)
+    # Patch direct AsyncSessionLocal usage (e.g. AuditMiddleware) so no middleware
+    # tries to open a real PostgreSQL connection during tests.
+    _db.AsyncSessionLocal = factory
+    return factory
 
 
 # ---------------------------------------------------------------------------
@@ -58,25 +75,30 @@ def reset_token_blacklist():
     clear_blacklist()
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    from coreAdmin_api.middleware.rate_limit import reset_rate_limiter
+    reset_rate_limiter()
+    yield
+    reset_rate_limiter()
+
+
 # ---------------------------------------------------------------------------
 # Per-test session and HTTP client
 # ---------------------------------------------------------------------------
 
 @pytest_asyncio.fixture
-async def db(db_engine: AsyncEngine) -> AsyncSession:
+async def db(session_factory: async_sessionmaker) -> AsyncSession:
     """Test setup session — use this to create/modify fixtures directly."""
-    factory = async_sessionmaker(db_engine, expire_on_commit=False)
-    async with factory() as session:
+    async with session_factory() as session:
         yield session
 
 
 @pytest_asyncio.fixture
-async def client(db_engine: AsyncEngine, db: AsyncSession):
+async def client(session_factory: async_sessionmaker, db: AsyncSession):
     """HTTP client — gets its own fresh session per request from the shared engine."""
-    factory = async_sessionmaker(db_engine, expire_on_commit=False)
-
     async def override_get_db():
-        async with factory() as session:
+        async with session_factory() as session:
             try:
                 yield session
             except Exception:

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 # Renderer identity
 RENDERER_ID = "builtin-lightweight"
-RENDERER_VERSION = "9.0"
+RENDERER_VERSION = "11.0"
 
 # Explicit capability map — True = supported, False = not yet supported.
 # Unsupported features must degrade safely (no hard error in the UI).
@@ -17,33 +17,33 @@ SUPPORTED_FEATURES: dict[str, bool] = {
     "detail": True,
     "create": True,
     "update": True,
-    "delete": True,              # Phase 8: explicit confirmation page
+    "delete": True,
     # List capabilities
     "search": True,
     "ordering": True,
     "pagination": True,
-    "field_filters": True,       # Phase 8: basic filter params forwarded
+    "field_filters": True,
     # Context and security
     "tenant_context": True,
     "impersonation_indicator": True,
     "readonly_fields": True,
     "protected_field_filtering": True,
     # Advanced flows
-    "dangerous_actions": True,   # Phase 8: confirmation UX for dangerous actions
-    "break_glass": True,         # Phase 8: break-glass initiation UI with reason capture
-    "bulk_actions": False,       # Phase 11
-    "audit_log_view": False,     # Phase 11
-    "export": False,
-    "import": False,
+    "dangerous_actions": True,
+    "bulk_actions": True,         # Phase 11
+    "audit_log_view": False,
+    "export": True,               # Phase 11
+    "import": True,               # Phase 11
     # Relation handling
-    "relation_selection": True,   # Phase 9: lookup endpoint + RelationMeta with URL
+    "relation_selection": True,
+    # Workflow
+    "workflow_approval": False,   # Phase 13 backend only; UI deferred
     # Quality
     "localization_ready": True,
     "accessibility_baseline": True,
     "unsupported_features_degrade_safely": True,
-    # Phase 8 additions
-    "preference_persistence": True,      # personal UI preferences stored per user
-    "impersonation_state_visible": True, # impersonation banner in base template
+    "preference_persistence": True,
+    "impersonation_state_visible": True,
     "validation_field_level_errors": True,
 }
 

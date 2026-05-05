@@ -12,7 +12,6 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Tenant-specific metadata — populated in Phase 3
 target_metadata = Base.metadata
 
 

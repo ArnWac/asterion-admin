@@ -1,11 +1,10 @@
-"""Phase 7 — Built-in admin UI tests (fast layer).
+"""Built-in admin UI tests (fast layer).
 
 Covers:
 - route mounting when ENABLE_BUILTIN_ADMIN_UI=True (default)
 - static asset serving
 - all HTML shell routes return 200 with text/html
 - disabling the built-in UI does not affect API routes
-- template helpers (ui_helpers)
 - renderer support matrix endpoint and structure
 - accessibility attributes present in templates
 - login page does not require auth
@@ -15,31 +14,8 @@ import pytest
 from unittest.mock import patch
 from httpx import AsyncClient, ASGITransport
 
-from coreAdmin_api.admin.ui_helpers import ui_field_input_type, get_model_names
 from coreAdmin_api.admin.ui_renderer import get_support_matrix, RENDERER_ID, SUPPORTED_FEATURES
 from coreAdmin_api.admin.registry import admin_site
-
-
-# ---------------------------------------------------------------------------
-# ui_helpers unit tests
-# ---------------------------------------------------------------------------
-
-def test_ui_field_input_type_known():
-    assert ui_field_input_type("integer") == "number"
-    assert ui_field_input_type("float") == "number"
-    assert ui_field_input_type("boolean") == "checkbox"
-    assert ui_field_input_type("datetime") == "datetime-local"
-    assert ui_field_input_type("uuid") == "text"
-
-
-def test_ui_field_input_type_fallback():
-    assert ui_field_input_type("string") == "text"
-    assert ui_field_input_type("unknown") == "text"
-
-
-def test_get_model_names():
-    names = get_model_names(admin_site)
-    assert isinstance(names, list)
 
 
 # ---------------------------------------------------------------------------
@@ -68,12 +44,12 @@ def test_support_matrix_core_features_supported():
 
 
 def test_support_matrix_deferred_features_not_supported():
-    """Phase 8+ features must be explicitly False (safe fallback)."""
+    """Features not yet in built-in UI must be False (safe fallback)."""
     m = SUPPORTED_FEATURES
-    assert m["delete"] is False
-    assert m["dangerous_actions"] is False
-    assert m["break_glass"] is False
-    assert m["bulk_actions"] is False
+    # audit_log_view and workflow_approval remain deferred
+    assert m["audit_log_view"] is False
+    # bulk_actions, delete, dangerous_actions are supported
+    assert m.get("unsupported_features_degrade_safely") is True
 
 
 def test_support_matrix_quality_flags():
@@ -203,7 +179,7 @@ async def test_support_matrix_endpoint(client):
     assert data["renderer"] == RENDERER_ID
     assert "supported" in data
     assert data["supported"]["list"] is True
-    assert data["supported"]["delete"] is False
+    assert data["supported"]["unsupported_features_degrade_safely"] is True
 
 
 # ---------------------------------------------------------------------------

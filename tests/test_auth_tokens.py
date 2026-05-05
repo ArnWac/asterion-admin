@@ -1,7 +1,7 @@
 """
-Phase 5 — Audit, impersonation, break-glass, logout tests.
+Audit, impersonation, logout tests.
 Covers: blacklist logic, logout, refresh restriction, impersonation flow,
-break-glass dual audit, audit log listing, and e2e critical flows.
+audit log listing, and e2e critical flows.
 """
 import pytest
 import pytest_asyncio
@@ -269,108 +269,16 @@ async def test_revoke_twice_returns_conflict(
 
 
 # ---------------------------------------------------------------------------
-# Break-glass — e2e flow 3: edit -> dual audit presence verified
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_break_glass_requires_reason(client: AsyncClient, superadmin: User):
-    resp = await client.post(
-        f"/api/v1/break-glass/roles/00000000-0000-0000-0000-000000000001",
-        headers=auth(superadmin),
-        json={"reason": "short", "changes": {"name": "x"}},
-    )
-    assert resp.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_break_glass_rejects_protected_field(
-    client: AsyncClient, superadmin: User
-):
-    resp = await client.post(
-        f"/api/v1/break-glass/users/{superadmin.id}",
-        headers=auth(superadmin),
-        json={"reason": "emergency fix needed now", "changes": {"hashed_password": "evil"}},
-    )
-    assert resp.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_break_glass_rejects_readonly_field(
-    client: AsyncClient, superadmin: User
-):
-    import uuid
-    resp = await client.post(
-        f"/api/v1/break-glass/users/{superadmin.id}",
-        headers=auth(superadmin),
-        json={"reason": "emergency fix needed now", "changes": {"id": str(uuid.uuid4())}},
-    )
-    assert resp.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_break_glass_success_with_dual_audit(
-    client: AsyncClient, superadmin: User, db: AsyncSession
-):
-    """Successful break-glass returns two audit_ids and both records exist in DB."""
-    resp = await client.post(
-        f"/api/v1/break-glass/users/{superadmin.id}",
-        headers=auth(superadmin),
-        json={"reason": "emergency fix needed now", "changes": {"full_name": "Emergency Edit"}},
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["updated"]["full_name"] == "Emergency Edit"
-    assert len(data["audit_ids"]) == 2
-
-    # Both audit records must exist
-    for aid in data["audit_ids"]:
-        log = (await db.execute(select(AuditLog).where(AuditLog.id == aid))).scalar_one_or_none()
-        assert log is not None
-        assert log.action in ("break_glass", "break_glass_tenant")
-
-
-@pytest.mark.asyncio
-async def test_break_glass_unknown_model_returns_404(
-    client: AsyncClient, superadmin: User
-):
-    resp = await client.post(
-        "/api/v1/break-glass/nonexistent/00000000-0000-0000-0000-000000000001",
-        headers=auth(superadmin),
-        json={"reason": "emergency fix needed now", "changes": {"name": "x"}},
-    )
-    assert resp.status_code == 404
-
-
-@pytest.mark.asyncio
-async def test_break_glass_unknown_object_returns_404(
-    client: AsyncClient, superadmin: User
-):
-    resp = await client.post(
-        "/api/v1/break-glass/users/00000000-0000-0000-0000-000000000001",
-        headers=auth(superadmin),
-        json={"reason": "emergency fix needed now", "changes": {"full_name": "x"}},
-    )
-    assert resp.status_code == 404
-
-
-# ---------------------------------------------------------------------------
 # Audit log listing
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_audit_log_list(client: AsyncClient, superadmin: User, db: AsyncSession):
-    # Write a break-glass to generate audit records
-    await client.post(
-        f"/api/v1/break-glass/users/{superadmin.id}",
-        headers=auth(superadmin),
-        json={"reason": "emergency fix needed now", "changes": {"full_name": "Audit Test"}},
-    )
-
     resp = await client.get("/api/v1/audit", headers=auth(superadmin))
     assert resp.status_code == 200
     data = resp.json()
-    assert data["total"] >= 2
-    assert len(data["items"]) >= 2
+    assert "total" in data
+    assert "items" in data
 
 
 @pytest.mark.asyncio

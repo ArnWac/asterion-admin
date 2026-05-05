@@ -22,5 +22,10 @@ class Settings(BaseSettings):
     ENABLE_BUILTIN_ADMIN_UI: bool = True
     ADMIN_UI_PATH: str = "/admin-ui"
 
+    ENABLE_WORKFLOWS: bool = True
+
+    # Step-up window: how recent a login must be for protected actions (minutes)
+    STEP_UP_WINDOW_MINUTES: int = 15
+
 
 settings = Settings()

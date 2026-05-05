@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from coreAdmin_api.models.base import Base, GUID, utcnow
 
@@ -17,5 +17,7 @@ class AuditLog(Base):
     status_code: Mapped[int] = mapped_column(Integer, nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(GUID, nullable=True)
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(GUID, nullable=True)
-    action: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    action: Mapped[str | None] = mapped_column(String(50), nullable=True)
     object_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    actor: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    changes: Mapped[dict | None] = mapped_column(JSON, nullable=True)

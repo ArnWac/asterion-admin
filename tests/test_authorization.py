@@ -270,14 +270,14 @@ def test_effective_caps_superadmin_all_true():
     pe = PolicyEngine()
     admin = _make_admin(admin_only=True)
     caps = pe.effective_model_caps(_make_superadmin(), admin, {})
-    assert all(caps[k] for k in ["can_list", "can_create", "can_read", "can_update", "can_delete", "can_break_glass"])
+    assert all(caps[k] for k in ["can_list", "can_create", "can_read", "can_update", "can_delete"])
 
 
 def test_effective_caps_admin_only_non_superadmin_all_false():
     pe = PolicyEngine()
     admin = _make_admin(admin_only=True)
     caps = pe.effective_model_caps(_make_user(["manager"]), admin, {})
-    assert not any(caps[k] for k in ["can_list", "can_create", "can_read", "can_update", "can_delete", "can_break_glass"])
+    assert not any(caps[k] for k in ["can_list", "can_create", "can_read", "can_update", "can_delete"])
 
 
 def test_effective_caps_policy_gated_has_access():
@@ -285,7 +285,6 @@ def test_effective_caps_policy_gated_has_access():
     admin = _make_admin(admin_only=False, access_roles=["manager"])
     caps = pe.effective_model_caps(_make_user(["manager"]), admin, {})
     assert caps["can_list"] and caps["can_read"]
-    assert caps["can_break_glass"] is False  # non-superadmin never gets break-glass
 
 
 def test_effective_caps_policy_gated_missing_role():
@@ -294,13 +293,6 @@ def test_effective_caps_policy_gated_missing_role():
     caps = pe.effective_model_caps(_make_user([]), admin, {})
     assert not any(caps[k] for k in ["can_list", "can_read"])
 
-
-def test_effective_caps_impersonated_superadmin_gets_no_break_glass():
-    pe = PolicyEngine()
-    admin = _make_admin(admin_only=False, access_roles=[])
-    caps = pe.effective_model_caps(_make_superadmin(), admin, {"impersonated_by": "x"})
-    # impersonated superadmin treated as non-superadmin; admin_only=False + no access_roles → all allowed except break_glass
-    assert caps["can_break_glass"] is False
 
 
 def test_effective_caps_action_policy_gates_update():
@@ -493,21 +485,6 @@ async def test_capabilities_policy_gated_model(client, manager_user, policy_role
     roles_caps = next(m for m in data["models"] if m["model"] == "roles")
     assert roles_caps["can_list"] is True
     assert roles_caps["can_read"] is True
-    assert roles_caps["can_break_glass"] is False
-
-
-@pytest.mark.asyncio
-async def test_capabilities_impersonated_no_break_glass(client, superadmin):
-    from coreAdmin_api.auth import create_impersonation_token
-    token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id))
-    resp = await client.get(
-        "/api/v1/admin/capabilities",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    for m in data["models"]:
-        assert m["can_break_glass"] is False
 
 
 @pytest.mark.asyncio

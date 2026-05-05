@@ -94,6 +94,23 @@ h1 { font-size: 1.2rem; }
 .warning-text strong { font-weight: 700; }
 .field-error { color: #bf2600; font-size: .8rem; margin-top: .25rem; }
 
+/* Detail two-column layout */
+.detail-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
+.detail-history-card { width: 280px; flex-shrink: 0; font-size: .82rem; }
+.history-entry { padding: .5rem 0; border-bottom: 1px solid #f0f0f0; }
+.history-entry:last-child { border-bottom: none; }
+.history-actor { font-weight: 500; font-size: .82rem; }
+.history-time { color: #586069; font-size: .75rem; }
+.history-changes { margin-top: .25rem; font-size: .78rem; color: #444; line-height: 1.6; }
+.history-field { font-weight: 600; color: #172b4d; }
+.history-old { color: #bf2600; text-decoration: line-through; }
+.history-new { color: #006644; }
+@media (max-width: 900px) { .detail-layout { flex-direction: column; } .detail-history-card { width: 100%; } }
+
+/* Relation field with +New button */
+.relation-field { display: flex; align-items: center; gap: .5rem; }
+.relation-field select { flex: 1; }
+
 /* Density variants */
 body[data-density="compact"] td, body[data-density="compact"] th { padding: .25rem .5rem; }
 body[data-density="spacious"] td, body[data-density="spacious"] th { padding: .75rem 1rem; }

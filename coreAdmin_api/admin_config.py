@@ -5,9 +5,11 @@ Note: admin CRUD for User is read/update only — use POST /api/v1/users to
 create users (the admin create path lacks the password hashing step).
 """
 from coreAdmin_api.admin import admin_site, ModelAdmin
+from coreAdmin_api.auth import hash_password
 from coreAdmin_api.models.role import Role
 from coreAdmin_api.models.tenant import Tenant
 from coreAdmin_api.models.user import User
+from coreAdmin_api.settings import settings
 
 
 class UserAdmin(ModelAdmin):
@@ -21,7 +23,17 @@ class UserAdmin(ModelAdmin):
     ordering = ["email"]
     readonly_fields = ["id", "created_at", "updated_at"]
     # hashed_password is globally protected — no need to list it here
+    # tenant_id hidden when multi-tenant is disabled
+    protected_fields = [] if settings.MULTI_TENANT else ["tenant_id"]
     tenant_scoped = False
+    extra_create_fields = {"set_password": str}
+
+    @classmethod
+    def before_create(cls, data: dict) -> dict:
+        plain = data.pop("set_password", None)
+        if plain:
+            data["hashed_password"] = hash_password(plain)
+        return data
     actions = [
         {
             "name": "deactivate",
@@ -70,4 +82,5 @@ class TenantAdmin(ModelAdmin):
 
 admin_site.register(UserAdmin())
 admin_site.register(RoleAdmin())
-admin_site.register(TenantAdmin())
+if settings.MULTI_TENANT:
+    admin_site.register(TenantAdmin())

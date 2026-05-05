@@ -16,6 +16,8 @@ class AuditLogPublic(BaseModel):
     tenant_id: uuid.UUID | None
     action: str | None
     object_id: str | None
+    actor: str | None
+    changes: dict | None
 
 
 class ImpersonateRequest(BaseModel):
@@ -30,13 +32,3 @@ class ImpersonateResponse(BaseModel):
 
 class RevokeImpersonationRequest(BaseModel):
     jti: str
-
-
-class BreakGlassRequest(BaseModel):
-    reason: str = Field(..., min_length=10, description="Must be at least 10 characters")
-    changes: dict[str, Any]
-
-
-class BreakGlassResponse(BaseModel):
-    updated: dict[str, Any]
-    audit_ids: list[uuid.UUID]

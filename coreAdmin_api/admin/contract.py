@@ -115,6 +115,25 @@ def build_field_metadata(model_admin: ModelAdmin, registry=None) -> list[FieldMe
             relation=relation,
         ))
 
+    # Virtual create-only fields (e.g. plain-text password before hashing)
+    for vname, vtype in model_admin.extra_create_fields.items():
+        widget = "password" if "password" in vname else "text"
+        fields.append(FieldMeta(
+            name=vname,
+            label=_prettify(vname),
+            field_type="string",
+            required=True,
+            nullable=False,
+            has_default=False,
+            readonly=False,
+            in_list=False,
+            searchable=False,
+            filterable=False,
+            sortable=False,
+            widget=widget,
+            create_only=True,
+        ))
+
     return fields
 
 
@@ -135,6 +154,7 @@ def build_model_contract(model_admin: ModelAdmin, registry=None) -> ModelContrac
         ordering=model_admin.ordering,
         readonly_fields=model_admin.readonly_fields,
         actions=actions,
+        requires_approval=getattr(model_admin, "requires_approval", False),
     )
 
 

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from coreAdmin_api.admin.ui_renderer import get_support_matrix
+from coreAdmin_api.admin.ui_renderer import get_support_matrix, RENDERER_VERSION
 from coreAdmin_api.settings import settings
 
 _PACKAGE_ROOT = Path(__file__).parent.parent
@@ -24,7 +24,7 @@ router = APIRouter(tags=["admin-ui"])
 def _tmpl(name: str, request: Request, **ctx):
     # Starlette 1.0 API: TemplateResponse(request, name, context)
     return templates.TemplateResponse(
-        request, name, {"ui_base": settings.ADMIN_UI_PATH, **ctx}
+        request, name, {"ui_base": settings.ADMIN_UI_PATH, "renderer_version": RENDERER_VERSION, **ctx}
     )
 
 
@@ -77,10 +77,6 @@ async def admin_ui_edit(request: Request, model_name: str, object_id: str):
 async def admin_ui_confirm_delete(request: Request, model_name: str, object_id: str):
     return _tmpl("confirm_delete.html", request, model=model_name, object_id=object_id)
 
-
-@router.get("/{model_name}/{object_id}/break-glass", response_class=HTMLResponse, include_in_schema=False)
-async def admin_ui_break_glass(request: Request, model_name: str, object_id: str):
-    return _tmpl("break_glass.html", request, model=model_name, object_id=object_id)
 
 
 @router.get("/{model_name}/{object_id}", response_class=HTMLResponse, include_in_schema=False)

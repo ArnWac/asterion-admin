@@ -66,6 +66,24 @@ class ModelAdmin:
     # roles that grant base CRUD access when admin_only=False
     access_roles: list = []
 
+    # Phase 11: action names that should be executed asynchronously (via job system)
+    async_actions: list[str] = []
+
+    # Phase 13: require approval workflow before applying changes
+    requires_approval: bool = False
+
+    # Extra virtual fields only present in the create form (not model columns).
+    # Dict of {field_name: python_type}, e.g. {"password": str}.
+    # Use before_create() to transform them before the object is saved.
+    extra_create_fields: dict = {}
+
+    @classmethod
+    def before_create(cls, data: dict) -> dict:
+        """Hook called with validated create data before the model instance is built.
+        Override to transform fields (e.g. hash a plain-text password).
+        Must return the (possibly mutated) data dict."""
+        return data
+
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
         # Ensure class-level list attrs are NOT shared between subclasses
@@ -78,7 +96,7 @@ class ModelAdmin:
             "protected_fields",
             "actions",
             "access_roles",
-            # lookup_field is str|None, skip list-copy logic for it
+            "async_actions",
         ):
             if attr not in cls.__dict__:
                 setattr(cls, attr, [])

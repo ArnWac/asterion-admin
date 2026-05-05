@@ -109,6 +109,9 @@ class SchemaBuilder:
             if name in excluded:
                 continue
             fields[name] = (Optional[py_type], None) if is_optional else (py_type, ...)
+        # Virtual fields only used at create time (e.g. plain-text password)
+        for vname, vtype in model_admin.extra_create_fields.items():
+            fields[vname] = (vtype, ...)
         return create_model(
             f"{model_admin.model.__name__}CreateSchema",
             __config__=ConfigDict(extra="forbid"),

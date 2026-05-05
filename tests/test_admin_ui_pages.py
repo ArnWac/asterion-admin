@@ -1,17 +1,14 @@
-"""Phase 8 — Built-in UI completeness tests (fast layer).
+"""Built-in UI completeness tests (fast layer).
 
 Covers:
-- Renderer support matrix updated for Phase 8 features
+- Renderer support matrix features
 - confirm_delete page renders with danger zone and confirmation button
-- break_glass page renders with reason field and danger zone
-- Break-glass page has no protected fields in HTML
 - UIPreference schema defaults and validation
 - Preference get/put API endpoints (authenticated)
 - Preference isolation per user
 - Preferences cannot encode security-relevant overrides
 - Impersonation indicator and tenant context in base template
 - Validation field-level error containers in templates
-- Regression: Phase 7 routes still work
 """
 import pytest
 import uuid
@@ -26,8 +23,10 @@ from coreAdmin_api.admin.ui_preferences import UIPreference, get_preferences, se
 # Renderer support matrix — Phase 8 features now True
 # ---------------------------------------------------------------------------
 
-def test_renderer_version_is_phase8():
-    assert RENDERER_VERSION == "8.0"
+def test_renderer_version_is_at_least_phase8():
+    # Version was 8.0 at Phase 8; later phases increment it
+    major = float(RENDERER_VERSION.split(".")[0])
+    assert major >= 8
 
 
 def test_delete_now_supported():
@@ -37,9 +36,6 @@ def test_delete_now_supported():
 def test_dangerous_actions_now_supported():
     assert SUPPORTED_FEATURES["dangerous_actions"] is True
 
-
-def test_break_glass_now_supported():
-    assert SUPPORTED_FEATURES["break_glass"] is True
 
 
 def test_field_filters_now_supported():
@@ -58,14 +54,14 @@ def test_validation_field_level_errors_supported():
     assert SUPPORTED_FEATURES["validation_field_level_errors"] is True
 
 
-def test_bulk_actions_still_deferred():
-    """Phase 11 feature must remain False."""
-    assert SUPPORTED_FEATURES["bulk_actions"] is False
+def test_bulk_actions_supported_from_phase11():
+    """Phase 11 added bulk_actions support."""
+    assert SUPPORTED_FEATURES["bulk_actions"] is True
 
 
-def test_relation_selection_still_deferred():
-    """Phase 9 feature must remain False."""
-    assert SUPPORTED_FEATURES["relation_selection"] is False
+def test_relation_selection_supported_from_phase9():
+    """Phase 9 added relation_selection support."""
+    assert SUPPORTED_FEATURES["relation_selection"] is True
 
 
 def test_support_matrix_endpoint_reflects_phase8(client):
@@ -74,9 +70,8 @@ def test_support_matrix_endpoint_reflects_phase8(client):
         resp = await client.get("/admin-ui/renderer/support-matrix")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["version"] == "8.0"
+        assert float(data["version"].split(".")[0]) >= 8
         assert data["supported"]["delete"] is True
-        assert data["supported"]["break_glass"] is True
     asyncio.get_event_loop().run_until_complete(_run())
 
 
@@ -85,9 +80,8 @@ async def test_support_matrix_endpoint_phase8(client):
     resp = await client.get("/admin-ui/renderer/support-matrix")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["version"] == "8.0"
+    assert float(data["version"].split(".")[0]) >= 8
     assert data["supported"]["delete"] is True
-    assert data["supported"]["break_glass"] is True
     assert data["supported"]["dangerous_actions"] is True
 
 
@@ -140,73 +134,6 @@ async def test_confirm_delete_no_protected_fields(client):
     resp = await client.get(f"/admin-ui/user/{fake_id}/delete")
     assert b"hashed_password" not in resp.content
     assert b"SECRET_KEY" not in resp.content
-
-
-# ---------------------------------------------------------------------------
-# break_glass page
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_break_glass_page_renders(client):
-    fake_id = str(uuid.uuid4())
-    resp = await client.get(f"/admin-ui/user/{fake_id}/break-glass")
-    assert resp.status_code == 200
-    assert "text/html" in resp.headers["content-type"]
-
-
-@pytest.mark.asyncio
-async def test_break_glass_has_reason_field(client):
-    fake_id = str(uuid.uuid4())
-    resp = await client.get(f"/admin-ui/user/{fake_id}/break-glass")
-    assert b"bg-reason" in resp.content
-    assert b"minlength" in resp.content
-
-
-@pytest.mark.asyncio
-async def test_break_glass_has_danger_zone(client):
-    fake_id = str(uuid.uuid4())
-    resp = await client.get(f"/admin-ui/user/{fake_id}/break-glass")
-    assert b"danger-zone" in resp.content
-
-
-@pytest.mark.asyncio
-async def test_break_glass_reason_is_required(client):
-    fake_id = str(uuid.uuid4())
-    resp = await client.get(f"/admin-ui/user/{fake_id}/break-glass")
-    assert b'aria-required="true"' in resp.content
-
-
-@pytest.mark.asyncio
-async def test_break_glass_has_field_error_container(client):
-    fake_id = str(uuid.uuid4())
-    resp = await client.get(f"/admin-ui/user/{fake_id}/break-glass")
-    assert b"reason-error" in resp.content
-    assert b'role="alert"' in resp.content
-
-
-@pytest.mark.asyncio
-async def test_break_glass_no_protected_fields(client):
-    """Break-glass form must not embed hashed_password or other secrets."""
-    fake_id = str(uuid.uuid4())
-    resp = await client.get(f"/admin-ui/user/{fake_id}/break-glass")
-    assert b"hashed_password" not in resp.content
-    assert b"SECRET_KEY" not in resp.content
-    assert b"pin_hash" not in resp.content
-
-
-@pytest.mark.asyncio
-async def test_break_glass_uses_btn_danger(client):
-    """Submit button must be styled as danger to surface the risk."""
-    fake_id = str(uuid.uuid4())
-    resp = await client.get(f"/admin-ui/user/{fake_id}/break-glass")
-    assert b"btn-danger" in resp.content
-
-
-@pytest.mark.asyncio
-async def test_break_glass_mentions_audit(client):
-    fake_id = str(uuid.uuid4())
-    resp = await client.get(f"/admin-ui/user/{fake_id}/break-glass")
-    assert b"audit" in resp.content.lower()
 
 
 # ---------------------------------------------------------------------------

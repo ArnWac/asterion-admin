@@ -22,6 +22,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 status_code=response.status_code,
                 user_id=uuid.UUID(user_id_str) if user_id_str else None,
                 tenant_id=tenant.id if tenant else None,
+                action=getattr(request.state, "audit_action", None),
+                object_id=getattr(request.state, "audit_object_id", None),
+                actor=getattr(request.state, "audit_actor", None),
+                changes=getattr(request.state, "audit_changes", None),
             )
             async with AsyncSessionLocal() as session:
                 session.add(log)

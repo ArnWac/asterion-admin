@@ -59,6 +59,19 @@ def create_impersonation_token(target_user_id: str, superadmin_id: str) -> tuple
     return token, jti
 
 
+def create_access_token_with_iat(user_id: str) -> str:
+    """Access token that embeds iat explicitly for step-up age checks."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": user_id,
+        "iat": int(now.timestamp()),
+        "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "jti": str(uuid.uuid4()),
+        "type": "access",
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
 def decode_token(token: str, expected_type: str) -> dict | None:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])

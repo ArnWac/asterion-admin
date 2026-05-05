@@ -78,22 +78,23 @@ def test_relation_meta_with_lookup_url():
 # Renderer — Phase 9 updates
 # ---------------------------------------------------------------------------
 
-def test_renderer_version_is_phase9():
-    assert RENDERER_VERSION == "9.0"
+def test_renderer_version_is_at_least_phase9():
+    major = float(RENDERER_VERSION.split(".")[0])
+    assert major >= 9
 
 
 def test_relation_selection_now_supported():
     assert SUPPORTED_FEATURES["relation_selection"] is True
 
 
-def test_bulk_actions_still_deferred():
-    assert SUPPORTED_FEATURES["bulk_actions"] is False
+def test_bulk_actions_supported_from_phase11():
+    assert SUPPORTED_FEATURES["bulk_actions"] is True
 
 
 def test_support_matrix_includes_relation_selection():
     matrix = get_support_matrix()
     assert matrix["supported"]["relation_selection"] is True
-    assert matrix["version"] == "9.0"
+    assert float(matrix["version"].split(".")[0]) >= 9
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +393,7 @@ async def test_client_config_renderer_version(client, superadmin):
         headers={"Authorization": f"Bearer {token}"},
     )
     data = resp.json()
-    assert data["renderer_version"] == "9.0"
+    assert float(data["renderer_version"].split(".")[0]) >= 9
 
 
 # ---------------------------------------------------------------------------
@@ -612,5 +613,5 @@ async def test_support_matrix_endpoint_reflects_phase9(client):
     resp = await client.get("/admin-ui/renderer/support-matrix")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["version"] == "9.0"
+    assert float(data["version"].split(".")[0]) >= 9
     assert data["supported"]["relation_selection"] is True

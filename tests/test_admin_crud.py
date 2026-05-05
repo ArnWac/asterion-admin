@@ -300,8 +300,10 @@ async def test_tenant_scoped_filter(client: AsyncClient, superadmin: User, db: A
             async def override():
                 yield db
 
+            from coreAdmin_api.dependencies import get_current_user as real_get_current_user
             test_app.dependency_overrides[real_get_db] = override
             test_app.dependency_overrides[require_superadmin] = lambda: superadmin
+            test_app.dependency_overrides[real_get_current_user] = lambda: superadmin
 
             transport = ASGITransport(app=test_app)
             async with AsyncClient(transport=transport, base_url="http://test") as ac:

@@ -9,9 +9,15 @@
     <a href="#" id="edit-link" class="btn btn-primary" aria-label="Edit this {{ model }}">Edit</a>
   </div>
 </div>
-<div class="card">
-  <div id="alert" class="alert" role="alert" aria-live="polite"></div>
-  <section id="detail-body" aria-label="{{ model }} details" aria-live="polite"><p class="loading">Loading…</p></section>
+<div class="detail-layout">
+  <div class="card" style="flex:1;min-width:0">
+    <div id="alert" class="alert" role="alert" aria-live="polite"></div>
+    <section id="detail-body" aria-label="{{ model }} details" aria-live="polite"><p class="loading">Loading…</p></section>
+  </div>
+  <aside class="card detail-history-card" aria-label="Change history">
+    <h3 style="font-size:.9rem;font-weight:600;color:#586069;margin-bottom:.75rem">Change History</h3>
+    <div id="detail-history"><p class="loading">Loading…</p></div>
+  </aside>
 </div>
 {% endblock %}
 

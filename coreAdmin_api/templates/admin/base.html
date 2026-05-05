@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>coreAdmin{% block title %}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ ui_base }}/static/admin.css">
+  <link rel="stylesheet" href="{{ ui_base }}/static/admin.css?v={{ renderer_version }}">
 </head>
 <body>
 <a href="#main-content" class="skip-link" style="position:absolute;left:-9999px;top:0;z-index:9999;padding:.5rem 1rem;background:#0052cc;color:#fff;text-decoration:none">Skip to main content</a>
@@ -23,7 +23,7 @@
   </main>
 </div>
 <script>window.ADMIN_UI_BASE = '{{ ui_base }}';</script>
-<script src="{{ ui_base }}/static/admin.js"></script>
+<script src="{{ ui_base }}/static/admin.js?v={{ renderer_version }}"></script>
 {% block scripts %}{% endblock %}
 <script>
 document.getElementById('logout-link').addEventListener('click', function(e) {

@@ -256,6 +256,45 @@ async function initDetail(model, objectId) {
     bodyEl.innerHTML = `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(e))}</div>`;
   }
 
+  // Change history (right column)
+  const historyEl = document.getElementById('detail-history');
+  if (historyEl) {
+    try {
+      const history = await API.get(`/audit?object_id=${encodeURIComponent(objectId)}&page_size=15`);
+      if (!history.items.length) {
+        historyEl.innerHTML = '<p style="color:#586069;font-size:.82rem">No changes recorded yet.</p>';
+      } else {
+        const actionColor = { created: 'badge-green', updated: 'badge-gray', deleted: 'badge-red' };
+        historyEl.innerHTML = history.items.map(e => {
+          const when = new Date(e.created_at).toLocaleString();
+          const color = actionColor[e.action] || 'badge-gray';
+          const actor = e.actor || 'Unknown';
+          let detail = '';
+          if (e.changes && Object.keys(e.changes).length) {
+            detail = '<div class="history-changes">' +
+              Object.entries(e.changes).map(([field, diff]) =>
+                `<span class="history-field">${esc(field)}:</span> ` +
+                `<span class="history-old">${esc(diff.from ?? '—')}</span> → ` +
+                `<span class="history-new">${esc(diff.to ?? '—')}</span>`
+              ).join('<br>') +
+            '</div>';
+          }
+          return `<div class="history-entry">
+            <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+              <span class="badge ${color}">${esc(e.action)}</span>
+              <span class="history-actor">${esc(actor)}</span>
+              <span class="history-time">${esc(when)}</span>
+            </div>
+            ${detail}
+          </div>`;
+        }).join('');
+      }
+    } catch (err) {
+      console.error('History load failed:', err);
+      historyEl.innerHTML = `<p style="color:#586069;font-size:.82rem">History unavailable: ${esc(String(err))}</p>`;
+    }
+  }
+
   await initNav(model);
 }
 
@@ -281,7 +320,12 @@ async function initCreate(model) {
       return;
     }
 
-    formEl.innerHTML = writableFields.map(f => buildFieldInput(f)).join('');
+    // Rebuild form content — always include the submit button
+    formEl.innerHTML =
+      writableFields.map(f => buildFieldInput(f)).join('') +
+      '<div style="margin-top:1rem"><button type="submit" class="btn btn-primary">Create</button></div>';
+
+    populateRelationSelects(formEl);
 
     formEl.addEventListener('submit', async e => {
       e.preventDefault();
@@ -295,7 +339,8 @@ async function initCreate(model) {
       }
     });
   } catch (e) {
-    formEl.innerHTML = `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(e))}</div>`;
+    formEl.innerHTML =
+      `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(e))}</div>`;
   }
 
   await initNav(model);
@@ -319,7 +364,7 @@ async function initUpdate(model, objectId) {
     if (backLink) backLink.href = `${UI_BASE}/${model}/${objectId}`;
 
     const editableFields = (meta.fields || []).filter(
-      f => !['id', 'created_at', 'updated_at'].includes(f.name)
+      f => !['id', 'created_at', 'updated_at'].includes(f.name) && !f.create_only
     );
 
     if (!editableFields.length) {
@@ -327,7 +372,11 @@ async function initUpdate(model, objectId) {
       return;
     }
 
-    formEl.innerHTML = editableFields.map(f => buildFieldInput(f, item[f.name])).join('');
+    formEl.innerHTML =
+      editableFields.map(f => buildFieldInput(f, item[f.name])).join('') +
+      '<div style="margin-top:1rem"><button type="submit" class="btn btn-primary">Save</button></div>';
+
+    populateRelationSelects(formEl);
 
     formEl.addEventListener('submit', async e => {
       e.preventDefault();
@@ -366,10 +415,25 @@ function buildFieldInput(f, value) {
   if (f.field_type === 'boolean') {
     const checked = val === true || val === 'true' || val === 1 ? ' checked' : '';
     input = `<input type="checkbox" name="${f.name}" id="f_${f.name}"${checked}${roAttr}>`;
+  } else if (f.widget === 'password') {
+    input = `<input type="password" name="${f.name}" id="f_${f.name}" autocomplete="new-password"${roAttr}>`;
   } else if (f.widget === 'select-relation') {
-    // Relation: render text UUID input with a hint
-    input = `<input type="text" name="${f.name}" id="f_${f.name}" value="${esc(String(val))}"${roAttr} placeholder="UUID">
-             <p class="field-hint">Relation to: ${esc(f.relation?.target_table || '')}</p>`;
+    const lookupUrl = f.relation?.lookup_url || '';
+    const targetTable = f.relation?.target_table || '';
+    const currentVal = val ? String(val) : '';
+    const newBtn = targetTable
+      ? `<a href="${UI_BASE}/${targetTable}/new" target="_blank" class="btn btn-sm btn-secondary">+ New</a>`
+      : '';
+    if (isReadonly || !lookupUrl) {
+      input = `<input type="text" name="${f.name}" id="f_${f.name}" value="${esc(currentVal)}"${roAttr} placeholder="UUID">`;
+    } else {
+      input = `<div class="relation-field">
+        <select name="${f.name}" id="f_${f.name}" data-lookup-url="${esc(lookupUrl)}" data-current-val="${esc(currentVal)}">
+          ${currentVal ? `<option value="${esc(currentVal)}" selected>Loading…</option>` : '<option value="">— Loading… —</option>'}
+        </select>
+        ${newBtn}
+      </div>`;
+    }
   } else {
     const itype = fieldInputType(f.field_type);
     input = `<input type="${itype}" name="${f.name}" id="f_${f.name}" value="${esc(String(val))}"${roAttr}>`;
@@ -402,6 +466,28 @@ function collectForm(formEl, fields) {
     }
   });
   return body;
+}
+
+// ---------------------------------------------------------------------------
+// Relation select population
+// ---------------------------------------------------------------------------
+async function populateRelationSelects(formEl) {
+  const selects = formEl.querySelectorAll('select[data-lookup-url]');
+  await Promise.all(Array.from(selects).map(async sel => {
+    const lookupUrl = sel.dataset.lookupUrl.replace('/api/v1', '');
+    const currentVal = sel.dataset.currentVal || '';
+    try {
+      const data = await API.get(lookupUrl + '?page_size=100');
+      sel.innerHTML = '<option value="">— Select —</option>' +
+        data.items.map(item =>
+          `<option value="${esc(item.id)}"${item.id === currentVal ? ' selected' : ''}>${esc(item.label)}</option>`
+        ).join('');
+    } catch (_) {
+      sel.innerHTML = currentVal
+        ? `<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`
+        : '<option value="">— None available —</option>';
+    }
+  }));
 }
 
 // ---------------------------------------------------------------------------

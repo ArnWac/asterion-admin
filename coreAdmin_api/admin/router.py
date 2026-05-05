@@ -19,6 +19,7 @@ from coreAdmin_api.authz.policy_engine import policy_engine
 from coreAdmin_api.database import get_db
 from coreAdmin_api.dependencies import get_current_user, require_superadmin
 from coreAdmin_api.models.user import User
+from coreAdmin_api.observability.admin_metrics import get_snapshot as metrics_snapshot
 from coreAdmin_api.schemas.client_config import ClientConfigResponse
 from coreAdmin_api.schemas.policy import FieldPolicyMeta, ModelPolicyResponse
 from coreAdmin_api.settings import settings
@@ -166,6 +167,58 @@ async def client_config(
     )
 
 
+@router.get("/metrics")
+async def admin_metrics(
+    _: User = Depends(require_superadmin),
+):
+    """Return admin operational metrics snapshot — no secrets or protected field content."""
+    return metrics_snapshot()
+
+
+@router.get("/compatibility")
+async def admin_compatibility(
+    _: User = Depends(get_current_user),
+):
+    """
+    Multi-surface compatibility manifest.
+    Describes which flows are baseline (builtin UI + external client),
+    advanced (enterprise client only), or client-specific.
+    """
+    matrix = get_support_matrix()
+    return {
+        "contract_version": CONTRACT_VERSION,
+        "surfaces": {
+            "builtin_ui": {
+                "renderer": matrix["renderer"],
+                "version": matrix["version"],
+                "supported_features": matrix["supported"],
+            },
+            "external_client": {
+                "note": "Must consume the same admin contract endpoints as builtin UI.",
+                "additional_hints": ["renderer_hints", "async_actions", "requires_approval"],
+            },
+            "api_only": {
+                "note": "All contract endpoints remain functional when builtin UI is disabled.",
+            },
+        },
+        "baseline_flows": [
+            "list", "detail", "create", "update", "delete",
+            "search", "filter", "order", "pagination",
+            "tenant_context", "impersonation_indicator",
+            "auth_login", "auth_logout", "auth_refresh",
+        ],
+        "advanced_flows": [
+            "workflow_approval", "bulk_action",
+            "import_export", "job_tracking", "step_up_auth",
+            "session_management", "audit_visibility",
+        ],
+        "breaking_change_policy": (
+            "Major contract_version increment signals a breaking change. "
+            "Clients must refuse to operate against an unsupported major version."
+        ),
+    }
+
+
 @router.get("/preferences")
 async def get_user_preferences(
     current_user: User = Depends(get_current_user),
@@ -267,7 +320,8 @@ async def create_object(
                 detail=f"Field '{field_name}' is not editable",
             )
 
-    obj = model_admin.model(**validated.model_dump(exclude_none=True))
+    data = model_admin.before_create(validated.model_dump(exclude_none=True))
+    obj = model_admin.model(**data)
     db.add(obj)
     try:
         await db.commit()
@@ -275,6 +329,10 @@ async def create_object(
     except IntegrityError as exc:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc.orig))
+
+    request.state.audit_action = "created"
+    request.state.audit_object_id = str(obj.id)
+    request.state.audit_actor = current_user.email
 
     return serializer.serialize(obj, model_admin)
 
@@ -437,11 +495,21 @@ async def update_object(
                 detail=f"Field '{field_name}' is not editable",
             )
 
+    changes = {}
     for field, value in validated.model_dump(exclude_none=True).items():
+        old = getattr(obj, field, None)
+        if str(old) != str(value):
+            changes[field] = {"from": str(old) if old is not None else None, "to": str(value)}
         setattr(obj, field, value)
 
     await db.commit()
     await db.refresh(obj)
+
+    request.state.audit_action = "updated"
+    request.state.audit_object_id = str(object_id)
+    request.state.audit_actor = current_user.email
+    request.state.audit_changes = changes or None
+
     return serializer.serialize(obj, model_admin)
 
 
@@ -470,7 +538,30 @@ async def delete_object(
     await db.delete(obj)
     await db.commit()
 
+    request.state.audit_action = "deleted"
+    request.state.audit_object_id = str(object_id)
+    request.state.audit_actor = current_user.email
 
-def create_coreadmin(app) -> None:
-    """Register the admin router on a FastAPI app."""
+
+def create_coreadmin(app, config=None) -> None:
+    """Register the admin router on a FastAPI app.
+
+    config: optional CoreAdminConfig instance.  When provided, enabled-feature
+    metadata is surfaced through /admin/context and diagnostics.
+    """
+    global _admin_config
+    _admin_config = config
     app.include_router(router)
+
+    # Always include the audit endpoint (required for change history in the UI)
+    from coreAdmin_api.routers.audit import router as audit_router
+    app.include_router(audit_router)
+
+    # Add audit middleware when enabled (writes a log entry after every response)
+    if config is None or config.enable_basic_audit:
+        from coreAdmin_api.middleware.audit import AuditMiddleware
+        app.add_middleware(AuditMiddleware)
+
+
+# Module-level config reference — set by create_coreadmin; None until wired
+_admin_config = None

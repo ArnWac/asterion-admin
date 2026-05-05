@@ -16,17 +16,23 @@ router = APIRouter(prefix="/api/v1/audit", tags=["audit"])
 async def list_audit_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    object_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
-    total = (await db.execute(select(func.count()).select_from(AuditLog))).scalar_one()
+    base = select(AuditLog)
+    count_q = select(func.count()).select_from(AuditLog)
+    if object_id:
+        base = base.where(AuditLog.object_id == object_id)
+        count_q = count_q.where(AuditLog.object_id == object_id)
+        base = base.where(AuditLog.action.in_(["created", "updated", "deleted"]))
+        count_q = count_q.where(AuditLog.action.in_(["created", "updated", "deleted"]))
+
+    total = (await db.execute(count_q)).scalar_one()
     offset = (page - 1) * page_size
     items = (
         await db.execute(
-            select(AuditLog)
-            .order_by(AuditLog.created_at.desc())
-            .offset(offset)
-            .limit(page_size)
+            base.order_by(AuditLog.created_at.desc()).offset(offset).limit(page_size)
         )
     ).scalars().all()
     return PaginatedResponse(

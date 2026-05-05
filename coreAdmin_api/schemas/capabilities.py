@@ -14,7 +14,6 @@ class ModelCapabilities(BaseModel):
     can_read: bool
     can_update: bool
     can_delete: bool
-    can_break_glass: bool
 
 
 class CapabilitiesResponse(BaseModel):
@@ -34,3 +33,5 @@ class AdminContextResponse(BaseModel):
     is_impersonating: bool
     impersonated_by: str | None
     tenant: TenantContext | None
+    # Phase 15: enabled feature flags (additive, always present)
+    enabled_features: dict | None = None
