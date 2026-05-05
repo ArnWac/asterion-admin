@@ -4,11 +4,11 @@ Tests cover multiple distinct model configurations.
 """
 import uuid
 import pytest
-from coreAdmin_api.admin.model_admin import ModelAdmin, GLOBALLY_PROTECTED, AUTO_FIELDS
-from coreAdmin_api.admin.schema_builder import SchemaBuilder
-from coreAdmin_api.models.user import User
-from coreAdmin_api.models.role import Role
-from coreAdmin_api.models.tenant import Tenant
+from adminfoundry.admin.model_admin import ModelAdmin, GLOBALLY_PROTECTED, AUTO_FIELDS
+from adminfoundry.admin.schema_builder import SchemaBuilder
+from adminfoundry.models.user import User
+from adminfoundry.models.role import Role
+from adminfoundry.models.tenant import Tenant
 
 
 # ---------------------------------------------------------------------------

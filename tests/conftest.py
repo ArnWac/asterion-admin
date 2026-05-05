@@ -9,18 +9,18 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
 )
 from sqlalchemy.pool import StaticPool
-from coreAdmin_api.main import app
-from coreAdmin_api.database import get_db
-from coreAdmin_api.models.base import Base
-from coreAdmin_api.models.user import User
-from coreAdmin_api.models.role import Role  # noqa: F401 — register table
-from coreAdmin_api.models.tenant import Tenant  # noqa: F401 — register table
-from coreAdmin_api.models.audit_log import AuditLog  # noqa: F401 — register table
-from coreAdmin_api.models.impersonation_log import ImpersonationLog  # noqa: F401 — register table
-from coreAdmin_api.extensions.jobs.models import Job  # noqa: F401 — register table
-from coreAdmin_api.models.change_request import ChangeRequest  # noqa: F401 — register table
-from coreAdmin_api.auth import hash_password
-from coreAdmin_api.token_blacklist import clear_blacklist
+from adminfoundry.main import app
+from adminfoundry.database import get_db
+from adminfoundry.models.base import Base
+from adminfoundry.models.user import User
+from adminfoundry.models.role import Role  # noqa: F401 — register table
+from adminfoundry.models.tenant import Tenant  # noqa: F401 — register table
+from adminfoundry.models.audit_log import AuditLog  # noqa: F401 — register table
+from adminfoundry.models.impersonation_log import ImpersonationLog  # noqa: F401 — register table
+from adminfoundry.extensions.jobs.models import Job  # noqa: F401 — register table
+from adminfoundry.models.change_request import ChangeRequest  # noqa: F401 — register table
+from adminfoundry.auth import hash_password
+from adminfoundry.token_blacklist import clear_blacklist
 
 # Use bcrypt rounds=4 in tests (vs default 12) — 256× faster, still valid hashes
 _orig_gensalt = _bcrypt.gensalt
@@ -47,7 +47,7 @@ async def db_engine() -> AsyncEngine:
 
 @pytest_asyncio.fixture(scope="session")
 async def session_factory(db_engine: AsyncEngine) -> async_sessionmaker:
-    import coreAdmin_api.database as _db
+    import adminfoundry.database as _db
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
     # Patch direct AsyncSessionLocal usage (e.g. AuditMiddleware) so no middleware
     # tries to open a real PostgreSQL connection during tests.
@@ -77,7 +77,7 @@ def reset_token_blacklist():
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
-    from coreAdmin_api.middleware.rate_limit import reset_rate_limiter
+    from adminfoundry.middleware.rate_limit import reset_rate_limiter
     reset_rate_limiter()
     yield
     reset_rate_limiter()

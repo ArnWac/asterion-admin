@@ -8,10 +8,10 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from coreAdmin_api.models.user import User
-from coreAdmin_api.models.role import Role
-from coreAdmin_api.models.tenant import Tenant
-from coreAdmin_api.auth import create_access_token, hash_password
+from adminfoundry.models.user import User
+from adminfoundry.models.role import Role
+from adminfoundry.models.tenant import Tenant
+from adminfoundry.auth import create_access_token, hash_password
 
 
 def auth(user: User) -> dict:
@@ -241,8 +241,8 @@ async def test_admin_ordering(client: AsyncClient, superadmin: User, db: AsyncSe
 @pytest.mark.asyncio
 async def test_tenant_scoped_filter(client: AsyncClient, superadmin: User, db: AsyncSession):
     """tenant_scoped=True filters by tenant_id when MULTI_TENANT=True."""
-    from coreAdmin_api.admin import admin_site, ModelAdmin
-    from coreAdmin_api.models.user import User
+    from adminfoundry.admin import admin_site, ModelAdmin
+    from adminfoundry.models.user import User
     from unittest.mock import patch
 
     # Register a scoped UserAdmin temporarily
@@ -267,17 +267,17 @@ async def test_tenant_scoped_filter(client: AsyncClient, superadmin: User, db: A
     await db.commit()
 
     # Simulate tenant in request state
-    from coreAdmin_api.middleware import tenant as tenant_mod
-    from coreAdmin_api.main import app as main_app
-    from coreAdmin_api.database import get_db as real_get_db
+    from adminfoundry.middleware import tenant as tenant_mod
+    from adminfoundry.main import app as main_app
+    from adminfoundry.database import get_db as real_get_db
     from sqlalchemy.ext.asyncio import async_sessionmaker
     import contextlib
 
     factory = admin_site  # just a reference to reuse the fixture pattern
 
     # Override with MULTI_TENANT=True + tenant in state via middleware patch
-    with patch("coreAdmin_api.settings.settings.MULTI_TENANT", True):
-        with patch("coreAdmin_api.admin.router.settings.MULTI_TENANT", True):
+    with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
+        with patch("adminfoundry.admin.router.settings.MULTI_TENANT", True):
             # Inject tenant into request.state manually via a custom middleware
             from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -292,7 +292,7 @@ async def test_tenant_scoped_filter(client: AsyncClient, superadmin: User, db: A
 
             test_app = FastAPI()
             test_app.add_middleware(InjectTenant)
-            from coreAdmin_api.admin.router import router as admin_router
+            from adminfoundry.admin.router import router as admin_router
             test_app.include_router(admin_router)
 
             db_factory = asm(db.get_bind().engine if hasattr(db.get_bind(), 'engine') else db.bind, expire_on_commit=False)
@@ -300,7 +300,7 @@ async def test_tenant_scoped_filter(client: AsyncClient, superadmin: User, db: A
             async def override():
                 yield db
 
-            from coreAdmin_api.dependencies import get_current_user as real_get_current_user
+            from adminfoundry.dependencies import get_current_user as real_get_current_user
             test_app.dependency_overrides[real_get_db] = override
             test_app.dependency_overrides[require_superadmin] = lambda: superadmin
             test_app.dependency_overrides[real_get_current_user] = lambda: superadmin
@@ -364,4 +364,4 @@ async def test_phase3_tenants_still_works(client: AsyncClient, superadmin: User)
 
 
 # reuse from test_roles for require_role convenience
-from coreAdmin_api.dependencies import require_superadmin
+from adminfoundry.dependencies import require_superadmin

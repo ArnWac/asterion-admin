@@ -4,11 +4,11 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coreAdmin_api.middleware.rate_limit import reset_rate_limiter
-from coreAdmin_api.models.user import User
-from coreAdmin_api.auth import hash_password, create_access_token_with_iat
-from coreAdmin_api.observability.admin_metrics import get_snapshot, reset as reset_metrics
-from coreAdmin_api.services.session_security import session_security
+from adminfoundry.middleware.rate_limit import reset_rate_limiter
+from adminfoundry.models.user import User
+from adminfoundry.auth import hash_password, create_access_token_with_iat
+from adminfoundry.observability.admin_metrics import get_snapshot, reset as reset_metrics
+from adminfoundry.services.session_security import session_security
 
 
 @pytest_asyncio.fixture

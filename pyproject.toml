@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "coreAdmin-api"
+name = "adminfoundry"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -43,11 +43,12 @@ dev = [
 ]
 
 [project.scripts]
-coreadmin = "coreAdmin_api.cli:app"
+adminfoundry = "adminfoundry.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["coreAdmin_api*"]
+include = ["adminfoundry*"]
+
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

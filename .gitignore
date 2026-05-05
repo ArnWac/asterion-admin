@@ -4,10 +4,30 @@ __pycache__/
 .eggs/
 dist/
 build/
+
+# Environment
 .env
+.env.local
 .venv/
 venv/
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Caches
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log

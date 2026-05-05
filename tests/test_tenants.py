@@ -9,9 +9,9 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from coreAdmin_api.models.user import User
-from coreAdmin_api.models.tenant import Tenant
-from coreAdmin_api.auth import create_access_token, hash_password
+from adminfoundry.models.user import User
+from adminfoundry.models.tenant import Tenant
+from adminfoundry.auth import create_access_token, hash_password
 
 
 def auth(user: User) -> dict:
@@ -131,8 +131,8 @@ async def test_middleware_passthrough_when_flag_false(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_middleware_disabled_tenant_blocked(db: AsyncSession, db_engine):
     """Middleware returns 403 when resolved tenant is disabled (MULTI_TENANT=true)."""
-    from coreAdmin_api.middleware import tenant as tenant_mod
-    from coreAdmin_api.main import app as main_app
+    from adminfoundry.middleware import tenant as tenant_mod
+    from adminfoundry.main import app as main_app
 
     disabled = Tenant(name="Disabled Co", slug="disabled-co", is_active=False)
     db.add(disabled)
@@ -149,7 +149,7 @@ async def test_middleware_disabled_tenant_blocked(db: AsyncSession, db_engine):
             yield s
 
     with patch.object(tenant_mod, "AsyncSessionLocal", fake_session_local):
-        with patch("coreAdmin_api.settings.settings.MULTI_TENANT", True):
+        with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
             transport = ASGITransport(app=main_app)
             async with AsyncClient(transport=transport, base_url="http://test") as ac:
                 resp = await ac.get("/health", headers={"X-Tenant-Slug": "disabled-co"})
@@ -159,8 +159,8 @@ async def test_middleware_disabled_tenant_blocked(db: AsyncSession, db_engine):
 @pytest.mark.asyncio
 async def test_middleware_unknown_tenant_404(db: AsyncSession, db_engine):
     """Middleware returns 404 for unknown tenant slug."""
-    from coreAdmin_api.middleware import tenant as tenant_mod
-    from coreAdmin_api.main import app as main_app
+    from adminfoundry.middleware import tenant as tenant_mod
+    from adminfoundry.main import app as main_app
 
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
 
@@ -172,7 +172,7 @@ async def test_middleware_unknown_tenant_404(db: AsyncSession, db_engine):
             yield s
 
     with patch.object(tenant_mod, "AsyncSessionLocal", fake_session_local):
-        with patch("coreAdmin_api.settings.settings.MULTI_TENANT", True):
+        with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
             transport = ASGITransport(app=main_app)
             async with AsyncClient(transport=transport, base_url="http://test") as ac:
                 resp = await ac.get("/health", headers={"X-Tenant-Slug": "no-such-tenant"})
@@ -182,8 +182,8 @@ async def test_middleware_unknown_tenant_404(db: AsyncSession, db_engine):
 @pytest.mark.asyncio
 async def test_middleware_active_tenant_passes(db: AsyncSession, db_engine):
     """Middleware stores tenant in state and lets request through."""
-    from coreAdmin_api.middleware import tenant as tenant_mod
-    from coreAdmin_api.main import app as main_app
+    from adminfoundry.middleware import tenant as tenant_mod
+    from adminfoundry.main import app as main_app
 
     active = Tenant(name="Active Co", slug="active-co", is_active=True)
     db.add(active)
@@ -199,7 +199,7 @@ async def test_middleware_active_tenant_passes(db: AsyncSession, db_engine):
             yield s
 
     with patch.object(tenant_mod, "AsyncSessionLocal", fake_session_local):
-        with patch("coreAdmin_api.settings.settings.MULTI_TENANT", True):
+        with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
             transport = ASGITransport(app=main_app)
             async with AsyncClient(transport=transport, base_url="http://test") as ac:
                 resp = await ac.get("/health", headers={"X-Tenant-Slug": "active-co"})
@@ -209,10 +209,10 @@ async def test_middleware_active_tenant_passes(db: AsyncSession, db_engine):
 @pytest.mark.asyncio
 async def test_middleware_no_header_stores_none(db: AsyncSession, db_engine):
     """When MULTI_TENANT=true but no header, request proceeds (tenant=None)."""
-    from coreAdmin_api.middleware import tenant as tenant_mod
-    from coreAdmin_api.main import app as main_app
+    from adminfoundry.middleware import tenant as tenant_mod
+    from adminfoundry.main import app as main_app
 
-    with patch("coreAdmin_api.settings.settings.MULTI_TENANT", True):
+    with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
         transport = ASGITransport(app=main_app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             resp = await ac.get("/health")
@@ -228,7 +228,7 @@ async def test_get_tenant_db_fails_without_context():
     """get_tenant_db raises 400 when MULTI_TENANT=true and no tenant in state."""
     from fastapi import FastAPI, Depends
     from httpx import AsyncClient, ASGITransport
-    from coreAdmin_api.database import get_tenant_db
+    from adminfoundry.database import get_tenant_db
     from sqlalchemy.ext.asyncio import AsyncSession
 
     test_app = FastAPI()
@@ -237,7 +237,7 @@ async def test_get_tenant_db_fails_without_context():
     async def scoped(_db: AsyncSession = Depends(get_tenant_db)):
         return {"ok": True}
 
-    with patch("coreAdmin_api.settings.settings.MULTI_TENANT", True):
+    with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
         transport = ASGITransport(app=test_app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             resp = await ac.get("/scoped")

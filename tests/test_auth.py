@@ -1,7 +1,7 @@
 import pytest
 from httpx import AsyncClient
-from coreAdmin_api.models.user import User
-from coreAdmin_api.auth import create_access_token, create_refresh_token
+from adminfoundry.models.user import User
+from adminfoundry.auth import create_access_token, create_refresh_token
 
 
 @pytest.mark.asyncio

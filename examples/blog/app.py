@@ -9,20 +9,20 @@ from fastapi import FastAPI
 from sqlalchemy import String, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
-import coreAdmin_api.admin_config  # noqa: F401 — registriert User, Role, Tenant
-from coreAdmin_api.admin import admin_site
-from coreAdmin_api.admin.model_admin import ModelAdmin
-from coreAdmin_api.admin.router import create_coreadmin
-from coreAdmin_api.auth import hash_password
-from coreAdmin_api.core.config import CoreAdminConfig
-from coreAdmin_api.database import AsyncSessionLocal
-from coreAdmin_api.models.base import Base, TimestampedBase
-from coreAdmin_api.models.role import Role       # noqa: F401 — register table
-from coreAdmin_api.models.tenant import Tenant   # noqa: F401 — register table
-from coreAdmin_api.models.user import User
-from coreAdmin_api.routers import auth, health
-from coreAdmin_api.routers.admin_ui import router as admin_ui_router, get_static_app
-from coreAdmin_api.settings import settings
+import adminfoundry.admin_config  # noqa: F401 — registriert User, Role, Tenant
+from adminfoundry.admin import admin_site
+from adminfoundry.admin.model_admin import ModelAdmin
+from adminfoundry.admin.router import create_coreadmin
+from adminfoundry.auth import hash_password
+from adminfoundry.core.config import CoreAdminConfig
+from adminfoundry.database import AsyncSessionLocal
+from adminfoundry.models.base import Base, TimestampedBase
+from adminfoundry.models.role import Role       # noqa: F401 — register table
+from adminfoundry.models.tenant import Tenant   # noqa: F401 — register table
+from adminfoundry.models.user import User
+from adminfoundry.routers import auth, health
+from adminfoundry.routers.admin_ui import router as admin_ui_router, get_static_app
+from adminfoundry.settings import settings
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ admin_site.register(PostAdmin())
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Tabellen anlegen (ersetzt Alembic für dieses Beispiel)
-    from coreAdmin_api.database import engine as db_engine
+    from adminfoundry.database import engine as db_engine
     async with db_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

@@ -9,13 +9,13 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from coreAdmin_api.models.user import User
-from coreAdmin_api.models.tenant import Tenant
-from coreAdmin_api.models.audit_log import AuditLog
-from coreAdmin_api.models.impersonation_log import ImpersonationLog
-from coreAdmin_api.auth import create_access_token, create_refresh_token, create_impersonation_token
-from coreAdmin_api.token_blacklist import blacklist_token, is_blacklisted, clear_blacklist
-from coreAdmin_api.auth import hash_password
+from adminfoundry.models.user import User
+from adminfoundry.models.tenant import Tenant
+from adminfoundry.models.audit_log import AuditLog
+from adminfoundry.models.impersonation_log import ImpersonationLog
+from adminfoundry.auth import create_access_token, create_refresh_token, create_impersonation_token
+from adminfoundry.token_blacklist import blacklist_token, is_blacklisted, clear_blacklist
+from adminfoundry.auth import hash_password
 
 
 def auth(user: User) -> dict:

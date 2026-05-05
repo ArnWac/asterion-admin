@@ -45,7 +45,9 @@
       "Bash(python -m pytest tests/test_admin_ui.py tests/test_admin_ui_pages.py -q --tb=short)",
       "Bash(python -m pytest tests/test_admin_contract.py::test_field_metadata_excludes_protected_fields -q --tb=short)",
       "Bash(python -m pytest tests/test_admin_contract.py::test_contract_no_protected_fields_in_any_endpoint -vv --tb=short)",
-      "Bash(Remove-Item \"f:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\\\\coreAdmin_api\\\\admin\\\\ui_helpers.py\")"
+      "Bash(Remove-Item \"f:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\\\\coreAdmin_api\\\\admin\\\\ui_helpers.py\")",
+      "Bash(xargs sed *)",
+      "Bash(git rm *)"
     ]
   }
 }

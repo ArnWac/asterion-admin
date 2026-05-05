@@ -490,7 +490,7 @@ PostgreSQL integration tests must apply Alembic migrations. Metadata-only setup 
 **Package layers**
 
 ```
-coreAdmin_api/
+adminfoundry/
   core/            typed config model
   admin/           registry, schema builder, serializer, contract, UI
   models/          shared SQLAlchemy models

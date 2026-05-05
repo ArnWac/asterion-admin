@@ -4,9 +4,9 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coreAdmin_api.models.user import User
-from coreAdmin_api.models.role import Role
-from coreAdmin_api.auth import hash_password, create_access_token_with_iat
+from adminfoundry.models.user import User
+from adminfoundry.models.role import Role
+from adminfoundry.auth import hash_password, create_access_token_with_iat
 
 
 @pytest_asyncio.fixture

@@ -8,12 +8,12 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coreAdmin_api.models.user import User
-from coreAdmin_api.auth import create_access_token, create_impersonation_token, hash_password
-from coreAdmin_api.admin import admin_site
-from coreAdmin_api.admin.contract import build_field_metadata, build_model_contract
-from coreAdmin_api.admin.capabilities import build_capabilities, build_admin_context
-from coreAdmin_api.admin.navigation import build_navigation
+from adminfoundry.models.user import User
+from adminfoundry.auth import create_access_token, create_impersonation_token, hash_password
+from adminfoundry.admin import admin_site
+from adminfoundry.admin.contract import build_field_metadata, build_model_contract
+from adminfoundry.admin.capabilities import build_capabilities, build_admin_context
+from adminfoundry.admin.navigation import build_navigation
 
 
 def auth(user: User) -> dict:
@@ -80,8 +80,8 @@ def test_field_metadata_widget_types():
 
 def test_field_metadata_relation_for_tenant_id():
     """tenant_id FK should produce a relation meta entry when protected_fields excludes it."""
-    from coreAdmin_api.admin.model_admin import ModelAdmin
-    from coreAdmin_api.models.user import User
+    from adminfoundry.admin.model_admin import ModelAdmin
+    from adminfoundry.models.user import User
 
     class _MultiTenantUserAdmin(ModelAdmin):
         model = User

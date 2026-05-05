@@ -14,11 +14,11 @@ Covers:
 import pytest
 from unittest.mock import MagicMock
 
-from coreAdmin_api.admin.contract import CONTRACT_VERSION, build_model_contract, build_field_metadata
-from coreAdmin_api.admin.ui_renderer import RENDERER_VERSION, SUPPORTED_FEATURES, get_support_matrix
-from coreAdmin_api.schemas.admin_contract import ModelContractMeta, RelationMeta
-from coreAdmin_api.schemas.capabilities import CapabilitiesResponse, AdminContextResponse
-from coreAdmin_api.schemas.client_config import ClientConfigResponse
+from adminfoundry.admin.contract import CONTRACT_VERSION, build_model_contract, build_field_metadata
+from adminfoundry.admin.ui_renderer import RENDERER_VERSION, SUPPORTED_FEATURES, get_support_matrix
+from adminfoundry.schemas.admin_contract import ModelContractMeta, RelationMeta
+from adminfoundry.schemas.capabilities import CapabilitiesResponse, AdminContextResponse
+from adminfoundry.schemas.client_config import ClientConfigResponse
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ def test_client_config_no_secret_fields():
 def _make_mock_admin(model_class, *, list_display=None, search_fields=None,
                      filter_fields=None, ordering=None, readonly_fields=None,
                      protected_fields=None, lookup_field=None):
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class _Admin(ModelAdmin):
         model = model_class
@@ -141,8 +141,8 @@ def _make_mock_admin(model_class, *, list_display=None, search_fields=None,
 
 
 def test_build_model_contract_has_contract_version():
-    from coreAdmin_api.models.user import User
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.models.user import User
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class UserAdmin(ModelAdmin):
         model = User
@@ -154,8 +154,8 @@ def test_build_model_contract_has_contract_version():
 
 
 def test_build_model_contract_with_registry_populates_lookup_url():
-    from coreAdmin_api.models.user import User
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.models.user import User
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class UserAdmin(ModelAdmin):
         model = User
@@ -179,8 +179,8 @@ def test_build_model_contract_with_registry_populates_lookup_url():
 
 
 def test_build_model_contract_without_registry_no_lookup_url():
-    from coreAdmin_api.models.user import User
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.models.user import User
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class UserAdmin(ModelAdmin):
         model = User
@@ -196,8 +196,8 @@ def test_build_model_contract_without_registry_no_lookup_url():
 # ---------------------------------------------------------------------------
 
 def test_user_contract_snapshot_shape():
-    from coreAdmin_api.models.user import User
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.models.user import User
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class UserAdmin(ModelAdmin):
         model = User
@@ -224,8 +224,8 @@ def test_user_contract_snapshot_shape():
 
 
 def test_user_contract_readonly_fields_present():
-    from coreAdmin_api.models.user import User
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.models.user import User
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class UserAdmin(ModelAdmin):
         model = User
@@ -239,8 +239,8 @@ def test_user_contract_readonly_fields_present():
 
 
 def test_user_contract_list_fields_subset_of_fields():
-    from coreAdmin_api.models.user import User
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.models.user import User
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class UserAdmin(ModelAdmin):
         model = User
@@ -257,8 +257,8 @@ def test_user_contract_list_fields_subset_of_fields():
 # ---------------------------------------------------------------------------
 
 def test_tenant_contract_snapshot_shape():
-    from coreAdmin_api.models.tenant import Tenant
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.models.tenant import Tenant
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class TenantAdmin(ModelAdmin):
         model = Tenant
@@ -278,8 +278,8 @@ def test_tenant_contract_snapshot_shape():
 
 
 def test_tenant_contract_no_protected_fields():
-    from coreAdmin_api.models.tenant import Tenant
-    from coreAdmin_api.admin.model_admin import ModelAdmin
+    from adminfoundry.models.tenant import Tenant
+    from adminfoundry.admin.model_admin import ModelAdmin
 
     class TenantAdmin(ModelAdmin):
         model = Tenant

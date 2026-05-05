@@ -1,9 +1,9 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from coreAdmin_api.models.user import User
-from coreAdmin_api.models.role import Role
-from coreAdmin_api.auth import create_access_token
+from adminfoundry.models.user import User
+from adminfoundry.models.role import Role
+from adminfoundry.auth import create_access_token
 
 
 def auth(user: User) -> dict:
@@ -21,7 +21,7 @@ async def test_list_users_superadmin(client: AsyncClient, superadmin: User):
 
 @pytest.mark.asyncio
 async def test_list_users_forbidden_non_superadmin(client: AsyncClient, db: AsyncSession):
-    from coreAdmin_api.auth import hash_password
+    from adminfoundry.auth import hash_password
     user = User(email="plain@example.com", hashed_password=hash_password("pw"), is_active=True, is_superadmin=False)
     db.add(user)
     await db.commit()
@@ -73,7 +73,7 @@ async def test_update_user(client: AsyncClient, superadmin: User):
 
 @pytest.mark.asyncio
 async def test_soft_delete_user(client: AsyncClient, superadmin: User, db: AsyncSession):
-    from coreAdmin_api.auth import hash_password
+    from adminfoundry.auth import hash_password
     target = User(email="todelete@example.com", hashed_password=hash_password("pw"), is_active=True, is_superadmin=False)
     db.add(target)
     await db.commit()

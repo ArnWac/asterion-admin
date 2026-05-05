@@ -1,9 +1,9 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from coreAdmin_api.models.user import User
-from coreAdmin_api.models.role import Role
-from coreAdmin_api.auth import create_access_token, hash_password
+from adminfoundry.models.user import User
+from adminfoundry.models.role import Role
+from adminfoundry.auth import create_access_token, hash_password
 
 
 def auth(user: User) -> dict:
@@ -90,8 +90,8 @@ async def test_duplicate_role_assignment_rejected(client: AsyncClient, superadmi
 @pytest.mark.asyncio
 async def test_require_role_passes_with_role(client: AsyncClient, superadmin: User, db: AsyncSession):
     """require_role dependency: user with role gets through."""
-    from coreAdmin_api.dependencies import require_role
-    from coreAdmin_api.main import app
+    from adminfoundry.dependencies import require_role
+    from adminfoundry.main import app
 
     user = User(email="hasrole@example.com", hashed_password=hash_password("pw"), is_active=True, is_superadmin=False)
     db.add(user)
@@ -105,7 +105,7 @@ async def test_require_role_passes_with_role(client: AsyncClient, superadmin: Us
     user_id = user.id  # capture before any expire
 
     # Assign role directly in DB
-    from coreAdmin_api.models.role import user_roles
+    from adminfoundry.models.role import user_roles
     await db.execute(user_roles.insert().values(user_id=user_id, role_id=role.id))
     await db.commit()
 
@@ -117,9 +117,9 @@ async def test_require_role_passes_with_role(client: AsyncClient, superadmin: Us
 @pytest.mark.asyncio
 async def test_require_role_fails_without_role(client: AsyncClient, db: AsyncSession):
     """require_role dependency: user without role gets 403."""
-    from coreAdmin_api.dependencies import require_role
-    from coreAdmin_api.models.user import User
-    from coreAdmin_api.auth import hash_password, create_access_token
+    from adminfoundry.dependencies import require_role
+    from adminfoundry.models.user import User
+    from adminfoundry.auth import hash_password, create_access_token
     from fastapi import FastAPI, Depends
     from httpx import AsyncClient, ASGITransport
 
@@ -129,8 +129,8 @@ async def test_require_role_fails_without_role(client: AsyncClient, db: AsyncSes
     await db.refresh(user)
 
     # Build a minimal test app with a require_role-protected route
-    from coreAdmin_api.main import app as main_app
-    from coreAdmin_api.database import get_db
+    from adminfoundry.main import app as main_app
+    from adminfoundry.database import get_db
 
     async def override_db():
         yield db
@@ -153,10 +153,10 @@ async def test_require_role_fails_without_role(client: AsyncClient, db: AsyncSes
 @pytest.mark.asyncio
 async def test_superadmin_bypasses_require_role(client: AsyncClient, superadmin: User, db: AsyncSession):
     """Superadmin passes require_role even without the role assigned."""
-    from coreAdmin_api.dependencies import require_role
+    from adminfoundry.dependencies import require_role
     from fastapi import FastAPI, Depends
     from httpx import AsyncClient, ASGITransport
-    from coreAdmin_api.database import get_db
+    from adminfoundry.database import get_db
 
     async def override_db():
         yield db

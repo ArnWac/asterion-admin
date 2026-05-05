@@ -3,11 +3,11 @@ from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
-from coreAdmin_api.settings import settings
-from coreAdmin_api.models.base import Base
-import coreAdmin_api.models.user  # noqa: F401 — register model
-import coreAdmin_api.models.role  # noqa: F401 — register model
-import coreAdmin_api.models.tenant  # noqa: F401 — register model
+from adminfoundry.settings import settings
+from adminfoundry.models.base import Base
+import adminfoundry.models.user  # noqa: F401 — register model
+import adminfoundry.models.role  # noqa: F401 — register model
+import adminfoundry.models.tenant  # noqa: F401 — register model
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

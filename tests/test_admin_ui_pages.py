@@ -15,8 +15,8 @@ import uuid
 from unittest.mock import patch
 from httpx import AsyncClient, ASGITransport
 
-from coreAdmin_api.admin.ui_renderer import get_support_matrix, SUPPORTED_FEATURES, RENDERER_VERSION
-from coreAdmin_api.admin.ui_preferences import UIPreference, get_preferences, set_preferences, clear_preferences
+from adminfoundry.admin.ui_renderer import get_support_matrix, SUPPORTED_FEATURES, RENDERER_VERSION
+from adminfoundry.admin.ui_preferences import UIPreference, get_preferences, set_preferences, clear_preferences
 
 
 # ---------------------------------------------------------------------------

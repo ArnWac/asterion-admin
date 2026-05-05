@@ -14,8 +14,8 @@ import pytest
 from unittest.mock import patch
 from httpx import AsyncClient, ASGITransport
 
-from coreAdmin_api.admin.ui_renderer import get_support_matrix, RENDERER_ID, SUPPORTED_FEATURES
-from coreAdmin_api.admin.registry import admin_site
+from adminfoundry.admin.ui_renderer import get_support_matrix, RENDERER_ID, SUPPORTED_FEATURES
+from adminfoundry.admin.registry import admin_site
 
 
 # ---------------------------------------------------------------------------
@@ -66,16 +66,16 @@ def test_support_matrix_quality_flags():
 def _make_app_enabled():
     """Return a fresh app with ENABLE_BUILTIN_ADMIN_UI=True."""
     import importlib
-    import coreAdmin_api.main as m
+    import adminfoundry.main as m
     importlib.reload(m)
     return m.app
 
 
 def _make_app_disabled():
     """Return a fresh app with ENABLE_BUILTIN_ADMIN_UI=False."""
-    with patch("coreAdmin_api.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
+    with patch("adminfoundry.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
         import importlib
-        import coreAdmin_api.main as m
+        import adminfoundry.main as m
         importlib.reload(m)
         return m.app
 
@@ -254,9 +254,9 @@ async def test_ui_base_in_list_template(client):
 @pytest.mark.asyncio
 async def test_api_unaffected_when_ui_disabled(db_engine):
     """Disabling the built-in UI must not break API routes."""
-    with patch("coreAdmin_api.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
+    with patch("adminfoundry.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
         import importlib
-        import coreAdmin_api.main as m
+        import adminfoundry.main as m
         importlib.reload(m)
         disabled_app = m.app
 
@@ -269,9 +269,9 @@ async def test_api_unaffected_when_ui_disabled(db_engine):
 @pytest.mark.asyncio
 async def test_ui_routes_absent_when_disabled(db_engine):
     """When UI disabled, /admin-ui/login should 404."""
-    with patch("coreAdmin_api.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
+    with patch("adminfoundry.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
         import importlib
-        import coreAdmin_api.main as m
+        import adminfoundry.main as m
         importlib.reload(m)
         disabled_app = m.app
 

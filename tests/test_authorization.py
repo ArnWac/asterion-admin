@@ -15,20 +15,20 @@ import pytest_asyncio
 from unittest.mock import MagicMock
 from sqlalchemy import select
 
-from coreAdmin_api.authz.rules import FieldPolicy, RecordPolicy
-from coreAdmin_api.authz.policy_engine import PolicyEngine, policy_engine, _roles_allow
-from coreAdmin_api.schemas.admin_contract import FieldMeta, ActionMeta
-from coreAdmin_api.schemas.policy import FieldPolicyMeta, ModelPolicyResponse
-from coreAdmin_api.admin.contract import (
+from adminfoundry.authz.rules import FieldPolicy, RecordPolicy
+from adminfoundry.authz.policy_engine import PolicyEngine, policy_engine, _roles_allow
+from adminfoundry.schemas.admin_contract import FieldMeta, ActionMeta
+from adminfoundry.schemas.policy import FieldPolicyMeta, ModelPolicyResponse
+from adminfoundry.admin.contract import (
     CONTRACT_VERSION, build_model_contract, build_model_contract_for_user,
 )
-from coreAdmin_api.admin.capabilities import build_capabilities
-from coreAdmin_api.admin.model_admin import ModelAdmin
-from coreAdmin_api.admin.registry import admin_site
-from coreAdmin_api.admin.schema_builder import schema_builder
-from coreAdmin_api.models.role import Role, user_roles
-from coreAdmin_api.models.user import User
-from coreAdmin_api.auth import create_access_token, hash_password
+from adminfoundry.admin.capabilities import build_capabilities
+from adminfoundry.admin.model_admin import ModelAdmin
+from adminfoundry.admin.registry import admin_site
+from adminfoundry.admin.schema_builder import schema_builder
+from adminfoundry.models.role import Role, user_roles
+from adminfoundry.models.user import User
+from adminfoundry.auth import create_access_token, hash_password
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -352,7 +352,7 @@ def test_field_policy_meta_schema():
 # ---------------------------------------------------------------------------
 
 def test_build_model_contract_for_user_superadmin_all_visible():
-    from coreAdmin_api.admin_config import UserAdmin
+    from adminfoundry.admin_config import UserAdmin
     admin = admin_site.get("users")
     user = _make_superadmin()
     contract = build_model_contract_for_user(admin, user, {})

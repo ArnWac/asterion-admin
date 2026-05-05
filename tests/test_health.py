@@ -17,7 +17,7 @@ async def test_health_degraded_on_db_failure(client: AsyncClient):
     from unittest.mock import AsyncMock, patch
     from sqlalchemy.exc import OperationalError
 
-    with patch("coreAdmin_api.routers.health.get_db") as mock_get_db:
+    with patch("adminfoundry.routers.health.get_db") as mock_get_db:
         async def broken_db():
             raise OperationalError("DB down", None, None)
             yield  # noqa: unreachable — makes it an async generator
