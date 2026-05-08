@@ -27,10 +27,18 @@ class PolicyEngine:
         return user.is_superadmin and not bool(token_payload.get("impersonated_by"))
 
     def evaluate_field(
-        self, user, model_admin, field_name: str, token_payload: dict
+        self, user, model_admin, field_name: str, token_payload: dict, *, record=None
     ) -> FieldPolicy:
         if self._privileged(user, token_payload):
             return FieldPolicy(can_view=True, can_edit=True)
+
+        # Per-record hook: ModelAdmin.field_permission(user, field_name, record) -> FieldPolicy | None
+        if record is not None:
+            hook = getattr(type(model_admin), "field_permission", None)
+            if hook is not None:
+                result = hook(model_admin, user, field_name, record)
+                if result is not None:
+                    return result
 
         field_policies = getattr(model_admin, "field_policies", {})
         policy = field_policies.get(field_name)
@@ -78,13 +86,23 @@ class PolicyEngine:
         allowed = bool(record_access(user, record))
         return RecordPolicy(can_read=allowed, can_update=allowed, can_delete=allowed)
 
-    def effective_model_caps(self, user, model_admin, token_payload: dict) -> dict:
-        """Return CRUD capability flags for a user on a model."""
+    def effective_model_caps(
+        self, user, model_admin, token_payload: dict, *, db_caps: dict | None = None
+    ) -> dict:
+        """Return CRUD capability flags for a user on a model.
+
+        db_caps: pre-fetched merged RolePermission dict from DB; when provided it
+        overrides the ModelAdmin config-based role check (but never overrides
+        superadmin / impersonation logic).
+        """
         if self._privileged(user, token_payload):
             return dict(
                 can_list=True, can_create=True, can_read=True,
                 can_update=True, can_delete=True,
             )
+        # DB-backed permissions take precedence over ModelAdmin config
+        if db_caps is not None:
+            return db_caps
         if getattr(model_admin, "admin_only", True):
             return dict(
                 can_list=False, can_create=False, can_read=False,

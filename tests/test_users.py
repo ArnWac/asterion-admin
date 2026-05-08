@@ -93,3 +93,38 @@ async def test_user_response_no_protected_fields(client: AsyncClient, superadmin
     data = resp.json()
     assert "hashed_password" not in data
     assert "password" not in data
+
+
+@pytest.mark.asyncio
+async def test_get_me(client: AsyncClient, superadmin: User):
+    resp = await client.get("/api/v1/users/me", headers=auth(superadmin))
+    assert resp.status_code == 200
+    assert resp.json()["email"] == superadmin.email
+
+
+@pytest.mark.asyncio
+async def test_update_me_name(client: AsyncClient, superadmin: User, db: AsyncSession):
+    resp = await client.patch("/api/v1/users/me", json={"full_name": "Updated Name"}, headers=auth(superadmin))
+    assert resp.status_code == 200
+    assert resp.json()["full_name"] == "Updated Name"
+
+
+@pytest.mark.asyncio
+async def test_update_me_wrong_password(client: AsyncClient, superadmin: User):
+    resp = await client.patch(
+        "/api/v1/users/me",
+        json={"current_password": "wrong", "new_password": "newpass"},
+        headers=auth(superadmin),
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_me_password_change(client: AsyncClient, superadmin: User):
+    # superadmin fixture uses "password123"
+    resp = await client.patch(
+        "/api/v1/users/me",
+        json={"current_password": "password123", "new_password": "newpass123"},
+        headers=auth(superadmin),
+    )
+    assert resp.status_code == 200

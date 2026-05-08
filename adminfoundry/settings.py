@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     ENABLE_BUILTIN_ADMIN_UI: bool = True
     ADMIN_UI_PATH: str = "/admin-ui"
+    ADMIN_TITLE: str = "adminfoundry"
 
     ENABLE_WORKFLOWS: bool = True
 

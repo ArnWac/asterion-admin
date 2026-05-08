@@ -286,18 +286,19 @@ async def test_base_template_has_tenant_ctx_element(client):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_create_form_has_alert_container(client):
+async def test_create_form_has_toast_container(client):
     resp = await client.get("/admin-ui/user/new")
-    assert b'role="alert"' in resp.content
-    assert b"alert" in resp.content
+    # inline alert replaced by toast — page must have the form and toast container
+    assert b'id="record-form"' in resp.content
+    assert b'toast-container' in resp.content
 
 
 @pytest.mark.asyncio
-async def test_update_form_has_alert_container(client):
+async def test_update_form_has_toast_container(client):
     fake_id = str(uuid.uuid4())
     resp = await client.get(f"/admin-ui/user/{fake_id}/edit")
-    assert b'role="alert"' in resp.content
-    assert b'aria-live="assertive"' in resp.content
+    assert b'id="record-form"' in resp.content
+    assert b'toast-container' in resp.content
 
 
 # ---------------------------------------------------------------------------

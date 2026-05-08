@@ -15,6 +15,7 @@ from adminfoundry.admin.model_admin import ModelAdmin
 from adminfoundry.schemas.admin_contract import (
     ActionMeta,
     FieldMeta,
+    InlineRelationMeta,
     ModelContractMeta,
     RelationMeta,
 )
@@ -99,6 +100,7 @@ def build_field_metadata(model_admin: ModelAdmin, registry=None) -> list[FieldMe
             fk = next(iter(col.foreign_keys))
             relation = _relation_meta(fk, registry)
 
+        choices_url = getattr(model_admin, "field_choices_urls", {}).get(name)
         fields.append(FieldMeta(
             name=name,
             label=_prettify(name),
@@ -110,9 +112,10 @@ def build_field_metadata(model_admin: ModelAdmin, registry=None) -> list[FieldMe
             in_list=name in list_set,
             searchable=name in search_set,
             filterable=name in filter_set,
-            sortable=True,  # all columns support order_by
-            widget=_widget(ft, relation is not None),
+            sortable=True,
+            widget="choices-select" if choices_url else _widget(ft, relation is not None),
             relation=relation,
+            choices_url=choices_url,
         ))
 
     # Virtual create-only fields (e.g. plain-text password before hashing)
@@ -137,6 +140,35 @@ def build_field_metadata(model_admin: ModelAdmin, registry=None) -> list[FieldMe
     return fields
 
 
+def _build_inline_relations(model_admin: ModelAdmin) -> list[InlineRelationMeta]:
+    """Introspect declared relationship attrs listed in model_admin.inline_fields."""
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy.orm import ONETOMANY
+    inline: list[InlineRelationMeta] = []
+    if not getattr(model_admin, "inline_fields", []):
+        return inline
+    mapper = sa_inspect(model_admin.model)
+    rel_map = {r.key: r for r in mapper.relationships}
+    for attr in model_admin.inline_fields:
+        rel = rel_map.get(attr)
+        if rel is None:
+            continue
+        target_table = rel.mapper.class_.__tablename__
+        many = rel.uselist
+        fk_field: str | None = None
+        if rel.direction == ONETOMANY and rel.synchronize_pairs:
+            # synchronize_pairs: [(parent_col, child_col), ...]
+            fk_field = rel.synchronize_pairs[0][1].name
+        inline.append(InlineRelationMeta(
+            attr=attr,
+            target_table=target_table,
+            many=many,
+            label=attr.replace("_", " ").title(),
+            fk_field=fk_field,
+        ))
+    return inline
+
+
 def build_model_contract(model_admin: ModelAdmin, registry=None) -> ModelContractMeta:
     fields = build_field_metadata(model_admin, registry=registry)
     from adminfoundry.admin.actions import AdminAction as _AdminAction
@@ -155,10 +187,16 @@ def build_model_contract(model_admin: ModelAdmin, registry=None) -> ModelContrac
         list_fields=model_admin.list_display,
         search_fields=model_admin.search_fields,
         filter_fields=model_admin.filter_fields,
+        range_filter_fields=getattr(model_admin, "range_filter_fields", []),
+        enum_filter_fields=getattr(model_admin, "enum_filter_fields", []),
         ordering=model_admin.ordering,
         readonly_fields=model_admin.readonly_fields,
         actions=actions,
         requires_approval=getattr(model_admin, "requires_approval", False),
+        inline_relations=_build_inline_relations(model_admin),
+        list_editable=getattr(model_admin, "list_editable", []),
+        create_redirect=getattr(model_admin, "create_redirect", "list"),
+        permission_matrix=getattr(model_admin, "permission_matrix", False),
     )
 
 

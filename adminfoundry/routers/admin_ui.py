@@ -24,8 +24,19 @@ router = APIRouter(tags=["admin-ui"])
 def _tmpl(name: str, request: Request, **ctx):
     # Starlette 1.0 API: TemplateResponse(request, name, context)
     return templates.TemplateResponse(
-        request, name, {"ui_base": settings.ADMIN_UI_PATH, "renderer_version": RENDERER_VERSION, **ctx}
+        request, name, {"ui_base": settings.ADMIN_UI_PATH, "renderer_version": RENDERER_VERSION,
+                        "admin_title": settings.ADMIN_TITLE, **ctx}
     )
+
+
+def _model_labels(model_name: str) -> tuple[str, str]:
+    """Resolve human-readable label / label_plural from the admin registry."""
+    from adminfoundry.admin import admin_site
+    ma = admin_site.get(model_name)
+    if ma:
+        return ma.display_label, ma.display_label_plural
+    pretty = model_name.replace("_", " ").title()
+    return pretty, pretty
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +53,14 @@ def get_static_app():
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def admin_ui_root(request: Request):
-    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/login")
+    base = settings.ADMIN_UI_PATH
+    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<script>
+  var t = localStorage.getItem('coreAdmin_access');
+  if (t) {{ window.location.replace('{base}/dashboard'); }}
+  else {{ window.location.replace('{base}/login'); }}
+</script></head><body></body></html>"""
+    return HTMLResponse(content=html)
 
 
 @router.get("/login", response_class=HTMLResponse, include_in_schema=False)
@@ -71,29 +89,38 @@ async def renderer_support_matrix():
     return get_support_matrix()
 
 
+@router.get("/settings", response_class=HTMLResponse, include_in_schema=False)
+async def admin_ui_settings(request: Request):
+    return _tmpl("settings.html", request)
+
+
 # /{model_name}/new must come before /{model_name}/{object_id}
 @router.get("/{model_name}/new", response_class=HTMLResponse, include_in_schema=False)
 async def admin_ui_create(request: Request, model_name: str):
-    return _tmpl("create.html", request, model=model_name)
+    label, label_plural = _model_labels(model_name)
+    return _tmpl("create.html", request, model=model_name, model_label=label, model_label_plural=label_plural)
 
 
 # 3-segment routes (explicit suffixes) must come before /{model_name}/{object_id}
 @router.get("/{model_name}/{object_id}/edit", response_class=HTMLResponse, include_in_schema=False)
 async def admin_ui_edit(request: Request, model_name: str, object_id: str):
-    return _tmpl("update.html", request, model=model_name, object_id=object_id)
+    label, label_plural = _model_labels(model_name)
+    return _tmpl("update.html", request, model=model_name, object_id=object_id, model_label=label, model_label_plural=label_plural)
 
 
 @router.get("/{model_name}/{object_id}/delete", response_class=HTMLResponse, include_in_schema=False)
 async def admin_ui_confirm_delete(request: Request, model_name: str, object_id: str):
-    return _tmpl("confirm_delete.html", request, model=model_name, object_id=object_id)
-
+    label, label_plural = _model_labels(model_name)
+    return _tmpl("confirm_delete.html", request, model=model_name, object_id=object_id, model_label=label, model_label_plural=label_plural)
 
 
 @router.get("/{model_name}/{object_id}", response_class=HTMLResponse, include_in_schema=False)
 async def admin_ui_detail(request: Request, model_name: str, object_id: str):
-    return _tmpl("detail.html", request, model=model_name, object_id=object_id)
+    label, label_plural = _model_labels(model_name)
+    return _tmpl("detail.html", request, model=model_name, object_id=object_id, model_label=label, model_label_plural=label_plural)
 
 
 @router.get("/{model_name}", response_class=HTMLResponse, include_in_schema=False)
 async def admin_ui_list(request: Request, model_name: str):
-    return _tmpl("list.html", request, model=model_name)
+    label, label_plural = _model_labels(model_name)
+    return _tmpl("list.html", request, model=model_name, model_label=label, model_label_plural=label_plural)

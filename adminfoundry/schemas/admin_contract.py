@@ -36,6 +36,8 @@ class FieldMeta(BaseModel):
     create_only: bool = False
     # Phase 14: optional advanced renderer hints
     renderer_hints: RendererHints | None = None
+    # URL to fetch <select> choices from (response: {models:[]} or {items:[]})
+    choices_url: str | None = None
 
 
 class ActionMeta(BaseModel):
@@ -49,6 +51,15 @@ class ActionMeta(BaseModel):
     async_execution: bool = False
 
 
+class InlineRelationMeta(BaseModel):
+    """Describes a relationship that can be edited inline in the detail/edit view."""
+    attr: str          # Python relationship attribute name on the model
+    target_table: str  # __tablename__ of the related model
+    many: bool         # True for M2M / one-to-many; False for FK (single)
+    label: str
+    fk_field: str | None = None  # FK column on child that points to parent (one-to-many only)
+
+
 class ModelContractMeta(BaseModel):
     contract_version: str
     model: str
@@ -60,8 +71,18 @@ class ModelContractMeta(BaseModel):
     list_fields: list[str]
     search_fields: list[str]
     filter_fields: list[str]
+    range_filter_fields: list[str] = []
+    enum_filter_fields: list[str] = []
     ordering: list[str]
     readonly_fields: list[str]
     actions: list[ActionMeta]
     # Phase 13: workflow capability flag
     requires_approval: bool = False
+    # Inline-editable relationships
+    inline_relations: list[InlineRelationMeta] = []
+    # List-editable field names
+    list_editable: list[str] = []
+    # Redirect target after create: "list" | "detail"
+    create_redirect: str = "list"
+    # True: render permission matrix section (role-like models)
+    permission_matrix: bool = False

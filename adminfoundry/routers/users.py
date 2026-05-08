@@ -6,9 +6,10 @@ from sqlalchemy import select, func
 from adminfoundry.database import get_db
 from adminfoundry.dependencies import require_superadmin
 from adminfoundry.models.user import User
-from adminfoundry.auth import hash_password
+from adminfoundry.auth import hash_password, verify_password
+from adminfoundry.dependencies import get_current_user
 from adminfoundry.schemas.common import PaginatedResponse
-from adminfoundry.schemas.user import UserPublic, UserCreate, UserUpdate
+from adminfoundry.schemas.user import UserPublic, UserCreate, UserUpdate, ProfileUpdate
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -54,6 +55,44 @@ async def create_user(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@router.get("/me", response_model=UserPublic)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+):
+    return current_user
+
+
+@router.patch("/me", response_model=UserPublic)
+async def update_me(
+    body: ProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if body.new_password is not None or body.current_password is not None:
+        if not body.current_password or not body.new_password:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Both current_password and new_password are required")
+        if not verify_password(body.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Current password is incorrect")
+        current_user.hashed_password = hash_password(body.new_password)
+
+    if body.email is not None and body.email != current_user.email:
+        conflict = (await db.execute(
+            select(User).where(User.email == body.email, User.id != current_user.id)
+        )).scalar_one_or_none()
+        if conflict:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already in use")
+        current_user.email = body.email
+
+    if body.full_name is not None:
+        current_user.full_name = body.full_name
+
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
 
 
 @router.get("/{user_id}", response_model=UserPublic)

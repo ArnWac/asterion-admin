@@ -16,12 +16,20 @@ def _coerce_value(value: str, sa_type: object) -> object:
 
 class FilterBuilder:
     def build_filters(self, model_admin: ModelAdmin, params: dict) -> list:
-        """Exact-match filters for each `filter_fields` key found in params."""
+        """Build WHERE clauses from query params.
+
+        Supports:
+        - Exact match: filter_fields → ?field=value
+        - Range:       range_filter_fields → ?field__gte=X&field__lte=Y
+        - Enum/multi:  enum_filter_fields → ?field__in=a,b,c
+        """
         from sqlalchemy import inspect as sa_inspect
         mapper = sa_inspect(model_admin.model)
         col_types = {c.name: c.type for c in mapper.columns}
 
         filters = []
+
+        # Exact-match filters
         for field in model_admin.filter_fields:
             raw = params.get(field)
             if raw is None:
@@ -31,6 +39,33 @@ class FilterBuilder:
                 continue
             value = _coerce_value(raw, col_types.get(field))
             filters.append(col == value)
+
+        # Range filters (__gte / __lte)
+        for field in getattr(model_admin, "range_filter_fields", []):
+            col = getattr(model_admin.model, field, None)
+            if col is None:
+                continue
+            sa_type = col_types.get(field)
+            gte = params.get(f"{field}__gte")
+            lte = params.get(f"{field}__lte")
+            if gte is not None:
+                filters.append(col >= _coerce_value(gte, sa_type))
+            if lte is not None:
+                filters.append(col <= _coerce_value(lte, sa_type))
+
+        # Enum/multi-value filters (__in = comma-separated)
+        for field in getattr(model_admin, "enum_filter_fields", []):
+            raw = params.get(f"{field}__in")
+            if raw is None:
+                continue
+            col = getattr(model_admin.model, field, None)
+            if col is None:
+                continue
+            sa_type = col_types.get(field)
+            values = [_coerce_value(v.strip(), sa_type) for v in raw.split(",") if v.strip()]
+            if values:
+                filters.append(col.in_(values))
+
         return filters
 
     def build_search(self, model_admin: ModelAdmin, q: str | None):

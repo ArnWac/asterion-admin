@@ -3,25 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>coreAdmin{% block title %}{% endblock %}</title>
+  <title>{{ admin_title }}{% block title %}{% endblock %}</title>
   <link rel="stylesheet" href="{{ ui_base }}/static/admin.css?v={{ renderer_version }}">
 </head>
 <body>
 <a href="#main-content" class="skip-link" style="position:absolute;left:-9999px;top:0;z-index:9999;padding:.5rem 1rem;background:#0052cc;color:#fff;text-decoration:none">Skip to main content</a>
 <div class="layout">
   <nav class="sidebar" aria-label="Admin navigation">
-    <h2>coreAdmin</h2>
+    <h2>{{ admin_title }}</h2>
     <div id="nav-items" role="list" aria-label="Model list"><span class="loading" aria-live="polite">Loading…</span></div>
     <div class="sidebar-footer">
       <span id="tenant-ctx" aria-label="Active tenant"></span>
       <div><span id="user-ctx" aria-label="Logged in as"></span></div>
+      <a href="{{ ui_base }}/settings" style="display:block;margin:.3rem 0;font-size:.85rem">⚙ Settings</a>
+      <button id="dark-mode-btn" class="btn btn-sm btn-secondary" onclick="AdminUI.DarkMode.toggle()" style="margin:.4rem 0;width:100%" aria-label="Toggle dark mode">☾ Dark</button>
       <a href="{{ ui_base }}/login" id="logout-link" aria-label="Log out">Log out</a>
     </div>
   </nav>
   <main id="main-content" class="main" tabindex="-1">
+    <nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb"></nav>
     {% block content %}{% endblock %}
   </main>
 </div>
+<div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 <script>window.ADMIN_UI_BASE = '{{ ui_base }}';</script>
 <script src="{{ ui_base }}/static/admin.js?v={{ renderer_version }}"></script>
 {% block scripts %}{% endblock %}

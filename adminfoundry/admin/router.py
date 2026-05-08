@@ -121,11 +121,14 @@ async def admin_navigation(
 @router.get("/capabilities")
 async def admin_capabilities(
     request: Request,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Return UI-safe capability metadata for the current user and context."""
     payload = getattr(request.state, "token_payload", {})
-    return build_capabilities(current_user, payload, admin_site)
+    from adminfoundry.authz.role_caps import fetch_all_model_caps
+    all_db_caps = await fetch_all_model_caps(current_user, db)
+    return build_capabilities(current_user, payload, admin_site, all_db_caps or None)
 
 
 @router.get("/client-config", response_model=ClientConfigResponse)
@@ -217,6 +220,52 @@ async def admin_compatibility(
             "Clients must refuse to operate against an unsupported major version."
         ),
     }
+
+
+@router.get("/profile")
+async def get_profile(
+    current_user: User = Depends(get_current_user),
+):
+    """Return the current user's own profile."""
+    from adminfoundry.schemas.user import UserPublic
+    return UserPublic.model_validate(current_user)
+
+
+@router.patch("/profile")
+async def update_profile(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update name, email, or password for the current user."""
+    from adminfoundry.auth import hash_password, verify_password
+    from adminfoundry.schemas.user import ProfileUpdate, UserPublic
+
+    body = ProfileUpdate(**await request.json())
+
+    if body.new_password is not None or body.current_password is not None:
+        if not body.current_password or not body.new_password:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Both current_password and new_password are required")
+        if not verify_password(body.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Current password is incorrect")
+        current_user.hashed_password = hash_password(body.new_password)
+
+    if body.email is not None and body.email != current_user.email:
+        conflict = (await db.execute(
+            select(User).where(User.email == body.email, User.id != current_user.id)
+        )).scalar_one_or_none()
+        if conflict:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already in use")
+        current_user.email = body.email
+
+    if body.full_name is not None:
+        current_user.full_name = body.full_name
+
+    await db.commit()
+    await db.refresh(current_user)
+    return UserPublic.model_validate(current_user)
 
 
 @router.get("/preferences")
@@ -407,6 +456,7 @@ async def lookup_objects(
 async def model_policy(
     model_name: str,
     request: Request,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Return effective field policies and capability flags for the current user."""
@@ -414,6 +464,7 @@ async def model_policy(
     payload = getattr(request.state, "token_payload", {})
 
     from adminfoundry.admin.contract import build_field_metadata
+    from adminfoundry.authz.role_caps import fetch_model_caps
     fields = build_field_metadata(model_admin)
     field_policies = [
         FieldPolicyMeta(
@@ -422,7 +473,8 @@ async def model_policy(
         )
         for f in fields
     ]
-    caps = policy_engine.effective_model_caps(current_user, model_admin, payload)
+    db_caps = await fetch_model_caps(current_user, model_name, db)
+    caps = policy_engine.effective_model_caps(current_user, model_admin, payload, db_caps=db_caps)
     return ModelPolicyResponse(
         model=model_name,
         contract_version=CONTRACT_VERSION,
@@ -433,6 +485,84 @@ async def model_policy(
         can_update=caps["can_update"],
         can_delete=caps["can_delete"],
     )
+
+
+# ---------------------------------------------------------------------------
+# Permission matrix — must be before /{model_name}/{object_id} to avoid conflict
+# ---------------------------------------------------------------------------
+
+@router.get("/permission-matrix/{role_id}")
+async def get_permission_matrix(
+    role_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    """Return CRUD caps for every registered model for this role."""
+    from sqlalchemy import select as _select
+    from adminfoundry.models.role_permission import RolePermission
+    rows = (
+        await db.execute(
+            _select(RolePermission).where(RolePermission.role_id == role_id)
+        )
+    ).scalars().all()
+    perms = {r.model_name: r for r in rows}
+
+    return [
+        {
+            "model_name": mn,
+            "can_list": perms[mn].can_list if mn in perms else False,
+            "can_create": perms[mn].can_create if mn in perms else False,
+            "can_update": perms[mn].can_update if mn in perms else False,
+            "can_delete": perms[mn].can_delete if mn in perms else False,
+        }
+        for mn in admin_site.model_names()
+    ]
+
+
+@router.put("/permission-matrix/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def save_permission_matrix(
+    role_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    """Replace all RolePermission records for this role with the submitted matrix."""
+    from sqlalchemy import delete as _delete, select as _select
+    from adminfoundry.models.role_permission import RolePermission
+
+    body = await request.json()  # list of {model_name, can_list, can_create, can_update, can_delete}
+    ops = ("can_list", "can_create", "can_update", "can_delete")
+
+    # Snapshot old state for audit diff
+    old_rows = (await db.execute(
+        _select(RolePermission).where(RolePermission.role_id == role_id)
+    )).scalars().all()
+    old_map = {r.model_name: {op: getattr(r, op) for op in ops} for r in old_rows}
+
+    await db.execute(_delete(RolePermission).where(RolePermission.role_id == role_id))
+    new_map: dict = {}
+    for entry in body:
+        caps = {op: bool(entry.get(op, False)) for op in ops}
+        if any(caps.values()):
+            db.add(RolePermission(role_id=role_id, model_name=entry["model_name"], **caps))
+            new_map[entry["model_name"]] = caps
+
+    # Build audit diff — only models where something changed
+    changes: dict = {}
+    all_models = set(old_map) | set(new_map)
+    for mn in sorted(all_models):
+        old_caps = old_map.get(mn, {op: False for op in ops})
+        new_caps = new_map.get(mn, {op: False for op in ops})
+        if old_caps != new_caps:
+            old_label = " ".join(op.replace("can_", "") for op in ops if old_caps.get(op))
+            new_label = " ".join(op.replace("can_", "") for op in ops if new_caps.get(op))
+            changes[mn] = {"from": old_label or "—", "to": new_label or "—"}
+
+    await db.commit()
+
+    request.state.audit_action = "updated"
+    request.state.audit_object_id = str(role_id)
+    request.state.audit_changes = changes or None
 
 
 @router.get("/{model_name}/{object_id}")
@@ -486,9 +616,9 @@ async def update_object(
     if not rp.can_update:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access to this record is denied")
 
-    # Enforce field-level edit policy
+    # Enforce field-level edit policy (pass obj for per-record hooks)
     for field_name in validated.model_dump(exclude_none=True):
-        fp = policy_engine.evaluate_field(current_user, model_admin, field_name, payload)
+        fp = policy_engine.evaluate_field(current_user, model_admin, field_name, payload, record=obj)
         if not fp.can_edit:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

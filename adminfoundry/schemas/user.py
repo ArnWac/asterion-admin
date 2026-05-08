@@ -28,3 +28,10 @@ class UserUpdate(BaseModel):
     full_name: str | None = None
     is_active: bool | None = None
     is_superadmin: bool | None = None
+
+
+class ProfileUpdate(BaseModel):
+    full_name: str | None = None
+    email: EmailStr | None = None
+    current_password: str | None = None
+    new_password: str | None = None

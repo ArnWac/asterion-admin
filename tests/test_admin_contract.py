@@ -135,9 +135,9 @@ def test_contract_snapshot_role_admin():
     contract = build_model_contract(role_admin)
 
     assert contract.model == "roles"
-    assert contract.label == "Role"
-    assert contract.label_plural == "Roles"
-    assert contract.description == "Permission roles assignable to users"
+    assert contract.label == "Permission Group"
+    assert contract.label_plural == "Permissions"
+    assert contract.description == "Permission groups assignable to users — CRUD capabilities configured below"
     assert contract.tenant_scoped is False
     assert contract.actions == []
 

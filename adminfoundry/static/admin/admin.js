@@ -69,26 +69,32 @@ class APIError extends Error {
 // ---------------------------------------------------------------------------
 // Alert helpers
 // ---------------------------------------------------------------------------
-function showError(msg, el) {
-  const e = el || document.getElementById('alert');
-  if (!e) return;
-  e.className = 'alert alert-error';
-  e.textContent = msg;
-  e.style.display = 'block';
+function showToast(msg, type = 'info', duration = 3500) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  container.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => {
+    t.classList.remove('show');
+    t.addEventListener('transitionend', () => t.remove(), { once: true });
+  }, duration);
 }
 
-function showSuccess(msg, el) {
-  const e = el || document.getElementById('alert');
-  if (!e) return;
-  e.className = 'alert alert-success';
-  e.textContent = msg;
-  e.style.display = 'block';
+function showError(msg) {
+  showToast(msg, 'error');
 }
 
-function clearAlert(el) {
-  const e = el || document.getElementById('alert');
-  if (e) { e.style.display = 'none'; e.textContent = ''; }
+function showSuccess(msg) {
+  showToast(msg, 'success');
 }
+
 
 function fmtAPIError(err) {
   if (err instanceof APIError) {
@@ -147,7 +153,9 @@ async function initNav(activeModel) {
 async function initList(model) {
   if (!Auth.isLoggedIn()) { Auth.redirectToLogin(); return; }
 
-  let meta, page = 1, pageSize = 20, q = '', orderBy = '';
+  let meta, page = 1, pageSize = Prefs.getPageSize(), orderBy = '';
+  const urlQ = new URLSearchParams(window.location.search).get('q') || '';
+  let q = urlQ;
   const selected = new Set();
 
   const actionBar = document.getElementById('action-bar');
@@ -186,7 +194,6 @@ async function initList(model) {
         const ok = confirm(`Run "${label}" on ${selected.size} item(s)? This cannot be undone.`);
         if (!ok) return;
       }
-      clearAlert();
       try {
         const result = await API.post(`/jobs/admin/${model}/bulk`, {
           action: actionName,
@@ -243,6 +250,7 @@ async function initList(model) {
       }).join('') + '<th style="width:120px">Actions</th></tr>';
 
       // Rows
+      const editableCols = new Set(meta?.list_editable || []);
       if (!data.items.length) {
         tableEl.innerHTML = `<tr><td colspan="99" style="color:#586069">No records found.</td></tr>`;
       } else {
@@ -252,13 +260,36 @@ async function initList(model) {
           const checkTd = hasBulkActions
             ? `<td><input type="checkbox" class="row-check" data-id="${id}" aria-label="Select row"${isChecked}></td>`
             : '';
-          const cells = cols.map(c => `<td>${fmtCell(item[c])}</td>`).join('');
+          const cells = cols.map(c => {
+            if (editableCols.has(c)) {
+              const v = item[c] ?? '';
+              return `<td><input class="list-inline-input" data-id="${esc(id)}" data-field="${esc(c)}" value="${esc(String(v))}" aria-label="${esc(c)}"></td>`;
+            }
+            return `<td>${fmtCell(item[c])}</td>`;
+          }).join('');
           const actions = `<td>
             <a class="btn btn-sm btn-secondary" href="${UI_BASE}/${model}/${id}">View</a>
             <a class="btn btn-sm btn-secondary" href="${UI_BASE}/${model}/${id}/edit">Edit</a>
           </td>`;
           return `<tr>${checkTd}${cells}${actions}</tr>`;
         }).join('');
+
+        // Inline-edit save on blur
+        if (editableCols.size) {
+          tableEl.addEventListener('blur', async e => {
+            const inp = e.target.closest('.list-inline-input');
+            if (!inp) return;
+            const recId = inp.dataset.id;
+            const field = inp.dataset.field;
+            try {
+              await API.patch(`/admin/${model}/${recId}`, { [field]: inp.value });
+              inp.style.borderColor = '';
+            } catch (err) {
+              inp.style.borderColor = '#de350b';
+              showError(fmtAPIError(err));
+            }
+          }, true);
+        }
       }
 
       // Checkbox events (delegated)
@@ -297,9 +328,10 @@ async function initList(model) {
 
   initActionBar();
 
-  // Search
+  // Search — pre-fill from URL ?q= if present
   const searchEl = document.getElementById('search-input');
   if (searchEl) {
+    if (urlQ) searchEl.value = urlQ;
     searchEl.addEventListener('input', debounce(() => { q = searchEl.value; page = 1; load(); }, 350));
   }
 
@@ -314,6 +346,7 @@ async function initList(model) {
   });
 
   await initNav(model);
+  setBreadcrumb([{ label: 'Home', href: UI_BASE + '/dashboard' }, { label: meta?.label_plural || model, href: '' }]);
   await load();
 }
 
@@ -325,8 +358,9 @@ async function initDetail(model, objectId) {
   const bodyEl = document.getElementById('detail-body');
   bodyEl.innerHTML = '<p class="loading">Loading…</p>';
 
+  let item = null, meta = null;
   try {
-    const [item, meta] = await Promise.all([
+    [item, meta] = await Promise.all([
       API.get(`/admin/${model}/${objectId}`),
       API.get(`/admin/${model}/meta`).catch(() => null),
     ]);
@@ -344,6 +378,17 @@ async function initDetail(model, objectId) {
     if (editLink) editLink.href = `${UI_BASE}/${model}/${objectId}/edit`;
     const backLink = document.getElementById('back-link');
     if (backLink) backLink.href = `${UI_BASE}/${model}`;
+
+    // 4B: permission matrix section
+    if (meta?.permission_matrix) {
+      const matrixCard = document.createElement('div');
+      matrixCard.className = 'card';
+      matrixCard.style.marginTop = '1.25rem';
+      matrixCard.innerHTML = '<h3 style="font-size:.95rem;font-weight:600;margin-bottom:1rem">CRUD Permissions</h3><div id="permission-matrix-body"></div>';
+      const layoutEl = bodyEl.closest('.detail-layout') || bodyEl.parentElement;
+      layoutEl.insertAdjacentElement('afterend', matrixCard);
+      renderPermissionMatrix(objectId, document.getElementById('permission-matrix-body'));
+    }
   } catch (e) {
     bodyEl.innerHTML = `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(e))}</div>`;
   }
@@ -352,12 +397,16 @@ async function initDetail(model, objectId) {
   const historyEl = document.getElementById('detail-history');
   if (historyEl) {
     try {
-      const history = await API.get(`/audit?object_id=${encodeURIComponent(objectId)}&page_size=15`);
+      const history = await API.get(`/audit?object_id=${encodeURIComponent(objectId)}&page_size=3`);
       if (!history.items.length) {
         historyEl.innerHTML = '<p style="color:#586069;font-size:.82rem">No changes recorded yet.</p>';
       } else {
         const actionColor = { created: 'badge-green', updated: 'badge-gray', deleted: 'badge-red' };
-        historyEl.innerHTML = history.items.map(e => {
+        const truncate = (s, max = 80) => {
+          const str = s == null ? '—' : String(s);
+          return str.length > max ? str.slice(0, max) + '…' : str;
+        };
+        const entries = history.items.map(e => {
           const when = new Date(e.created_at).toLocaleString();
           const color = actionColor[e.action] || 'badge-gray';
           const actor = e.actor || 'Unknown';
@@ -366,8 +415,8 @@ async function initDetail(model, objectId) {
             detail = '<div class="history-changes">' +
               Object.entries(e.changes).map(([field, diff]) =>
                 `<span class="history-field">${esc(field)}:</span> ` +
-                `<span class="history-old">${esc(diff.from ?? '—')}</span> → ` +
-                `<span class="history-new">${esc(diff.to ?? '—')}</span>`
+                `<span class="history-old">${esc(truncate(diff.from))}</span> → ` +
+                `<span class="history-new">${esc(truncate(diff.to))}</span>`
               ).join('<br>') +
             '</div>';
           }
@@ -380,6 +429,12 @@ async function initDetail(model, objectId) {
             ${detail}
           </div>`;
         }).join('');
+
+        const remaining = history.total - history.items.length;
+        const moreLink = remaining > 0
+          ? `<a href="${UI_BASE}/audit_logs?q=${encodeURIComponent(objectId)}" style="font-size:.78rem;display:block;margin-top:.6rem;color:var(--link,#0052cc)">+${remaining} more — view all changes →</a>`
+          : '';
+        historyEl.innerHTML = entries + moreLink;
       }
     } catch (err) {
       console.error('History load failed:', err);
@@ -387,6 +442,11 @@ async function initDetail(model, objectId) {
     }
   }
 
+  setBreadcrumb([
+    { label: 'Home', href: UI_BASE + '/dashboard' },
+    { label: meta?.label_plural || model, href: `${UI_BASE}/${model}` },
+    { label: objectId, href: '' },
+  ]);
   await initNav(model);
 }
 
@@ -396,9 +456,10 @@ async function initDetail(model, objectId) {
 async function initCreate(model) {
   if (!Auth.isLoggedIn()) { Auth.redirectToLogin(); return; }
   const formEl = document.getElementById('record-form');
+  let meta = null;
 
   try {
-    const meta = await API.get(`/admin/${model}/meta`);
+    meta = await API.get(`/admin/${model}/meta`);
     document.getElementById('page-title').textContent = `New ${meta.label || model}`;
     const backLink = document.getElementById('back-link');
     if (backLink) backLink.href = `${UI_BASE}/${model}`;
@@ -421,11 +482,15 @@ async function initCreate(model) {
 
     formEl.addEventListener('submit', async e => {
       e.preventDefault();
-      clearAlert();
       const body = collectForm(formEl, writableFields);
       try {
         const created = await API.post(`/admin/${model}`, body);
-        window.location.href = `${UI_BASE}/${model}/${created.id}`;
+        // 1C: respect create_redirect ("list" default, "detail" for opt-in models)
+        if (meta.create_redirect === 'detail') {
+          window.location.href = `${UI_BASE}/${model}/${created.id}`;
+        } else {
+          window.location.href = `${UI_BASE}/${model}`;
+        }
       } catch (err) {
         showError(fmtAPIError(err));
       }
@@ -435,6 +500,11 @@ async function initCreate(model) {
       `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(e))}</div>`;
   }
 
+  setBreadcrumb([
+    { label: 'Home', href: UI_BASE + '/dashboard' },
+    { label: meta?.label_plural || model, href: `${UI_BASE}/${model}` },
+    { label: 'New', href: '' },
+  ]);
   await initNav(model);
 }
 
@@ -444,9 +514,10 @@ async function initCreate(model) {
 async function initUpdate(model, objectId) {
   if (!Auth.isLoggedIn()) { Auth.redirectToLogin(); return; }
   const formEl = document.getElementById('record-form');
+  let meta = null, item = null;
 
   try {
-    const [meta, item] = await Promise.all([
+    [meta, item] = await Promise.all([
       API.get(`/admin/${model}/meta`),
       API.get(`/admin/${model}/${objectId}`),
     ]);
@@ -472,13 +543,11 @@ async function initUpdate(model, objectId) {
 
     formEl.addEventListener('submit', async e => {
       e.preventDefault();
-      clearAlert();
       const writableFields = editableFields.filter(f => !f.readonly);
       const body = collectForm(formEl, writableFields);
       try {
         const updated = await API.patch(`/admin/${model}/${objectId}`, body);
         showSuccess('Saved successfully.');
-        // refresh form values
         editableFields.forEach(f => {
           const el = formEl.querySelector(`[name="${f.name}"]`);
           if (el && updated[f.name] !== undefined) el.value = updated[f.name] ?? '';
@@ -487,10 +556,26 @@ async function initUpdate(model, objectId) {
         showError(fmtAPIError(err));
       }
     });
+
+    // 4B: permission matrix section below the form
+    if (meta?.permission_matrix) {
+      const matrixCard = document.createElement('div');
+      matrixCard.className = 'card';
+      matrixCard.style.marginTop = '1.25rem';
+      matrixCard.innerHTML = '<h3 style="font-size:.95rem;font-weight:600;margin-bottom:1rem">CRUD Permissions</h3><div id="permission-matrix-body"></div>';
+      formEl.parentElement.insertAdjacentElement('afterend', matrixCard);
+      renderPermissionMatrix(objectId, document.getElementById('permission-matrix-body'));
+    }
   } catch (e) {
     formEl.innerHTML = `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(e))}</div>`;
   }
 
+  setBreadcrumb([
+    { label: 'Home', href: UI_BASE + '/dashboard' },
+    { label: meta?.label_plural || model, href: `${UI_BASE}/${model}` },
+    { label: objectId, href: `${UI_BASE}/${model}/${objectId}` },
+    { label: 'Edit', href: '' },
+  ]);
   await initNav(model);
 }
 
@@ -509,12 +594,23 @@ function buildFieldInput(f, value) {
     input = `<input type="checkbox" name="${f.name}" id="f_${f.name}"${checked}${roAttr}>`;
   } else if (f.widget === 'password') {
     input = `<input type="password" name="${f.name}" id="f_${f.name}" autocomplete="new-password"${roAttr}>`;
+  } else if (f.widget === 'choices-select') {
+    // 2A: registry/URL-backed select (e.g. model_name → admin registry)
+    const currentVal = val ? String(val) : '';
+    if (isReadonly) {
+      input = `<input type="text" name="${f.name}" id="f_${f.name}" value="${esc(currentVal)}"${roAttr}>`;
+    } else {
+      input = `<select name="${f.name}" id="f_${f.name}" data-choices-url="${esc(f.choices_url || '')}" data-current-val="${esc(currentVal)}">
+        ${currentVal ? `<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>` : '<option value="">— Loading… —</option>'}
+      </select>`;
+    }
   } else if (f.widget === 'select-relation') {
     const lookupUrl = f.relation?.lookup_url || '';
     const targetTable = f.relation?.target_table || '';
     const currentVal = val ? String(val) : '';
-    const newBtn = targetTable
-      ? `<a href="${UI_BASE}/${targetTable}/new" target="_blank" class="btn btn-sm btn-secondary">+ New</a>`
+    // 3B: inline-create modal instead of new-tab link
+    const newBtn = targetTable && !isReadonly
+      ? `<button type="button" class="btn btn-sm btn-secondary" onclick="AdminUI.openInlineCreate('${esc(targetTable)}','f_${esc(f.name)}')">+ New</button>`
       : '';
     if (isReadonly || !lookupUrl) {
       input = `<input type="text" name="${f.name}" id="f_${f.name}" value="${esc(currentVal)}"${roAttr} placeholder="UUID">`;
@@ -564,22 +660,54 @@ function collectForm(formEl, fields) {
 // Relation select population
 // ---------------------------------------------------------------------------
 async function populateRelationSelects(formEl) {
-  const selects = formEl.querySelectorAll('select[data-lookup-url]');
-  await Promise.all(Array.from(selects).map(async sel => {
-    const lookupUrl = sel.dataset.lookupUrl.replace('/api/v1', '');
-    const currentVal = sel.dataset.currentVal || '';
-    try {
-      const data = await API.get(lookupUrl + '?page_size=100');
-      sel.innerHTML = '<option value="">— Select —</option>' +
-        data.items.map(item =>
-          `<option value="${esc(item.id)}"${item.id === currentVal ? ' selected' : ''}>${esc(item.label)}</option>`
-        ).join('');
-    } catch (_) {
-      sel.innerHTML = currentVal
-        ? `<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`
-        : '<option value="">— None available —</option>';
-    }
-  }));
+  const tasks = [];
+
+  // Standard lookup selects
+  formEl.querySelectorAll('select[data-lookup-url]').forEach(sel => {
+    tasks.push((async () => {
+      const lookupUrl = sel.dataset.lookupUrl.replace('/api/v1', '');
+      const currentVal = sel.dataset.currentVal || '';
+      try {
+        const data = await API.get(lookupUrl + '?page_size=100');
+        sel.innerHTML = '<option value="">— Select —</option>' +
+          data.items.map(item =>
+            `<option value="${esc(item.id)}"${item.id === currentVal ? ' selected' : ''}>${esc(item.label)}</option>`
+          ).join('');
+      } catch (_) {
+        sel.innerHTML = currentVal
+          ? `<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`
+          : '<option value="">— None available —</option>';
+      }
+    })());
+  });
+
+  // 2A: choices-url selects (admin registry or other URL)
+  formEl.querySelectorAll('select[data-choices-url]').forEach(sel => {
+    tasks.push((async () => {
+      const url = sel.dataset.choicesUrl.replace('/api/v1', '');
+      const currentVal = sel.dataset.currentVal || '';
+      try {
+        const data = await API.get(url);
+        // Admin registry returns {models:[{model,label,...}]}, else {items:[{id,label}]}
+        let opts;
+        if (data.models) {
+          opts = data.models.map(m => ({ id: m.model, label: m.label || m.model }));
+        } else {
+          opts = (data.items || []).map(m => ({ id: m.id, label: m.label || m.id }));
+        }
+        sel.innerHTML = '<option value="">— Select model —</option>' +
+          opts.map(o =>
+            `<option value="${esc(o.id)}"${o.id === currentVal ? ' selected' : ''}>${esc(o.label)}</option>`
+          ).join('');
+      } catch (_) {
+        sel.innerHTML = currentVal
+          ? `<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`
+          : '<option value="">— None available —</option>';
+      }
+    })());
+  });
+
+  await Promise.all(tasks);
 }
 
 // ---------------------------------------------------------------------------
@@ -657,11 +785,83 @@ const Prefs = {
   },
   getFavorites() { return this.get().navigation_favorites || []; },
   setFavorites(list) { this.set({navigation_favorites: list}); },
+  getPageSize() { return parseInt(this.get().page_size || '20', 10); },
+  setPageSize(n) { this.set({page_size: String(n)}); },
+  getTheme() { return this.get().theme || 'auto'; },
+  setTheme(t) { this.set({theme: t}); },
   applyDensity() {
     const d = this.getDensity();
     if (d !== 'comfortable') document.body.dataset.density = d;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Settings page
+// ---------------------------------------------------------------------------
+async function initSettings() {
+  if (!Auth.isLoggedIn()) { Auth.redirectToLogin(); return; }
+  setBreadcrumb([{ label: 'Settings' }]);
+  await initNav(null);
+
+  // --- Profile ---
+  const nameEl = document.getElementById('pf-name');
+  const emailEl = document.getElementById('pf-email');
+
+  try {
+    const me = await API.get('/admin/profile');
+    if (nameEl) nameEl.value = me.full_name || '';
+    if (emailEl) emailEl.value = me.email || '';
+  } catch (e) {
+    showError('Failed to load profile.');
+  }
+
+  document.getElementById('profile-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('profile-save-btn');
+    btn.disabled = true;
+
+    const body = {};
+    const name = nameEl.value.trim();
+    const email = emailEl.value.trim();
+    const curPw = document.getElementById('pf-cur-pw').value;
+    const newPw = document.getElementById('pf-new-pw').value;
+
+    if (name) body.full_name = name;
+    if (email) body.email = email;
+    if (curPw || newPw) { body.current_password = curPw; body.new_password = newPw; }
+
+    try {
+      await API.patch('/admin/profile', body);
+      document.getElementById('pf-cur-pw').value = '';
+      document.getElementById('pf-new-pw').value = '';
+      showSuccess('Profile saved.');
+    } catch (err) {
+      showError(fmtAPIError(err) || 'Save failed.');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // --- UI Preferences ---
+  const densityEl = document.getElementById('pref-density');
+  const pageSizeEl = document.getElementById('pref-page-size');
+  const themeEl = document.getElementById('pref-theme');
+
+  densityEl.value = Prefs.getDensity();
+  pageSizeEl.value = String(Prefs.getPageSize());
+  themeEl.value = Prefs.getTheme();
+
+  document.getElementById('prefs-save-btn').addEventListener('click', () => {
+    Prefs.setDensity(densityEl.value);
+    Prefs.setPageSize(parseInt(pageSizeEl.value, 10));
+    Prefs.setTheme(themeEl.value);
+    const theme = themeEl.value === 'auto'
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : themeEl.value;
+    DarkMode.apply(theme);
+    showToast('Preferences saved.', 'success');
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Confirm delete page
@@ -695,7 +895,6 @@ async function initConfirmDelete(model, objectId) {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       btn.textContent = 'Deleting…';
-      clearAlert();
       try {
         await API.delete(`/admin/${model}/${objectId}`);
         window.location.href = `${UI_BASE}/${model}`;
@@ -738,7 +937,6 @@ async function initBreakGlass(model, objectId) {
 
     formEl.addEventListener('submit', async e => {
       e.preventDefault();
-      clearAlert();
       const reasonEl = document.getElementById('bg-reason');
       const reasonErrEl = document.getElementById('reason-error');
       const reason = reasonEl ? reasonEl.value.trim() : '';
@@ -779,5 +977,152 @@ async function initBreakGlass(model, objectId) {
   await initNav(model);
 }
 
+// ---------------------------------------------------------------------------
+// 3B: Inline-create modal for relation fields
+// ---------------------------------------------------------------------------
+async function openInlineCreate(targetTable, selectId) {
+  // Remove any existing modal
+  document.getElementById('inline-create-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'inline-create-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center';
+
+  const panel = document.createElement('div');
+  panel.style.cssText = 'background:var(--surface,#fff);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.25);padding:1.5rem;width:480px;max-width:95vw;max-height:80vh;overflow-y:auto;position:relative';
+
+  const closeBtn = `<button onclick="document.getElementById('inline-create-modal').remove()" style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted,#586069)" aria-label="Close">✕</button>`;
+
+  panel.innerHTML = closeBtn + `<h3 style="font-size:1rem;margin-bottom:1rem">New ${targetTable}</h3><div id="inline-form-wrap"><p class="loading">Loading…</p></div>`;
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  // Close on overlay click
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  try {
+    const meta = await API.get(`/admin/${targetTable}/meta`);
+    const wrapEl = document.getElementById('inline-form-wrap');
+    const writableFields = (meta.fields || []).filter(
+      f => !f.readonly && !['id', 'created_at', 'updated_at'].includes(f.name)
+    );
+
+    const form = document.createElement('form');
+    form.innerHTML =
+      writableFields.map(f => buildFieldInput(f)).join('') +
+      '<div style="margin-top:1rem;display:flex;gap:.5rem">' +
+        '<button type="submit" class="btn btn-primary">Create</button>' +
+        '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'inline-create-modal\').remove()">Cancel</button>' +
+      '</div>';
+    wrapEl.innerHTML = '';
+    wrapEl.appendChild(form);
+    populateRelationSelects(form);
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const body = collectForm(form, writableFields);
+      try {
+        const created = await API.post(`/admin/${targetTable}`, body);
+        const sel = document.getElementById(selectId);
+        if (sel) {
+          const labelField = meta.list_fields?.[0] || 'id';
+          const label = created[labelField] || created.id;
+          const opt = new Option(label, created.id, true, true);
+          sel.add(opt);
+        }
+        overlay.remove();
+      } catch (err) {
+        showError(fmtAPIError(err));
+      }
+    });
+  } catch (err) {
+    document.getElementById('inline-form-wrap').innerHTML =
+      `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(err))}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4B: Permission matrix section for role-like models
+// ---------------------------------------------------------------------------
+async function renderPermissionMatrix(objectId, containerEl) {
+  containerEl.innerHTML = '<p class="loading">Loading permissions…</p>';
+  try {
+    const matrix = await API.get(`/admin/permission-matrix/${objectId}`);
+
+    const ops = ['can_list', 'can_create', 'can_update', 'can_delete'];
+    const opLabels = { can_list: 'List', can_create: 'Create', can_update: 'Update', can_delete: 'Delete' };
+
+    const thead = '<thead><tr><th>Model</th>' + ops.map(o => `<th style="text-align:center">${opLabels[o]}</th>`).join('') + '</tr></thead>';
+    const tbody = matrix.map(row =>
+      `<tr><td style="font-weight:500">${esc(row.model_name)}</td>` +
+      ops.map(op =>
+        `<td style="text-align:center"><input type="checkbox" data-model="${esc(row.model_name)}" data-op="${esc(op)}"${row[op] ? ' checked' : ''}></td>`
+      ).join('') +
+      '</tr>'
+    ).join('');
+
+    containerEl.innerHTML =
+      `<table style="width:100%">${thead}<tbody>${tbody}</tbody></table>` +
+      `<button id="matrix-save" class="btn btn-primary" style="margin-top:1rem">Save Permissions</button>`;
+
+    document.getElementById('matrix-save')?.addEventListener('click', async () => {
+      const updated = matrix.map(row => {
+        const entry = { model_name: row.model_name };
+        ops.forEach(op => {
+          const cb = containerEl.querySelector(`input[data-model="${row.model_name}"][data-op="${op}"]`);
+          entry[op] = cb ? cb.checked : false;
+        });
+        return entry;
+      });
+      try {
+        await API._fetch(`/admin/permission-matrix/${objectId}`, {
+          method: 'PUT', body: JSON.stringify(updated),
+        });
+        showSuccess('Permissions saved.');
+      } catch (err) {
+        showError(fmtAPIError(err));
+      }
+    });
+  } catch (err) {
+    containerEl.innerHTML = `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(err))}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumbs
+// ---------------------------------------------------------------------------
+function setBreadcrumb(parts) {
+  const el = document.getElementById('breadcrumb');
+  if (!el) return;
+  el.innerHTML = parts.map((p, i) => {
+    const isLast = i === parts.length - 1;
+    const content = isLast ? `<span>${esc(p.label)}</span>` : `<a href="${esc(p.href)}">${esc(p.label)}</a>`;
+    return content + (isLast ? '' : '<span class="bc-sep" aria-hidden="true">›</span>');
+  }).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Dark Mode
+// ---------------------------------------------------------------------------
+const DarkMode = {
+  PREF_KEY: 'coreAdmin_theme',
+  apply(theme) {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(this.PREF_KEY, theme);
+    const btn = document.getElementById('dark-mode-btn');
+    if (btn) btn.textContent = theme === 'dark' ? '☀ Light' : '☾ Dark';
+  },
+  init() {
+    const saved = localStorage.getItem(this.PREF_KEY);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    this.apply(saved || (prefersDark ? 'dark' : 'light'));
+  },
+  toggle() {
+    const current = document.documentElement.dataset.theme || 'light';
+    this.apply(current === 'dark' ? 'light' : 'dark');
+  },
+};
+DarkMode.init();
+
 // Expose globally
-window.AdminUI = { Auth, API, Prefs, initNav, initList, initDetail, initCreate, initUpdate, initConfirmDelete, initBreakGlass, showError, showSuccess };
+window.AdminUI = { Auth, API, Prefs, DarkMode, initNav, initList, initDetail, initCreate, initUpdate, initConfirmDelete, initBreakGlass, initSettings, openInlineCreate, showToast, showError, showSuccess };

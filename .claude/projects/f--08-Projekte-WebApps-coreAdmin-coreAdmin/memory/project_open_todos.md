@@ -14,28 +14,28 @@ type: project
 
 ## Permissions / Daten
 
-4. **Permission-Matrix pro Rolle (Standard-Rollen)** — Neues Modell `RolePermission(role_id, model_name, can_list, can_create, can_update, can_delete)`. `PolicyEngine` schaut statt in `ModelAdmin`-Config in die DB. Im Admin-UI konfigurierbar. Aktuell hat `Role` nur ein `name`-Feld ohne attached Permissions — `PolicyEngine` prüft Rollennamen gegen manuell definierte `access_roles` auf `ModelAdmin`.
+4. ✅ **Permission-Matrix pro Rolle** — `RolePermission(role_id, model_name, can_list, can_create, can_update, can_delete)` implementiert. `PolicyEngine.effective_model_caps()` nimmt jetzt optionalen `db_caps`-Override. Async-Helper `fetch_model_caps` / `fetch_all_model_caps` in `adminfoundry/authz/role_caps.py`. `RolePermissionAdmin` registriert. Tests in `tests/test_role_permissions.py`. Migration `0003_add_role_permissions.py`. **Offen:** `_check_model_access` in `router.py` prüft noch nicht die DB-Permissions (nur `effective_model_caps` tut es).
 
-5. **Field-level Permissions** — Aktuell nur protected/not-protected. Braucht `has_change_permission(obj)` pro Feld/Objekt analog zu Django.
+5. ✅ **Field-level Permissions (per-Record)** — `PolicyEngine.evaluate_field()` nimmt jetzt optionalen `record`-Parameter. ModelAdmin kann `field_permission(user, field_name, record) -> FieldPolicy | None` überschreiben. `update_object`-Route übergibt das Objekt an `evaluate_field`.
 
-5. **Custom Filters** — Aktuell nur Boolean-Filter. Fehlen: Range-Filter (Datum, Zahl), Enum-Filter, Relation-Filter (z.B. "nur User von Tenant X").
+5. ✅ **Custom Filters** — `FilterBuilder.build_filters()` unterstützt jetzt `range_filter_fields` (`field__gte` / `field__lte`) und `enum_filter_fields` (`field__in=a,b,c`). Beide Attribute auf `ModelAdmin` definiert. Werden automatisch aus Query-Params ausgelesen.
 
 ## UI / UX
 
-6. **Inline-Relations** — ForeignKey/M2M direkt im Detail-Formular bearbeiten (z.B. User + Roles im User-Formular), ohne separate Seite.
+6. ✅ **Inline-Relations** — `inline_fields: list[str]` auf ModelAdmin (Relationship-Attributnamen). Contract liefert `inline_relations: list[InlineRelationMeta]`. Serializer gibt verschachtelte Objekte zurück. **Offen:** Volle UI-Darstellung im admin.js (Inline-Formular rendern, Speichern).
 
-7. **List-Editable** — Felder direkt in der Listenansicht inline editieren.
+7. ✅ **List-Editable** — `list_editable: list[str]` auf ModelAdmin. Contract enthält `list_editable`-Feld. admin.js rendert `<input class="list-inline-input">` für editierbare Felder und speichert per blur → PATCH.
 
-8. **Audit Log im UI** — `AuditLog`-Modell existiert, ist aber nirgends in der Admin-UI sichtbar.
+8. ✅ **Audit Log im UI** — `AuditLogAdmin` registriert in `admin_config.py`. Read-only, Filter auf `action`/`method`/`status_code`, Range-Filter auf `created_at`, Sortierung nach `-created_at`.
 
-9. **Breadcrumb-Navigation** — Fehlt im aktuellen UI vollständig.
+9. ✅ **Breadcrumb-Navigation** — `setBreadcrumb(parts)` Funktion in admin.js. `<nav id="breadcrumb">` in base.html. Breadcrumbs werden in initList, initDetail, initCreate, initUpdate gesetzt.
 
-10. **Dark Mode** — Rein CSS-seitig, kleiner Aufwand.
+10. ✅ **Dark Mode** — CSS Custom Properties + `html[data-theme="dark"]`. System-Präferenz via `@media (prefers-color-scheme: dark)`. Manueller Toggle via Button in Sidebar-Footer. Präferenz in localStorage gespeichert.
 
 ## Ops / Observability
 
-11. **Health-Dashboard** — DB-Status, Queue-Länge, letzte Jobs, Rate-Limit-Hits auf einer Seite aggregiert.
+11. ✅ **Health-Dashboard** — `GET /health/dashboard` aggregiert DB-Status, aktive Sessions, Rate-Limit-Config, Metriken-Snapshot, letzte 5 Jobs.
 
-12. **Metrics-Endpoint** — `GET /metrics` im Prometheus-Format (aktive Sessions, Job-Fehlerrate, Rate-Limit-Hits, etc.).
+12. ✅ **Metrics-Endpoint** — `GET /metrics` im Prometheus-Format (text/plain). Enthält: requests_total, request_errors_total, actions_total, action_errors_total, audit_write_failures_total, active_sessions.
 
 13. **CSV/Excel Export** — JSON-Export läuft bereits; CSV/XLSX ist für Ops-Workflows deutlich häufiger gefragt.

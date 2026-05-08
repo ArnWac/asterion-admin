@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %} — {{ model }}{% endblock %}
+{% block title %} — {{ model_label_plural }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 id="page-title">{{ model }}</h1>
-  <a href="{{ ui_base }}/{{ model }}/new" class="btn btn-primary" aria-label="Create new {{ model }}">+ New</a>
+  <h1 id="page-title">{{ model_label_plural }}</h1>
+  <a href="{{ ui_base }}/{{ model }}/new" class="btn btn-primary" aria-label="Create new {{ model_label }}">+ New</a>
 </div>
 <div class="card">
   <div class="toolbar" role="search">
-    <label for="search-input" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden">Search {{ model }}</label>
-    <input type="search" id="search-input" placeholder="Search…" aria-label="Search {{ model }}">
+    <label for="search-input" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden">Search {{ model_label_plural }}</label>
+    <input type="search" id="search-input" placeholder="Search…" aria-label="Search {{ model_label_plural }}">
   </div>
   <div id="action-bar" style="display:none;align-items:center;gap:.5rem;padding:.5rem 0;border-bottom:1px solid var(--border,#e1e4e8)">
     <span id="selected-count" style="font-size:.875rem;color:var(--text-muted,#6b7280)"></span>
@@ -17,9 +17,8 @@
     <button id="action-run" class="btn btn-sm btn-danger">Run</button>
     <button id="action-clear" class="btn btn-sm btn-secondary">Clear selection</button>
   </div>
-  <div id="alert" class="alert" role="alert" aria-live="polite"></div>
-  <div role="region" aria-label="{{ model }} list" aria-live="polite">
-    <table aria-label="{{ model }} records">
+  <div role="region" aria-label="{{ model_label_plural }} list" aria-live="polite">
+    <table aria-label="{{ model_label_plural }} records">
       <thead id="table-head"></thead>
       <tbody id="table-body"><tr><td class="loading" aria-label="Loading">Loading…</td></tr></tbody>
     </table>

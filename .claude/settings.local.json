@@ -60,7 +60,14 @@
       "Bash(Get-ChildItem -Path \"f:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\\\\adminfoundry\\\\routers\\\\admin_ui.py\" -ErrorAction SilentlyContinue)",
       "Bash(Select-Object FullName, PSIsContainer)",
       "Bash(python -m pytest tests/test_password_reset.py tests/test_admin_actions.py -q)",
-      "Bash(python -m pytest -q)"
+      "Bash(python -m pytest -q)",
+      "PowerShell(Get-ChildItem -Path \"f:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\" -Force | Select-Object Name, @{Name='Type'; Expression={if \\($_.PSIsContainer\\) {'DIR'} else {'FILE'}}} | Format-Table -AutoSize)",
+      "Bash(Get-ChildItem -Path \"f:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell(Get-ChildItem -Path \"f:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\\\\adminfoundry\\\\templates\\\\admin\" -File | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-ChildItem -Path \"f:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\\\\adminfoundry\\\\static\\\\admin\" -Recurse -File | ForEach-Object { $_.FullName })",
+      "Bash(python -m pytest tests/test_users.py -q --tb=short)",
+      "Bash(python -m pytest tests/test_admin_contract.py::test_contract_snapshot_role_admin -q --tb=short)"
     ],
     "additionalDirectories": [
       "f:\\08_Projekte\\WebApps\\coreAdmin\\coreAdmin\\.claude\\projects\\f--08-Projekte-WebApps-coreAdmin-coreAdmin\\memory"

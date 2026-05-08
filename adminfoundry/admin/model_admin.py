@@ -30,6 +30,10 @@ class ModelAdmin:
     list_display: list[str] = []
     search_fields: list[str] = []
     filter_fields: list[str] = []
+    # Range filters: ?field__gte=X&field__lte=Y
+    range_filter_fields: list[str] = []
+    # Enum/multi-value filters: ?field__in=a,b,c
+    enum_filter_fields: list[str] = []
     ordering: list[str] = []
     # readonly_fields: excluded from create/update schemas; mutation → 422
     readonly_fields: list[str] = []
@@ -72,10 +76,29 @@ class ModelAdmin:
     # Phase 13: require approval workflow before applying changes
     requires_approval: bool = False
 
+    # Inline-editable relationships (SQLAlchemy relationship attr names)
+    inline_fields: list[str] = []
+    # Fields editable directly in the list view
+    list_editable: list[str] = []
+    # Where to redirect after a successful create: "list" | "detail"
+    create_redirect: str = "list"
+    # Per-field URL to fetch choices from (renders a <select> instead of text input)
+    field_choices_urls: dict[str, str] = {}
+    # True: render permission matrix section in detail/edit view (for role-like models)
+    permission_matrix: bool = False
+
     # Extra virtual fields only present in the create form (not model columns).
     # Dict of {field_name: python_type}, e.g. {"password": str}.
     # Use before_create() to transform them before the object is saved.
     extra_create_fields: dict = {}
+
+    def field_permission(self, user, field_name: str, record) -> "FieldPolicy | None":
+        """Override to return a FieldPolicy based on the current record state.
+
+        Return None to fall back to role-based field_policies config.
+        Example: make a field read-only once a record is in 'published' state.
+        """
+        return None
 
     @classmethod
     def before_create(cls, data: dict) -> dict:
@@ -91,16 +114,20 @@ class ModelAdmin:
             "list_display",
             "search_fields",
             "filter_fields",
+            "range_filter_fields",
+            "enum_filter_fields",
             "ordering",
             "readonly_fields",
             "protected_fields",
             "actions",
             "access_roles",
             "async_actions",
+            "inline_fields",
+            "list_editable",
         ):
             if attr not in cls.__dict__:
                 setattr(cls, attr, [])
-        for attr in ("field_policies", "action_policies"):
+        for attr in ("field_policies", "action_policies", "field_choices_urls"):
             if attr not in cls.__dict__:
                 setattr(cls, attr, {})
 

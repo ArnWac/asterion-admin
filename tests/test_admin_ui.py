@@ -144,8 +144,9 @@ async def test_update_page(client):
 @pytest.mark.asyncio
 async def test_root_redirect(client):
     resp = await client.get("/admin-ui/", follow_redirects=False)
-    # Should redirect to login
-    assert resp.status_code in (302, 307, 308)
+    # Returns client-side redirect HTML (JS checks localStorage token)
+    assert resp.status_code == 200
+    assert b"coreAdmin_access" in resp.content
 
 
 # ---------------------------------------------------------------------------

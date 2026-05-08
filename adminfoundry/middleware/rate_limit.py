@@ -45,3 +45,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 def reset_rate_limiter() -> None:
     """No-op — DB cleanup is handled by the clean_tables test fixture."""
+
+
+def get_rate_limit_stats() -> dict:
+    """Return in-process rate-limit config summary (no per-IP data)."""
+    return {
+        "configured_routes": list(_LIMITS.keys()),
+        "limits": {k: {"max_requests": v[0], "window_seconds": v[1]} for k, v in _LIMITS.items()},
+    }

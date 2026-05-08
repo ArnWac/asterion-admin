@@ -1,14 +1,13 @@
 {% extends "base.html" %}
-{% block title %} — Edit {{ model }}{% endblock %}
+{% block title %} — Edit {{ model_label }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 id="page-title">Edit {{ model }}</h1>
+  <h1 id="page-title">Edit {{ model_label }}</h1>
   <a href="#" id="back-link" class="btn btn-secondary" aria-label="Cancel and go back">← Back</a>
 </div>
 <div class="card">
-  <div id="alert" class="alert" role="alert" aria-live="assertive"></div>
-  <form id="record-form" novalidate aria-label="Edit {{ model }} form">
+  <form id="record-form" novalidate aria-label="Edit {{ model_label }} form">
     <p class="loading">Loading…</p>
     <div style="margin-top:1rem">
       <button type="submit" class="btn btn-primary" aria-label="Save changes">Save</button>

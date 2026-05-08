@@ -7,7 +7,9 @@ create users (the admin create path lacks the password hashing step).
 from adminfoundry.admin import admin_site, ModelAdmin
 from adminfoundry.admin.actions import AdminAction
 from adminfoundry.auth import hash_password
+from adminfoundry.models.audit_log import AuditLog
 from adminfoundry.models.role import Role
+from adminfoundry.models.role_permission import RolePermission
 from adminfoundry.models.tenant import Tenant
 from adminfoundry.models.user import User
 from adminfoundry.settings import settings
@@ -70,13 +72,15 @@ class UserAdmin(ModelAdmin):
 
 class RoleAdmin(ModelAdmin):
     model = Role
-    label = "Role"
-    label_plural = "Roles"
-    description = "Permission roles assignable to users"
+    label = "Permission Group"
+    label_plural = "Permissions"
+    description = "Permission groups assignable to users — CRUD capabilities configured below"
     list_display = ["name", "id"]
     search_fields = ["name"]
     ordering = ["name"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    permission_matrix = True
+    create_redirect = "detail"
     actions = []
 
 
@@ -93,7 +97,37 @@ class TenantAdmin(ModelAdmin):
     actions = [DisableTenantAction()]
 
 
+class RolePermissionAdmin(ModelAdmin):
+    model = RolePermission
+    label = "Role Permission"
+    label_plural = "Role Permissions"
+    description = "CRUD capability grants per role per model"
+    list_display = ["role_id", "model_name", "can_list", "can_create", "can_update", "can_delete"]
+    filter_fields = ["can_list", "can_create", "can_update", "can_delete"]
+    ordering = ["model_name"]
+    readonly_fields = ["id", "created_at", "updated_at"]
+    # model_name field: populated from registered models in the admin registry
+    field_choices_urls = {"model_name": "/api/v1/admin"}
+    actions = []
+
+
+class AuditLogAdmin(ModelAdmin):
+    model = AuditLog
+    label = "Audit Log"
+    label_plural = "Audit Logs"
+    description = "Immutable record of all admin actions"
+    list_display = ["created_at", "actor", "action", "method", "path", "status_code", "object_id"]
+    search_fields = ["actor", "path", "object_id", "action"]
+    filter_fields = ["action", "method", "status_code"]
+    range_filter_fields = ["created_at"]
+    ordering = ["-created_at"]
+    readonly_fields = ["id", "created_at", "updated_at", "method", "path", "status_code",
+                       "user_id", "tenant_id", "action", "object_id", "actor", "changes"]
+    actions = []
+
+
 admin_site.register(UserAdmin())
 admin_site.register(RoleAdmin())
+admin_site.register(AuditLogAdmin())
 if settings.MULTI_TENANT:
     admin_site.register(TenantAdmin())
