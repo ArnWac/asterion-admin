@@ -92,7 +92,11 @@
       "Bash(Get-ChildItem -Path \"F:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\\\\adminfoundry\\\\\" -Recurse -File | Select-Object FullName | ConvertTo-Csv -NoTypeInformation | Select-Object -Skip 1)",
       "PowerShell(Get-Process | Where-Object { $_.Name -match \"uvicorn|python|fastapi\" } | Select-Object Id, Name, CPU, StartTime)",
       "PowerShell(Get-Process | Where-Object { $_.Name -match \"python|uvicorn|py\" } | Select-Object Id, Name)",
-      "Bash(uvicorn examples.saas.app:app --reload --host 0.0.0.0 --port 8000)"
+      "Bash(uvicorn examples.saas.app:app --reload --host 0.0.0.0 --port 8000)",
+      "Bash(python -c \"from adminfoundry.settings import settings; print\\(settings.ADMIN_TITLE\\)\")",
+      "Bash(python -m pytest tests/test_admin_crud.py::test_cross_tenant_impersonation_rejected tests/test_admin_crud.py::test_superadmin_blocked_from_tenant_scoped_in_root_panel tests/test_admin_crud.py::test_tenant_admin_access_in_correct_tenant tests/test_admin_crud.py::test_tenant_admin_blocked_from_wrong_tenant tests/test_admin_contract.py::test_impersonating_superadmin_sees_only_tenant_scoped_in_nav tests/test_admin_contract.py::test_tenant_admin_user_sees_all_tenant_scoped_in_nav tests/test_admin_contract.py::test_no_roles_user_sees_empty_nav_in_tenant -v)",
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object -First 20)"
     ],
     "additionalDirectories": [
       "f:\\08_Projekte\\WebApps\\coreAdmin\\coreAdmin\\.claude\\projects\\f--08-Projekte-WebApps-coreAdmin-coreAdmin\\memory"

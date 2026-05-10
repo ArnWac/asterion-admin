@@ -224,24 +224,23 @@ async def test_middleware_no_header_stores_none(db: AsyncSession, db_engine):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_get_tenant_db_fails_without_context():
-    """get_tenant_db raises 400 when MULTI_TENANT=true and no tenant in state."""
-    from fastapi import FastAPI, Depends
+async def test_get_admin_db_falls_back_to_shared_without_tenant():
+    """get_admin_db returns a valid session even when no tenant is in request state."""
+    from fastapi import FastAPI, Depends, Request
     from httpx import AsyncClient, ASGITransport
-    from adminfoundry.database import get_tenant_db
+    from adminfoundry.database import get_admin_db
     from sqlalchemy.ext.asyncio import AsyncSession
 
     test_app = FastAPI()
 
     @test_app.get("/scoped")
-    async def scoped(_db: AsyncSession = Depends(get_tenant_db)):
+    async def scoped(_db: AsyncSession = Depends(get_admin_db)):
         return {"ok": True}
 
-    with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
-        transport = ASGITransport(app=test_app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            resp = await ac.get("/scoped")
-    assert resp.status_code == 400
+    transport = ASGITransport(app=test_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        resp = await ac.get("/scoped")
+    assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

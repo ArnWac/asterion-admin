@@ -87,6 +87,14 @@ def reset_rate_limiter():
     reset_rate_limiter()
 
 
+@pytest.fixture(autouse=True)
+def reset_tenant_cache():
+    from adminfoundry.middleware.tenant import clear_tenant_cache
+    clear_tenant_cache()
+    yield
+    clear_tenant_cache()
+
+
 # ---------------------------------------------------------------------------
 # Per-test session and HTTP client
 # ---------------------------------------------------------------------------

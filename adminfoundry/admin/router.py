@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adminfoundry import signals as _signals
+from adminfoundry.pagination import paginate
 from adminfoundry.admin.capabilities import build_capabilities, build_admin_context
 from adminfoundry.admin.contract import build_model_contract, CONTRACT_VERSION
 from adminfoundry.admin.filter_builder import filter_builder
@@ -52,9 +53,20 @@ def _check_model_access(model_admin, user, token_payload: dict, tenant=None) -> 
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Use an impersonation token to access tenant panels",
             )
+        if settings.MULTI_TENANT and tenant is None and model_admin.tenant_scoped:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tenant context required — use impersonation to access tenant-scoped models",
+            )
         return
 
     if user.is_superadmin and is_impersonating:
+        token_tenant_id = token_payload.get("tenant_id")
+        if tenant is None or token_tenant_id != str(tenant.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Impersonation token is not valid for this tenant",
+            )
         if model_admin.tenant_scoped:
             return
         raise HTTPException(
@@ -385,23 +397,18 @@ async def list_objects(
     for f in filter_builder.build_filters(model_admin, dict(request.query_params)):
         stmt = stmt.where(f)
 
-    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-
     # Ordering
     ordering = filter_builder.build_ordering(model_admin, order_by)
     if ordering is not None:
         stmt = stmt.order_by(ordering)
 
-    offset = (page - 1) * page_size
-    stmt = stmt.offset(offset).limit(page_size)
-
-    items = (await db.execute(stmt)).scalars().all()
+    items, total, pages = await paginate(db, stmt, page, page_size)
     return {
         "items": serializer.serialize_many(items, model_admin),
         "total": total,
         "page": page,
         "page_size": page_size,
-        "pages": math.ceil(total / page_size) if total else 0,
+        "pages": pages,
     }
 
 
@@ -497,12 +504,7 @@ async def lookup_objects(
     if search is not None:
         stmt = stmt.where(search)
 
-    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-
-    offset = (page - 1) * page_size
-    stmt = stmt.offset(offset).limit(page_size)
-
-    items = (await db.execute(stmt)).scalars().all()
+    items, total, pages = await paginate(db, stmt, page, page_size)
 
     label_field = (
         model_admin.lookup_field
@@ -518,7 +520,7 @@ async def lookup_objects(
         "total": total,
         "page": page,
         "page_size": page_size,
-        "pages": math.ceil(total / page_size) if total else 0,
+        "pages": pages,
     }
 
 

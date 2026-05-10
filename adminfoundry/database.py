@@ -4,7 +4,11 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, create_async_engine, async_sessionmaker
 from adminfoundry.settings import settings
 
-engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG)
+_engine_kwargs: dict = {"echo": settings.DEBUG}
+if "postgresql" in settings.DATABASE_URL:
+    _engine_kwargs.update({"pool_size": 10, "max_overflow": 20, "pool_pre_ping": True})
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 # Cache of per-tenant engines keyed by schema_name

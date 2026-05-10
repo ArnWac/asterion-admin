@@ -308,10 +308,8 @@ async def test_tenant_scoped_filter(client: AsyncClient, superadmin: User, db: A
             transport = ASGITransport(app=test_app)
             async with AsyncClient(transport=transport, base_url="http://test") as ac:
                 resp = await ac.get("/api/v1/admin/users")
-            items = resp.json()["items"]
-            emails = [i["email"] for i in items]
-            assert "has-tenant@x.com" in emails
-            assert "no-tenant@x.com" not in emails
+            # Superadmin without impersonation token is blocked from tenant panels
+            assert resp.status_code == 403
 
     # Restore original admin
     if original:
@@ -361,6 +359,110 @@ async def test_phase2_users_still_works(client: AsyncClient, superadmin: User):
 async def test_phase3_tenants_still_works(client: AsyncClient, superadmin: User):
     resp = await client.get("/api/v1/tenants", headers=auth(superadmin))
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Security: access control enforcement — unit tests for _check_model_access
+# ---------------------------------------------------------------------------
+
+def test_cross_tenant_impersonation_rejected():
+    """Impersonation token issued for tenant A must be rejected when used at tenant B."""
+    import uuid
+    import pytest
+    from unittest.mock import MagicMock
+    from fastapi import HTTPException
+    from adminfoundry.admin.router import _check_model_access
+
+    model_admin = MagicMock()
+    model_admin.tenant_scoped = True
+
+    user = MagicMock()
+    user.is_superadmin = True
+
+    tenant_a_id = str(uuid.uuid4())
+    tenant_b = MagicMock()
+    tenant_b.id = uuid.uuid4()
+
+    token_payload = {"impersonated_by": "superadmin-id", "tenant_id": tenant_a_id}
+
+    with pytest.raises(HTTPException) as exc_info:
+        _check_model_access(model_admin, user, token_payload, tenant=tenant_b)
+    assert exc_info.value.status_code == 403
+
+
+def test_superadmin_blocked_from_tenant_scoped_in_root_panel():
+    """Superadmin without impersonation token gets 403 on tenant-scoped model with MULTI_TENANT=True."""
+    import pytest
+    from unittest.mock import MagicMock, patch
+    from fastapi import HTTPException
+    from adminfoundry.admin.router import _check_model_access
+
+    model_admin = MagicMock()
+    model_admin.tenant_scoped = True
+
+    user = MagicMock()
+    user.is_superadmin = True
+
+    with patch("adminfoundry.admin.router.settings.MULTI_TENANT", True):
+        with pytest.raises(HTTPException) as exc_info:
+            _check_model_access(model_admin, user, {}, tenant=None)
+    assert exc_info.value.status_code == 403
+
+
+def test_tenant_admin_access_in_correct_tenant():
+    """User with tenant_admin role for tenant A can access tenant-scoped models in tenant A."""
+    import uuid
+    from unittest.mock import MagicMock
+    from adminfoundry.admin.router import _check_model_access
+
+    tenant_id = uuid.uuid4()
+    tenant = MagicMock()
+    tenant.id = tenant_id
+
+    role = MagicMock()
+    role.name = "tenant_admin"
+    role.tenant_id = tenant_id
+
+    user = MagicMock()
+    user.is_superadmin = False
+    user.roles = [role]
+
+    model_admin = MagicMock()
+    model_admin.tenant_scoped = True
+
+    # Must not raise
+    _check_model_access(model_admin, user, {}, tenant=tenant)
+
+
+def test_tenant_admin_blocked_from_wrong_tenant():
+    """User with tenant_admin role for tenant A gets 403 when accessing tenant B's panel."""
+    import uuid
+    import pytest
+    from unittest.mock import MagicMock
+    from fastapi import HTTPException
+    from adminfoundry.admin.router import _check_model_access
+
+    tenant_a_id = uuid.uuid4()
+
+    role = MagicMock()
+    role.name = "tenant_admin"
+    role.tenant_id = tenant_a_id
+
+    user = MagicMock()
+    user.is_superadmin = False
+    user.roles = [role]
+
+    model_admin = MagicMock()
+    model_admin.tenant_scoped = True
+    model_admin.admin_only = True
+    model_admin.access_roles = []
+
+    tenant_b = MagicMock()
+    tenant_b.id = uuid.uuid4()  # different tenant
+
+    with pytest.raises(HTTPException) as exc_info:
+        _check_model_access(model_admin, user, {}, tenant=tenant_b)
+    assert exc_info.value.status_code == 403
 
 
 # reuse from test_roles for require_role convenience

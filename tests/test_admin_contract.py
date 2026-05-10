@@ -138,7 +138,7 @@ def test_contract_snapshot_role_admin():
     assert contract.label == "Permission Group"
     assert contract.label_plural == "Permissions"
     assert contract.description == "Permission groups assignable to users — CRUD capabilities configured below"
-    assert contract.tenant_scoped is False
+    assert contract.tenant_scoped is True
     assert contract.actions == []
 
     field_names = [f.name for f in contract.fields]
@@ -209,8 +209,8 @@ def test_superadmin_sees_all_models_in_navigation():
 
     model_names = [item.model for item in nav.items]
     assert "users" in model_names
-    assert "roles" in model_names
-    # tenants only registered when MULTI_TENANT=True; skip assertion in default config
+    # roles is tenant_scoped=True — hidden in root panel (no tenant context)
+    assert "roles" not in model_names
 
 
 def test_impersonation_token_sees_empty_navigation():
@@ -228,6 +228,67 @@ def test_non_superadmin_sees_empty_navigation():
     user.is_superadmin = False
     payload = {}
     nav = build_navigation(user, payload, admin_site)
+    assert nav.items == []
+
+
+def test_impersonating_superadmin_sees_only_tenant_scoped_in_nav():
+    """Superadmin with impersonation token in tenant context sees only tenant-scoped models."""
+    from unittest.mock import MagicMock
+    user = MagicMock()
+    user.is_superadmin = True
+    payload = {"impersonated_by": "some-superadmin-id"}
+    tenant = MagicMock()
+
+    nav = build_navigation(user, payload, admin_site, tenant=tenant)
+
+    assert len(nav.items) > 0
+    for item in nav.items:
+        assert item.tenant_scoped is True
+    model_names = [item.model for item in nav.items]
+    assert "roles" in model_names
+    assert "users" not in model_names  # users is not tenant_scoped
+
+
+def test_tenant_admin_user_sees_all_tenant_scoped_in_nav():
+    """User with tenant_admin role sees all tenant_scoped models in tenant panel."""
+    import uuid
+    from unittest.mock import MagicMock
+
+    tenant_id = uuid.uuid4()
+    tenant = MagicMock()
+    tenant.id = tenant_id
+
+    role = MagicMock()
+    role.name = "tenant_admin"
+    role.tenant_id = tenant_id
+
+    user = MagicMock()
+    user.is_superadmin = False
+    user.roles = [role]
+
+    nav = build_navigation(user, {}, admin_site, tenant=tenant)
+
+    model_names = [item.model for item in nav.items]
+    assert "roles" in model_names
+    assert "users" not in model_names
+    for item in nav.items:
+        assert item.tenant_scoped is True
+
+
+def test_no_roles_user_sees_empty_nav_in_tenant():
+    """User with no roles and admin_only models sees empty nav in tenant context."""
+    import uuid
+    from unittest.mock import MagicMock
+
+    tenant_id = uuid.uuid4()
+    tenant = MagicMock()
+    tenant.id = tenant_id
+
+    user = MagicMock()
+    user.is_superadmin = False
+    user.roles = []
+
+    nav = build_navigation(user, {}, admin_site, tenant=tenant)
     assert nav.items == []
 
 
@@ -249,7 +310,7 @@ async def test_admin_context_endpoint(client: AsyncClient, superadmin: User):
 
 @pytest.mark.asyncio
 async def test_admin_context_shows_impersonation_state(client: AsyncClient, superadmin: User):
-    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id))
+    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id), "00000000-0000-0000-0000-000000000000")
     resp = await client.get(
         "/api/v1/admin/context",
         headers={"Authorization": f"Bearer {imp_token}"},
@@ -267,7 +328,8 @@ async def test_admin_navigation_endpoint(client: AsyncClient, superadmin: User):
     items = resp.json()["items"]
     model_names = [i["model"] for i in items]
     assert "users" in model_names
-    assert "roles" in model_names
+    # roles is tenant_scoped=True — not shown in root panel
+    assert "roles" not in model_names
     # Each item has required fields
     for item in items:
         assert "label" in item
@@ -290,7 +352,7 @@ async def test_admin_capabilities_endpoint(client: AsyncClient, superadmin: User
 @pytest.mark.asyncio
 async def test_admin_capabilities_impersonation(client: AsyncClient, superadmin: User):
     """Impersonation token → all model capabilities are False."""
-    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id))
+    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id), "00000000-0000-0000-0000-000000000000")
     resp = await client.get(
         "/api/v1/admin/capabilities",
         headers={"Authorization": f"Bearer {imp_token}"},

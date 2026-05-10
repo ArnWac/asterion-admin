@@ -104,7 +104,7 @@ async def test_refresh_still_works_after_logout(client: AsyncClient, superadmin:
 @pytest.mark.asyncio
 async def test_impersonation_token_cannot_be_refreshed(client: AsyncClient, superadmin: User, db: AsyncSession):
     """Impersonation tokens are access-type; passing one as refresh token must fail."""
-    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id))
+    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id), "00000000-0000-0000-0000-000000000000")
     resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": imp_token})
     assert resp.status_code == 401
 
@@ -114,7 +114,7 @@ async def test_impersonation_token_rejected_on_superadmin_route(
     client: AsyncClient, superadmin: User, db: AsyncSession
 ):
     """An impersonation token must not access superadmin-only routes."""
-    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id))
+    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id), "00000000-0000-0000-0000-000000000000")
     resp = await client.get(
         "/api/v1/admin",
         headers={"Authorization": f"Bearer {imp_token}"},
@@ -127,7 +127,7 @@ async def test_impersonation_token_allows_normal_route(
     client: AsyncClient, superadmin: User, db: AsyncSession
 ):
     """Impersonation token is valid for non-superadmin routes like /me."""
-    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id))
+    imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id), "00000000-0000-0000-0000-000000000000")
     resp = await client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {imp_token}"},

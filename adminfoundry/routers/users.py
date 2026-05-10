@@ -2,8 +2,9 @@ import math
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from adminfoundry.database import get_db
+from adminfoundry.pagination import paginate
 from adminfoundry.dependencies import require_superadmin
 from adminfoundry.models.user import User
 from adminfoundry.auth import hash_password, verify_password
@@ -21,17 +22,8 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
-    total = (await db.execute(select(func.count()).select_from(User))).scalar_one()
-    offset = (page - 1) * page_size
-    result = await db.execute(select(User).offset(offset).limit(page_size))
-    items = result.scalars().all()
-    return PaginatedResponse(
-        items=items,
-        total=total,
-        page=page,
-        page_size=page_size,
-        pages=math.ceil(total / page_size) if total else 0,
-    )
+    items, total, pages = await paginate(db, select(User), page, page_size)
+    return PaginatedResponse(items=items, total=total, page=page, page_size=page_size, pages=pages)
 
 
 @router.post("", response_model=UserPublic, status_code=status.HTTP_201_CREATED)

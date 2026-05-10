@@ -1,10 +1,11 @@
 import math
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
+from sqlalchemy import select, text
 from adminfoundry.database import get_db, get_or_create_tenant_engine
+from adminfoundry.pagination import paginate
 from adminfoundry.dependencies import require_superadmin
 from adminfoundry.models.tenant import Tenant
 from adminfoundry.models.user import User
@@ -25,17 +26,8 @@ async def list_tenants(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
-    total = (await db.execute(select(func.count()).select_from(Tenant))).scalar_one()
-    offset = (page - 1) * page_size
-    result = await db.execute(select(Tenant).offset(offset).limit(page_size))
-    items = result.scalars().all()
-    return PaginatedResponse(
-        items=items,
-        total=total,
-        page=page,
-        page_size=page_size,
-        pages=math.ceil(total / page_size) if total else 0,
-    )
+    items, total, pages = await paginate(db, select(Tenant), page, page_size)
+    return PaginatedResponse(items=items, total=total, page=page, page_size=page_size, pages=pages)
 
 
 @router.post("", response_model=TenantPublic, status_code=status.HTTP_201_CREATED)
@@ -122,6 +114,7 @@ async def migrate_tenant(
 async def impersonate(
     tenant_id: uuid.UUID,
     body: ImpersonateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_superadmin),
 ):
@@ -139,7 +132,7 @@ async def impersonate(
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target user not found")
 
-    token, jti = create_impersonation_token(str(target.id), str(current_user.id))
+    token, jti = create_impersonation_token(str(target.id), str(current_user.id), str(tenant.id))
 
     log = ImpersonationLog(
         superadmin_id=current_user.id,
@@ -151,6 +144,11 @@ async def impersonate(
     await db.commit()
     await db.refresh(log)
 
+    request.state.audit_action = "impersonation_started"
+    request.state.audit_actor = current_user.email
+    request.state.audit_user_id = str(current_user.id)
+    request.state.audit_object_id = str(target.id)
+
     return ImpersonateResponse(access_token=token, impersonation_log_id=log.id)
 
 
@@ -158,8 +156,9 @@ async def impersonate(
 async def revoke_impersonation(
     tenant_id: uuid.UUID,
     body: RevokeImpersonationRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    current_user: User = Depends(require_superadmin),
 ):
     """Blacklist an impersonation token by JTI and mark its log entry revoked."""
     log = (
@@ -180,5 +179,10 @@ async def revoke_impersonation(
 
     log.revoked_at = datetime.now(timezone.utc)
     await db.commit()
+
+    request.state.audit_action = "impersonation_revoked"
+    request.state.audit_actor = current_user.email
+    request.state.audit_user_id = str(current_user.id)
+    request.state.audit_object_id = body.jti
 
     return {"status": "revoked", "jti": body.jti}

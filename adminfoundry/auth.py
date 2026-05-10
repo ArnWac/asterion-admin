@@ -41,8 +41,8 @@ def create_refresh_token(user_id: str) -> str:
     )
 
 
-def create_impersonation_token(target_user_id: str, superadmin_id: str) -> tuple[str, str]:
-    """Create a short-lived, non-renewable impersonation access token.
+def create_impersonation_token(target_user_id: str, superadmin_id: str, tenant_id: str) -> tuple[str, str]:
+    """Create a short-lived, non-renewable impersonation access token scoped to one tenant.
 
     Returns (token, jti) so the JTI can be stored in ImpersonationLog.
     """
@@ -50,6 +50,7 @@ def create_impersonation_token(target_user_id: str, superadmin_id: str) -> tuple
     payload = {
         "sub": target_user_id,
         "impersonated_by": superadmin_id,
+        "tenant_id": tenant_id,
         "renewable": False,
         "exp": datetime.now(timezone.utc) + timedelta(hours=1),
         "jti": jti,

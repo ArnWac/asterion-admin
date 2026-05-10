@@ -89,7 +89,7 @@ async def test_login_page_accessible(client):
     resp = await client.get("/admin-ui/login")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
-    assert b"coreAdmin" in resp.content
+    assert b"adminfoundry" in resp.content
 
 
 @pytest.mark.asyncio
@@ -146,7 +146,7 @@ async def test_root_redirect(client):
     resp = await client.get("/admin-ui/", follow_redirects=False)
     # Returns client-side redirect HTML (JS checks localStorage token)
     assert resp.status_code == 200
-    assert b"coreAdmin_access" in resp.content
+    assert b"adminfoundry_access" in resp.content
 
 
 # ---------------------------------------------------------------------------

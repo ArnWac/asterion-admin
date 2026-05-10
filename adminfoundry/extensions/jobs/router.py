@@ -1,12 +1,13 @@
 import math
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adminfoundry.admin.registry import admin_site
 from adminfoundry.authz.policy_engine import policy_engine
 from adminfoundry.database import get_db
+from adminfoundry.pagination import paginate
 from adminfoundry.dependencies import get_current_user, require_superadmin
 from adminfoundry.extensions.jobs.models import Job, JobStatus
 from adminfoundry.extensions.jobs.schemas import (
@@ -41,15 +42,13 @@ async def list_jobs(
     _: User = Depends(require_superadmin),
 ):
     stmt = select(Job).order_by(Job.created_at.desc())
-    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-    offset = (page - 1) * page_size
-    jobs = (await db.execute(stmt.offset(offset).limit(page_size))).scalars().all()
+    jobs, total, pages = await paginate(db, stmt, page, page_size)
     return {
         "items": [JobRead.model_validate(j).model_dump() for j in jobs],
         "total": total,
         "page": page,
         "page_size": page_size,
-        "pages": math.ceil(total / page_size) if total else 0,
+        "pages": pages,
     }
 
 
