@@ -1,4 +1,4 @@
-// coreAdmin built-in UI — i18n translation bundle
+// adminfoundry built-in UI — i18n translation bundle
 // Add a new language by adding a key to ADMIN_I18N below.
 // Strings use {varname} for interpolation via T(key, vars).
 'use strict';
@@ -89,6 +89,8 @@ window.ADMIN_I18N = {
     label_unknown_actor: 'Unknown',
     label_tenant_ctx: 'Tenant: {slug}',
     label_impersonating: 'Impersonating — token issued by: {by}',
+    btn_enter_tenant_panel: 'Enter tenant panel',
+    btn_exit_tenant_panel: 'Exit tenant panel',
     link_forgot_password: 'Forgot password?',
     link_view_all_changes: '+{count} more — view all changes →',
     // Pagination
@@ -224,6 +226,8 @@ window.ADMIN_I18N = {
     label_unknown_actor: 'Unbekannt',
     label_tenant_ctx: 'Mandant: {slug}',
     label_impersonating: 'Identitätswechsel — Token ausgestellt von: {by}',
+    btn_enter_tenant_panel: 'Tenant-Panel betreten',
+    btn_exit_tenant_panel: 'Tenant-Panel verlassen',
     link_forgot_password: 'Passwort vergessen?',
     link_view_all_changes: '+{count} weitere — alle Änderungen anzeigen →',
     // Pagination

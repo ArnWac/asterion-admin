@@ -56,8 +56,8 @@ class UserAdmin(ModelAdmin):
     ordering = ["email"]
     readonly_fields = ["id", "created_at", "updated_at"]
     # hashed_password is globally protected — no need to list it here
-    # tenant_id hidden when multi-tenant is disabled
-    protected_fields = [] if settings.MULTI_TENANT else ["tenant_id"]
+    # Users are global — tenant membership is handled via tenant-scoped Profiles in the app
+    protected_fields = ["tenant_id"]
     tenant_scoped = False
     extra_create_fields = {"set_password": str}
 
@@ -79,6 +79,9 @@ class RoleAdmin(ModelAdmin):
     search_fields = ["name"]
     ordering = ["name"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    protected_fields = ["tenant_id"]
+    tenant_scoped = True
+    global_only_in_root_panel = True
     permission_matrix = True
     create_redirect = "detail"
     actions = []
@@ -106,6 +109,9 @@ class RolePermissionAdmin(ModelAdmin):
     filter_fields = ["can_list", "can_create", "can_update", "can_delete"]
     ordering = ["model_name"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    protected_fields = ["tenant_id"]
+    tenant_scoped = True
+    global_only_in_root_panel = True
     # model_name field: populated from registered models in the admin registry
     field_choices_urls = {"model_name": "/api/v1/admin"}
     actions = []
@@ -123,6 +129,8 @@ class AuditLogAdmin(ModelAdmin):
     ordering = ["-created_at"]
     readonly_fields = ["id", "created_at", "updated_at", "method", "path", "status_code",
                        "user_id", "tenant_id", "action", "object_id", "actor", "changes"]
+    tenant_scoped = True
+    global_only_in_root_panel = True
     actions = []
 
 

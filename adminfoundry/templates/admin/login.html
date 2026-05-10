@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>coreAdmin — Login</title>
+  <title>adminfoundry — Login</title>
   <link rel="stylesheet" href="{{ ui_base }}/static/admin.css">
 </head>
 <body>
 <a href="#login-form" class="skip-link" style="position:absolute;left:-9999px;top:0;z-index:9999;padding:.5rem 1rem;background:#0052cc;color:#fff;text-decoration:none">Skip to login form</a>
 <div class="login-wrap">
   <div class="login-box">
-    <h1>coreAdmin</h1>
+    <div class="app-logo">
+      <span class="app-name">{{ admin_title }}</span>
+      <span class="app-admin-label">ADMIN</span>
+    </div>
     <div id="alert" class="alert" role="alert" aria-live="assertive"></div>
     <form id="login-form" novalidate aria-label="Login form">
       <div class="form-group">

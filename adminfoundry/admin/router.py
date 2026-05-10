@@ -17,7 +17,7 @@ from adminfoundry.admin.serializer import serializer
 from adminfoundry.admin.ui_preferences import UIPreference, get_preferences, set_preferences
 from adminfoundry.admin.ui_renderer import get_support_matrix
 from adminfoundry.authz.policy_engine import policy_engine
-from adminfoundry.database import get_db
+from adminfoundry.database import get_db, get_admin_db
 from adminfoundry.dependencies import get_current_user, require_superadmin
 from adminfoundry.models.user import User
 from adminfoundry.observability.admin_metrics import get_snapshot as metrics_snapshot
@@ -38,35 +38,66 @@ def _get_admin_or_404(model_name: str):
     return model_admin
 
 
-def _check_model_access(model_admin, user, token_payload: dict) -> None:
-    """Raise 403 if the user lacks access to this model's admin CRUD interface."""
+def _check_model_access(model_admin, user, token_payload: dict, tenant=None) -> None:
+    """Raise 403 if the user lacks access to this model's admin CRUD interface.
+
+    Superadmin without impersonation token in a tenant context → 403 (must use impersonation).
+    Superadmin with impersonation token in tenant context → only tenant-scoped models allowed.
+    """
     is_impersonating = bool(token_payload.get("impersonated_by"))
+
     if user.is_superadmin and not is_impersonating:
+        if settings.MULTI_TENANT and tenant is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Use an impersonation token to access tenant panels",
+            )
         return
+
+    if user.is_superadmin and is_impersonating:
+        if model_admin.tenant_scoped:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only tenant-scoped models are accessible during tenant impersonation",
+        )
+
+    # Tenant admin: a user who holds the "tenant_admin" role scoped to the current tenant
+    # gets full CRUD access to all tenant-scoped models in that tenant's panel.
+    if tenant is not None and model_admin.tenant_scoped:
+        for r in (user.roles or []):
+            if r.name == "tenant_admin" and r.tenant_id == tenant.id:
+                return
+
     if getattr(model_admin, "admin_only", True):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin required")
     access_roles = getattr(model_admin, "access_roles", [])
     if access_roles:
-        user_roles = {r.name for r in (user.roles or [])}
-        if not user_roles.intersection(access_roles):
+        user_role_names = {r.name for r in (user.roles or [])}
+        if not user_role_names.intersection(access_roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
 
 
 def _tenant_filter(request: Request, model_admin):
-    """Return a SQLAlchemy filter for tenant-scoped models, or None."""
+    """Return a SQLAlchemy filter for tenant-scoped models, or None.
+
+    Tenant context present      → WHERE tenant_id = <tenant.id>
+    No tenant (root panel)
+      global_only_in_root_panel → WHERE tenant_id IS NULL  (e.g. Roles)
+      otherwise                 → no filter (e.g. AuditLog — superadmin sees all)
+    """
     if not model_admin.tenant_scoped or not settings.MULTI_TENANT:
         return None
-    tenant = getattr(request.state, "tenant", None)
-    if tenant is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tenant context required for scoped model",
-        )
     if not hasattr(model_admin.model, "tenant_id"):
         return None
-    return model_admin.model.tenant_id == tenant.id
+    tenant = getattr(request.state, "tenant", None)
+    if tenant is not None:
+        return model_admin.model.tenant_id == tenant.id
+    if model_admin.global_only_in_root_panel:
+        return model_admin.model.tenant_id.is_(None)
+    return None
 
 
 def _validate_body(schema_class, body: dict):
@@ -116,7 +147,8 @@ async def admin_navigation(
 ):
     """Return visible navigation structure for the current user and context."""
     payload = getattr(request.state, "token_payload", {})
-    return build_navigation(current_user, payload, admin_site)
+    tenant = getattr(request.state, "tenant", None)
+    return build_navigation(current_user, payload, admin_site, tenant=tenant)
 
 
 @router.get("/capabilities")
@@ -182,7 +214,7 @@ async def admin_metrics(
 @router.get("/dashboard")
 async def admin_dashboard(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
 ):
     """Return rendered dashboard widgets for the current user."""
@@ -325,12 +357,12 @@ async def list_objects(
     page_size: int = Query(20, ge=1, le=100),
     q: str | None = Query(None),
     order_by: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
     stmt = select(model_admin.model)
 
@@ -377,12 +409,12 @@ async def list_objects(
 async def create_object(
     model_name: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
     create_schema = schema_builder.build_create_schema(model_admin)
     body = await request.json()
@@ -398,6 +430,14 @@ async def create_object(
             )
 
     data = model_admin.before_create(validated.model_dump(exclude_none=True))
+
+    # For tenant-scoped models, auto-inject tenant_id from the request context.
+    # The field is protected (not in the schema), so the client cannot set it.
+    if model_admin.tenant_scoped and settings.MULTI_TENANT:
+        tenant = getattr(request.state, "tenant", None)
+        if tenant is not None and hasattr(model_admin.model, "tenant_id"):
+            data.setdefault("tenant_id", str(tenant.id))
+
     obj = model_admin.model(**data)
     db.add(obj)
     try:
@@ -434,10 +474,11 @@ async def model_meta(
 @router.get("/{model_name}/lookup")
 async def lookup_objects(
     model_name: str,
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     q: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     _: User = Depends(require_superadmin),
 ):
     """
@@ -599,7 +640,7 @@ async def save_permission_matrix(
 async def bulk_action_direct(
     model_name: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
 ):
     """Execute a declared bulk action directly — no job queue required."""
@@ -607,7 +648,7 @@ async def bulk_action_direct(
 
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
     body = await request.json()
     action_name: str = body.get("action", "")
@@ -658,7 +699,7 @@ async def export_objects(
     q: str | None = Query(None),
     order_by: str | None = Query(None),
     tz: str | None = Query(None, description="IANA timezone name, e.g. Europe/Berlin"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
 ):
     """Export all matching records as CSV, JSON, or XLSX (max 10 000 rows).
@@ -691,7 +732,7 @@ async def export_objects(
 
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
     stmt = select(model_admin.model)
     tf = _tenant_filter(request, model_admin)
@@ -813,12 +854,12 @@ async def get_object(
     model_name: str,
     object_id: uuid.UUID,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
     obj = (
         await db.execute(select(model_admin.model).where(model_admin.model.id == object_id))
@@ -838,12 +879,12 @@ async def update_object(
     model_name: str,
     object_id: uuid.UUID,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
     update_schema = schema_builder.build_update_schema(model_admin)
     body = await request.json()
@@ -892,12 +933,12 @@ async def delete_object(
     model_name: str,
     object_id: uuid.UUID,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
     obj = (
         await db.execute(select(model_admin.model).where(model_admin.model.id == object_id))

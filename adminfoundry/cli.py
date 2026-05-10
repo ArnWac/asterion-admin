@@ -118,6 +118,54 @@ async def _create_superadmin(email: str, password: str, full_name: str | None):
         typer.echo(f"Superadmin {email} created.")
 
 
+@app.command("create-user")
+def create_user(
+    email: str = typer.Option(..., prompt=True),
+    password: str = typer.Option(..., prompt=True, hide_input=True, confirmation_prompt=True),
+    full_name: str = typer.Option(None),
+    role: str = typer.Option(None, help="Role name to assign (must already exist)"),
+    tenant_slug: str = typer.Option(None, help="Tenant slug the role belongs to (for tenant-scoped roles)"),
+):
+    """Create a regular (non-superadmin) user, optionally assigned to a role."""
+    asyncio.run(_create_user(email, password, full_name, role, tenant_slug))
+
+
+async def _create_user(
+    email: str, password: str, full_name: str | None, role_name: str | None, tenant_slug: str | None
+):
+    async with AsyncSessionLocal() as session:
+        user = User(
+            email=email,
+            hashed_password=hash_password(password),
+            full_name=full_name,
+            is_active=True,
+            is_superadmin=False,
+        )
+        session.add(user)
+        await session.flush()
+
+        if role_name:
+            from adminfoundry.models.role import Role, user_roles
+            stmt = select(Role).where(Role.name == role_name)
+            if tenant_slug:
+                tenant = (await session.execute(
+                    select(Tenant).where(Tenant.slug == tenant_slug)
+                )).scalar_one_or_none()
+                if tenant is None:
+                    typer.echo(f"Tenant '{tenant_slug}' not found.", err=True)
+                    raise typer.Exit(code=1)
+                stmt = stmt.where(Role.tenant_id == tenant.id)
+            role = (await session.execute(stmt)).scalar_one_or_none()
+            if role is None:
+                typer.echo(f"Role '{role_name}' not found.", err=True)
+                raise typer.Exit(code=1)
+            await session.execute(user_roles.insert().values(user_id=user.id, role_id=role.id))
+            typer.echo(f"Role '{role_name}' assigned.")
+
+        await session.commit()
+        typer.echo(f"User {email} created.")
+
+
 @app.command("inspect-registry")
 def inspect_registry():
     """Report registered models, fields, actions, protected fields, and contract readiness."""

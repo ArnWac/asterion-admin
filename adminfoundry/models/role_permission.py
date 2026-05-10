@@ -16,3 +16,7 @@ class RolePermission(TimestampedBase):
     can_create: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     can_update: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     can_delete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Denormalised from role.tenant_id for fast tenant-scoped filtering.
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True
+    )

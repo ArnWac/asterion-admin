@@ -1,6 +1,16 @@
+"""Tenant migration environment.
+
+Run against a specific tenant schema by passing --x-schema:
+
+    alembic -c alembic_tenant.ini -x schema=tenant_acme upgrade head
+
+When --x-schema is supplied the migration connection sets search_path so that
+DDL runs inside that tenant schema.  Without it, migrations run in the default
+search_path (useful for generating SQL scripts).
+"""
 import asyncio
 from logging.config import fileConfig
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from adminfoundry.settings import settings
@@ -14,15 +24,23 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+# Optional schema override passed via -x schema=tenant_acme
+_schema = context.get_x_argument(as_dictionary=True).get("schema")
+
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
+    opts = {}
+    if _schema:
+        opts["include_schemas"] = True
+    context.configure(url=url, target_metadata=target_metadata, literal_binds=True, **opts)
     with context.begin_transaction():
         context.run_migrations()
 
 
 def do_run_migrations(connection):
+    if _schema:
+        connection.execute(text(f"SET search_path TO {_schema}, public"))
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()

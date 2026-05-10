@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator
-from fastapi import HTTPException, Request, status
-from sqlalchemy import event, text
+from fastapi import Request
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, create_async_engine, async_sessionmaker
 from adminfoundry.settings import settings
 
@@ -43,25 +43,28 @@ def get_or_create_tenant_engine(schema_name: str) -> AsyncEngine:
     return _tenant_engines[schema_name]
 
 
-async def get_tenant_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """Tenant-scoped DB session.  Falls back to shared DB when MULTI_TENANT=false."""
-    if not settings.MULTI_TENANT:
-        async for session in get_db():
-            yield session
-        return
+async def get_admin_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+    """Admin-aware DB session.
 
-    tenant = getattr(request.state, "tenant", None)
-    if tenant is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tenant context required",
-        )
+    When MULTI_TENANT is enabled and a tenant context is present, returns a
+    session bound to the tenant engine (search_path = tenant_schema, public).
+    Tenant-scoped tables are queried from the tenant schema; shared tables
+    (users, roles, audit_log) fall through to public via search_path.
 
-    tenant_engine = get_or_create_tenant_engine(tenant.schema_name)
-    factory = async_sessionmaker(tenant_engine, expire_on_commit=False)
-    async with factory() as session:
-        try:
-            yield session
-        except Exception:
-            await session.rollback()
-            raise
+    When no tenant is active (superadmin root panel) or MULTI_TENANT is off,
+    falls back to the shared DB session.
+    """
+    if settings.MULTI_TENANT:
+        tenant = getattr(request.state, "tenant", None)
+        if tenant is not None:
+            tenant_engine = get_or_create_tenant_engine(tenant.schema_name)
+            factory = async_sessionmaker(tenant_engine, expire_on_commit=False)
+            async with factory() as session:
+                try:
+                    yield session
+                except Exception:
+                    await session.rollback()
+                    raise
+            return
+    async for session in get_db():
+        yield session

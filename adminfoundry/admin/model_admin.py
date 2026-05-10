@@ -41,6 +41,12 @@ class ModelAdmin:
     protected_fields: list[str] = []
     # tenant_scoped: True → filter by tenant_id when MULTI_TENANT=True
     tenant_scoped: bool = False
+    # global_only_in_root_panel: only meaningful when tenant_scoped=True.
+    # True  → superadmin root panel (no tenant) shows WHERE tenant_id IS NULL
+    # False → superadmin root panel shows all rows across all tenants (default)
+    # Use True for Roles/Permissions (global definitions only in root panel).
+    # Use False for AuditLog (superadmin should see all tenants' logs).
+    global_only_in_root_panel: bool = False
 
     # --- Phase 6: UI contract metadata ---
     # Human-readable labels; defaults derived from model class name if unset

@@ -3,40 +3,31 @@ SaaS Multi-Tenant Beispiel — Subdomain-Routing
 
 Eine App-Instanz, zwei Admin-Kontexte:
 
-  admin.yourdomain.com        → kein Tenant  → Superadmin-Panel
-                                               (Users, Roles, Tenants verwalten)
+  localhost:8000          → kein Tenant  → Superadmin-Panel
+  acme.localhost:8000     → Tenant acme  → nur acme-Projects sichtbar
+  globex.localhost:8000   → Tenant globex → nur globex-Projects sichtbar
 
-  acme.yourdomain.com         → Tenant acme  → nur acme-Projects sichtbar
-  globex.yourdomain.com       → Tenant globex → nur globex-Projects sichtbar
-
-Lokales Testen ohne echte Subdomains:
-  X-Tenant-Slug: acme   Header setzen  → Tenant-Panel
-  kein Header           →              → Superadmin-Panel
+*.localhost wird von modernen Betriebssystemen automatisch auf 127.0.0.1 aufgeloest.
+Kein /etc/hosts-Eintrag noetig.
 
 Starten:
-  uvicorn examples.saas.app:app --reload
+  uvicorn examples.saas.app:app --reload --host 0.0.0.0
 
 Nginx-Beispiel (Production):
   server {
       server_name ~^(?<slug>.+)\\.yourdomain\\.com$;
-      location / {
-          proxy_pass http://127.0.0.1:8000;
-          proxy_set_header X-Tenant-Slug $slug;
-      }
+      location / { proxy_pass http://127.0.0.1:8000; }
   }
   server {
-      server_name admin.yourdomain.com;
-      location / {
-          proxy_pass http://127.0.0.1:8000;
-          # kein X-Tenant-Slug Header → Superadmin-Kontext
-      }
+      server_name yourdomain.com;
+      location / { proxy_pass http://127.0.0.1:8000; }
   }
 """
 import os
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///saas.db")
 os.environ.setdefault("MULTI_TENANT", "true")
-os.environ.setdefault("TENANT_RESOLUTION_STRATEGY", "header")  # "subdomain" in Production
+os.environ.setdefault("TENANT_RESOLUTION_STRATEGY", "subdomain")
 
 from contextlib import asynccontextmanager
 
@@ -53,7 +44,7 @@ from adminfoundry.core.config import CoreAdminConfig
 from adminfoundry.database import AsyncSessionLocal
 from adminfoundry.middleware.tenant import TenantMiddleware
 from adminfoundry.models.base import Base, TimestampedBase
-from adminfoundry.models.role import Role      # noqa: F401
+from adminfoundry.models.role import Role, user_roles
 from adminfoundry.models.tenant import Tenant
 from adminfoundry.models.user import User
 from adminfoundry.routers import auth, health, tenants
@@ -127,25 +118,60 @@ async def lifespan(app: FastAPI):
                 is_active=True,
                 is_superadmin=True,
             ))
-            print("\n✓ Superadmin: admin@example.com / admin123")
+            print("\nSuperadmin: admin@example.com / admin123")
 
-        # Demo-Tenants
+        # Demo-Tenants + je ein tenant_admin-User
         for slug, name in [("acme", "Acme Corp"), ("globex", "Globex Inc")]:
-            if not (await session.execute(
+            tenant = (await session.execute(
                 select(Tenant).where(Tenant.slug == slug)
-            )).scalars().first():
-                session.add(Tenant(name=name, slug=slug, is_active=True))
-                print(f"✓ Tenant: {slug}")
+            )).scalars().first()
+            if not tenant:
+                tenant = Tenant(name=name, slug=slug, is_active=True)
+                session.add(tenant)
+                await session.flush()
+                print(f"Tenant angelegt: {slug}")
+
+            # Role "tenant_admin" für diesen Tenant
+            role = (await session.execute(
+                select(Role).where(Role.name == "tenant_admin", Role.tenant_id == tenant.id)
+            )).scalars().first()
+            if not role:
+                role = Role(name="tenant_admin", description="Tenant admin", tenant_id=tenant.id)
+                session.add(role)
+                await session.flush()
+
+            # Demo-User für diesen Tenant
+            user_email = f"{slug}-admin@example.com"
+            demo_user = (await session.execute(
+                select(User).where(User.email == user_email)
+            )).scalars().first()
+            if not demo_user:
+                demo_user = User(
+                    email=user_email,
+                    hashed_password=hash_password("tenant123"),
+                    full_name=f"{name} Admin",
+                    is_active=True,
+                    is_superadmin=False,
+                )
+                session.add(demo_user)
+                await session.flush()
+                await session.execute(
+                    user_roles.insert().values(user_id=demo_user.id, role_id=role.id)
+                )
+                print(f"Tenant-User angelegt: {user_email}")
 
         await session.commit()
 
     print("""
-─────────────────────────────────────────────
-  Superadmin-Panel   →  kein Header
-  Tenant acme        →  X-Tenant-Slug: acme
-  Tenant globex      →  X-Tenant-Slug: globex
-  Admin UI           →  http://localhost:8000/admin-ui
-─────────────────────────────────────────────
+-------------------------------------------------
+  Superadmin-Panel   ->  http://localhost:8000/admin-ui
+  Tenant acme        ->  http://acme.localhost:8000/admin-ui
+  Tenant globex      ->  http://globex.localhost:8000/admin-ui
+
+  Superadmin:  admin@example.com    / admin123
+  Acme-Admin:  acme-admin@example.com   / tenant123
+  Globex-Admin: globex-admin@example.com / tenant123
+-------------------------------------------------
 """)
     yield
 

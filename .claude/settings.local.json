@@ -84,7 +84,15 @@
       "Bash(cat)",
       "Bash(python3 /tmp/check_imports.py)",
       "Bash(Remove-Item \"f:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\\\\examples\\\\blog\\\\blog.db\" -ErrorAction SilentlyContinue)",
-      "Bash(Write-Host \"done\")"
+      "Bash(Write-Host \"done\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/admin-ui/)",
+      "Bash(python -m uvicorn examples.saas.app:app --reload --host 0.0.0.0 --port 8001)",
+      "Bash(python -c \"from adminfoundry.database import get_db, get_admin_db, get_tenant_db; print\\('OK'\\)\")",
+      "Bash(python -c \"from adminfoundry.admin.router import router; print\\('OK'\\)\")",
+      "Bash(Get-ChildItem -Path \"F:\\\\08_Projekte\\\\WebApps\\\\coreAdmin\\\\coreAdmin\\\\adminfoundry\\\\\" -Recurse -File | Select-Object FullName | ConvertTo-Csv -NoTypeInformation | Select-Object -Skip 1)",
+      "PowerShell(Get-Process | Where-Object { $_.Name -match \"uvicorn|python|fastapi\" } | Select-Object Id, Name, CPU, StartTime)",
+      "PowerShell(Get-Process | Where-Object { $_.Name -match \"python|uvicorn|py\" } | Select-Object Id, Name)",
+      "Bash(uvicorn examples.saas.app:app --reload --host 0.0.0.0 --port 8000)"
     ],
     "additionalDirectories": [
       "f:\\08_Projekte\\WebApps\\coreAdmin\\coreAdmin\\.claude\\projects\\f--08-Projekte-WebApps-coreAdmin-coreAdmin\\memory"

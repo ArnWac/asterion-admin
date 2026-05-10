@@ -1,9 +1,11 @@
-// coreAdmin built-in UI — shared JS
+// adminfoundry built-in UI — shared JS
 'use strict';
 
 const API_BASE = '/api/v1';
-const TOKEN_KEY = 'coreAdmin_access';
-const REFRESH_KEY = 'coreAdmin_refresh';
+const TOKEN_KEY = 'adminfoundry_access';
+const REFRESH_KEY = 'adminfoundry_refresh';
+
+let _adminCtx = null; // cached from initNav; read by initDetail for impersonation checks
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -141,6 +143,7 @@ async function initNav(activeModel) {
       API.get('/admin/navigation'),
       API.get('/admin/context'),
     ]);
+    _adminCtx = ctx;
 
     if (navEl) {
       navEl.innerHTML = nav.items.map(item => {
@@ -156,7 +159,33 @@ async function initNav(activeModel) {
     if (ctx.is_impersonating) {
       const banner = document.createElement('div');
       banner.className = 'impersonation-banner';
-      banner.textContent = T('label_impersonating', {by: ctx.impersonated_by});
+      banner.style.display = 'flex';
+      banner.style.alignItems = 'center';
+      banner.style.justifyContent = 'space-between';
+      const msg = document.createElement('span');
+      msg.textContent = T('label_impersonating', {by: ctx.impersonated_by});
+      const exitBtn = document.createElement('button');
+      exitBtn.textContent = T('btn_exit_tenant_panel');
+      exitBtn.style.cssText = 'margin-left:1rem;padding:.25rem .75rem;font-size:.8rem;cursor:pointer;border:1px solid #172b4d;border-radius:4px;background:#fff;color:#172b4d';
+      exitBtn.onclick = () => {
+        const prev = localStorage.getItem('adminfoundry_prev_access');
+        const prevR = localStorage.getItem('adminfoundry_prev_refresh');
+        localStorage.removeItem('adminfoundry_prev_access');
+        localStorage.removeItem('adminfoundry_prev_refresh');
+        if (prev) {
+          localStorage.setItem(TOKEN_KEY, prev);
+          if (prevR) localStorage.setItem(REFRESH_KEY, prevR); else localStorage.removeItem(REFRESH_KEY);
+        } else {
+          Auth.clear();
+        }
+        // Redirect to root panel (strip subdomain)
+        const parts = window.location.hostname.split('.');
+        const rootHost = parts.length > 1 ? parts.slice(1).join('.') : parts[0];
+        const port = window.location.port ? ':' + window.location.port : '';
+        window.location.href = `${window.location.protocol}//${rootHost}${port}${UI_BASE}/dashboard`;
+      };
+      banner.appendChild(msg);
+      banner.appendChild(exitBtn);
       document.body.prepend(banner);
     }
 
@@ -493,6 +522,33 @@ async function initDetail(model, objectId) {
     if (editLink) editLink.href = `${UI_BASE}/${model}/${objectId}/edit`;
     const backLink = document.getElementById('back-link');
     if (backLink) backLink.href = `${UI_BASE}/${model}`;
+
+    // "Enter tenant panel" button — only shown on Tenant detail for superadmin in root panel
+    if (model === 'tenants' && item.slug && !_adminCtx?.is_impersonating && !_adminCtx?.tenant) {
+      const enterBtn = document.createElement('button');
+      enterBtn.className = 'btn';
+      enterBtn.style.cssText = 'margin-top:1rem;display:inline-block';
+      enterBtn.textContent = T('btn_enter_tenant_panel');
+      enterBtn.onclick = async () => {
+        enterBtn.disabled = true;
+        try {
+          const resp = await API.post(`/tenants/${objectId}/impersonate`, {});
+          // Save current tokens so the exit button can restore them
+          const cur = localStorage.getItem(TOKEN_KEY);
+          const curR = localStorage.getItem(REFRESH_KEY);
+          if (cur) localStorage.setItem('adminfoundry_prev_access', cur);
+          if (curR) localStorage.setItem('adminfoundry_prev_refresh', curR);
+          localStorage.setItem(TOKEN_KEY, resp.access_token);
+          localStorage.removeItem(REFRESH_KEY);
+          const port = window.location.port ? ':' + window.location.port : '';
+          window.location.href = `${window.location.protocol}//${item.slug}.${window.location.hostname}${port}${UI_BASE}/dashboard`;
+        } catch (e) {
+          enterBtn.disabled = false;
+          showError(fmtAPIError(e));
+        }
+      };
+      bodyEl.appendChild(enterBtn);
+    }
 
     // 4B: permission matrix section
     if (meta?.permission_matrix) {
@@ -942,7 +998,7 @@ function debounce(fn, ms) {
 // ---------------------------------------------------------------------------
 // Personal UI preferences (localStorage-backed, non-security)
 // ---------------------------------------------------------------------------
-const PREFS_KEY = 'coreAdmin_prefs';
+const PREFS_KEY = 'adminfoundry_prefs';
 const Prefs = {
   get() {
     try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); }
@@ -1346,7 +1402,7 @@ function setBreadcrumb(parts) {
 // Dark Mode
 // ---------------------------------------------------------------------------
 const DarkMode = {
-  PREF_KEY: 'coreAdmin_theme',
+  PREF_KEY: 'adminfoundry_theme',
   apply(theme) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(this.PREF_KEY, theme);

@@ -21,7 +21,7 @@ class AuditLogPublic(BaseModel):
 
 
 class ImpersonateRequest(BaseModel):
-    target_user_id: uuid.UUID
+    target_user_id: uuid.UUID | None = None  # None = self-impersonation (enter tenant context)
 
 
 class ImpersonateResponse(BaseModel):

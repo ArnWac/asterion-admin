@@ -4,15 +4,22 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from adminfoundry.database import AsyncSessionLocal
 from adminfoundry.models.tenant import Tenant
+from adminfoundry.schemas.tenant import RESERVED_SLUGS
 from adminfoundry.settings import settings
 
 
 def _extract_slug(request: Request) -> str | None:
     if settings.TENANT_RESOLUTION_STRATEGY == "subdomain":
-        host = request.headers.get("host", "").split(":")[0]
+        host = request.headers.get("host", "").split(":")[0]  # strip port
         parts = host.split(".")
+        # acme.localhost → ["acme", "localhost"] — works for local dev
+        # acme.example.com → ["acme", "example", "com"]
+        # localhost → ["localhost"] — no subdomain, skip
         if len(parts) >= 2:
-            return parts[0]
+            candidate = parts[0]
+            if candidate not in RESERVED_SLUGS:
+                return candidate
+        return None
     # default: header
     return request.headers.get("X-Tenant-Slug")
 

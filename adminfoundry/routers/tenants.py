@@ -132,8 +132,9 @@ async def impersonate(
     if tenant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
 
+    target_id = body.target_user_id if body.target_user_id is not None else current_user.id
     target = (
-        await db.execute(select(User).where(User.id == body.target_user_id))
+        await db.execute(select(User).where(User.id == target_id))
     ).scalar_one_or_none()
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target user not found")

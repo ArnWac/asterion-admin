@@ -59,7 +59,7 @@ async def admin_ui_root(request: Request):
     base = settings.ADMIN_UI_PATH
     html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
 <script>
-  var t = localStorage.getItem('coreAdmin_access');
+  var t = localStorage.getItem('adminfoundry_access');
   if (t) {{ window.location.replace('{base}/dashboard'); }}
   else {{ window.location.replace('{base}/login'); }}
 </script></head><body></body></html>"""

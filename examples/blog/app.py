@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI):
             )
             session.add(admin)
             await session.commit()
-            print("\n✓ Superadmin angelegt: admin@example.com / admin123\n")
+            print("\nSuperadmin angelegt: admin@example.com / admin123\n")
 
     yield
 

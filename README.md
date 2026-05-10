@@ -305,7 +305,37 @@ pytest tests/ -q
 
 ## Examples
 
-- [`examples/blog/`](examples/blog/app.py) — minimal single-tenant app with SQLite, bulk actions, and custom dashboard
+Two runnable example apps are included. Both use SQLite so no database setup is needed.
+
+### Blog — single-tenant
+
+```bash
+uvicorn examples.blog.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+Open `http://localhost:8000/admin-ui` — Login: `admin@example.com` / `admin123`
+
+Source: [`examples/blog/app.py`](examples/blog/app.py)
+
+### SaaS — multi-tenant with subdomain routing
+
+```bash
+uvicorn examples.saas.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+| URL | Context |
+|---|---|
+| `http://localhost:8000/admin-ui` | Superadmin panel (no tenant) |
+| `http://acme.localhost:8000/admin-ui` | Tenant *acme* |
+| `http://globex.localhost:8000/admin-ui` | Tenant *globex* |
+
+Login: `admin@example.com` / `admin123`
+
+`*.localhost` resolves to `127.0.0.1` on modern OSes — no `/etc/hosts` entry needed.
+
+> **SQLite note:** delete `saas.db` / `blog.db` after pulling schema changes (SQLite has no migrations — `create_all` recreates the file on next start).
+
+Source: [`examples/saas/app.py`](examples/saas/app.py)
 
 ## Requirements
 

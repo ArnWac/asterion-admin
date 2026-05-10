@@ -10,7 +10,10 @@
 <a href="#main-content" class="skip-link" style="position:absolute;left:-9999px;top:0;z-index:9999;padding:.5rem 1rem;background:#0052cc;color:#fff;text-decoration:none">Skip to main content</a>
 <div class="layout">
   <nav class="sidebar" data-i18n-aria="aria_nav_label" aria-label="Admin navigation">
-    <h2>{{ admin_title }}</h2>
+    <div class="app-logo app-logo--sidebar">
+      <span class="app-name">{{ admin_title }}</span>
+      <span class="app-admin-label">ADMIN</span>
+    </div>
     <div id="nav-items" role="list" data-i18n-aria="aria_model_list" aria-label="Model list"><span class="loading" aria-live="polite" data-i18n="status_loading">Loading…</span></div>
     <div class="sidebar-footer">
       <span id="tenant-ctx" data-i18n-aria="aria_tenant" aria-label="Active tenant"></span>
