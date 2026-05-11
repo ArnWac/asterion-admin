@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
+    REDIS_URL: str | None = None
+
     DEBUG: bool = False
     MULTI_TENANT: bool = False
     # "header" uses X-Tenant-Slug; "subdomain" extracts from the first hostname segment
