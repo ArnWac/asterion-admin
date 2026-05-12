@@ -37,6 +37,20 @@ class Post(TimestampedBase):
     published: Mapped[bool]      = mapped_column(Boolean,     nullable=False, default=False)
 
 
+def _word_count(obj: Post) -> int:
+    return len((obj.content or "").split())
+
+
+def _read_time(obj: Post) -> str:
+    minutes = max(1, round(_word_count(obj) / 200))
+    return f"{minutes} min"
+
+
+def _excerpt(obj: Post) -> str:
+    body = (obj.content or "").strip()
+    return body[:100] + ("…" if len(body) > 100 else "")
+
+
 # ---------------------------------------------------------------------------
 # Admin-Konfiguration
 # ---------------------------------------------------------------------------
@@ -58,12 +72,21 @@ class PostAdmin(ModelAdmin):
     model        = Post
     label        = "Post"
     label_plural = "Posts"
-    list_display = ["title", "author", "published", "created_at"]
-    search_fields  = ["title", "content", "author"]
-    filter_fields  = ["published"]
-    ordering       = ["-created_at"]
+    list_display    = ["title", "author", "word_count", "read_time", "published", "created_at"]
+    search_fields   = ["title", "content", "author"]
+    filter_fields   = ["published"]
+    ordering        = ["-created_at"]
     readonly_fields = ["id", "created_at", "updated_at"]
-    actions        = [PublishAction()]
+    actions         = [PublishAction()]
+    fieldsets = [
+        ("Content",     ["title", "content"]),
+        ("Publishing",  ["author", "published"]),
+    ]
+    computed_fields = {
+        "word_count": _word_count,
+        "read_time":  _read_time,
+        "excerpt":    _excerpt,
+    }
 
 
 admin_site.register(PostAdmin())

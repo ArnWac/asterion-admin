@@ -185,6 +185,28 @@ class ArticleAdmin(ModelAdmin):
     # --- Create flow ---
     create_redirect = "detail"  # redirect to detail after create; default: "list"
 
+    # --- Soft-delete ---
+    soft_delete  = False  # True: DELETE sets deleted_at; requires SoftDeleteMixin
+    allow_delete = True   # False: block deletion entirely (e.g. immutable audit logs)
+
+    # --- UI layout ---
+    fieldsets = [                          # group form fields into labeled sections
+        ("Basic", ["title", "published"]),
+        ("Meta",  ["author_id", "created_at"]),
+    ]
+    widget_overrides = {                   # override widget for specific fields
+        "cover_image": "image",            # renders thumbnail in list + file picker in form
+        "attachment":  "file",             # renders download link in list
+    }
+
+    # --- Import ---
+    allow_import = False  # True: show "Import CSV" button on list page
+
+    # --- Computed columns ---
+    computed_fields = {                    # read-only virtual columns (not in DB)
+        "word_count": lambda obj: len((obj.body or "").split()),
+    }
+
     # --- Multi-tenancy ---
     tenant_scoped            = False  # filter by tenant_id in tenant context
     global_only_in_root_panel = False # superadmin root panel shows WHERE tenant_id IS NULL
@@ -237,6 +259,52 @@ class ArticleAdmin(ModelAdmin):
 
 ---
 
+## Computed columns
+
+Virtual read-only columns calculated at serialize time — no DB column needed:
+
+```python
+class ArticleAdmin(ModelAdmin):
+    model = Article
+    list_display = ["title", "word_count", "published"]
+    computed_fields = {
+        "word_count": lambda obj: len((obj.body or "").split()),
+        "excerpt":    lambda obj: (obj.body or "")[:120],
+    }
+```
+
+Computed fields appear in the list view and detail page. They are excluded from create/update forms and cannot be filtered or sorted.
+
+---
+
+## Fieldsets and widgets
+
+Group form fields into labeled sections with `fieldsets`:
+
+```python
+class ArticleAdmin(ModelAdmin):
+    model     = Article
+    fieldsets = [
+        ("Content",  ["title", "body", "published"]),
+        ("Metadata", ["author_id", "category_id"]),
+    ]
+```
+
+Override the widget for image and file URL columns:
+
+```python
+class ProfileAdmin(ModelAdmin):
+    model            = Profile
+    widget_overrides = {
+        "avatar_url":    "image",  # shows thumbnail in list; file picker in form
+        "resume_url":    "file",   # shows filename link in list; file picker in form
+    }
+```
+
+File and image fields store a URL string. Use the storage API to upload the file and store the resulting URL.
+
+---
+
 ## Actions
 
 ```python
@@ -265,19 +333,21 @@ Actions are exposed via `POST /api/v1/admin/{model}/bulk-action`.
 
 **Export** is built into every list view — CSV, JSON, and Excel (requires `adminfoundry[xlsx]`). Datetimes are converted to the tenant's configured timezone automatically.
 
-**Import** accepts JSON rows and supports dry-run validation before committing:
+**Import** accepts a UTF-8 CSV file and supports dry-run validation before committing. Enable per model with `allow_import = True`:
 
 ```bash
-# Dry run — validate only, no writes
-POST /api/v1/jobs/admin/articles/import
-{"rows": [{"title": "Hello", "published": false}], "dry_run": true}
+# Dry run — validate rows, no writes; returns preview of first 5 rows + any errors
+POST /api/v1/admin/articles/import?dry_run=true
+Content-Type: multipart/form-data
+file=@articles.csv
 
-# Commit
-POST /api/v1/jobs/admin/articles/import
-{"rows": [...], "dry_run": false, "idempotency_key": "import-2024-01-batch-1"}
+# Commit all rows (rolls back entire upload on any validation error)
+POST /api/v1/admin/articles/import?dry_run=false
+Content-Type: multipart/form-data
+file=@articles.csv
 ```
 
-Both respect field-level permissions and protected fields. Import supports idempotency keys to safely retry failed uploads.
+The built-in UI shows an "Import CSV" button on the list page when `allow_import = True`. Clicking it opens a modal with dry-run preview before the user confirms the full import. Field-level permissions and protected fields are enforced as on regular creates.
 
 ---
 
@@ -460,6 +530,34 @@ Tenant language, timezone, and date format are set in the admin UI and applied t
 User preference (Settings page) → Tenant settings (DB) → CoreAdminConfig default
 ```
 
+**IP allowlist** — restrict a tenant to a set of CIDRs. Set `allowed_cidrs` on the `Tenant` record as a JSON array:
+
+```json
+["10.0.0.0/8", "203.0.113.42/32"]
+```
+
+Requests from IPs outside the allowlist receive a 403. When no CIDRs are configured, all IPs are allowed.
+
+---
+
+## Soft-delete
+
+Attach `SoftDeleteMixin` to your model and set `soft_delete = True` on its `ModelAdmin`:
+
+```python
+from adminfoundry.models.base import TimestampedBase, SoftDeleteMixin
+
+class Article(SoftDeleteMixin, TimestampedBase):
+    __tablename__ = "articles"
+    ...
+
+class ArticleAdmin(ModelAdmin):
+    model       = Article
+    soft_delete = True   # DELETE sets deleted_at; record is hidden from normal list queries
+```
+
+The admin panel gains a **Trash** toggle that shows soft-deleted records with **Restore** and **Hard Delete** buttons. Hard delete is superadmin-only.
+
 ---
 
 ## Audit log
@@ -537,7 +635,7 @@ async def guard_delete(model_name, obj, user, **kw):
         raise ValueError("Cannot delete locked records")
 ```
 
-Available signals: `post_create`, `post_update`, `pre_delete`, `post_delete`.
+Available signals: `post_create`, `post_update`, `pre_delete`, `post_delete`, `post_login`, `post_logout`.
 
 ---
 
@@ -669,6 +767,8 @@ pytest tests/ -q
 Two runnable example apps are included. Both use SQLite — no database setup needed.
 
 ### Blog — single-tenant
+
+Demonstrates actions, computed columns (`word_count`, `read_time`, `excerpt`), and fieldsets.
 
 ```bash
 uvicorn examples.blog.app:app --reload --host 0.0.0.0 --port 8000
