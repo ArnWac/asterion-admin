@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adminfoundry.admin.filter_builder import filter_builder
 from adminfoundry.admin.registry import admin_site
 from adminfoundry.authz.policy_engine import policy_engine
 from adminfoundry.database import get_db
@@ -12,7 +13,6 @@ from adminfoundry.dependencies import get_current_user, require_superadmin
 from adminfoundry.extensions.jobs.models import Job, JobStatus
 from adminfoundry.extensions.jobs.schemas import (
     BulkActionRequest,
-    ExportResult,
     ImportRequest,
     ImportResult,
     JobRead,
@@ -67,38 +67,148 @@ async def get_job(
 
 
 # ---------------------------------------------------------------------------
-# Export
+# Export — file download (CSV / JSON / XLSX) with field-policy enforcement
 # ---------------------------------------------------------------------------
 
-@router.post("/admin/{model_name}/export", response_model=ExportResult)
+@router.get("/admin/{model_name}/export")
 async def export_model(
     model_name: str,
     request: Request,
+    format: str = Query("csv", pattern="^(csv|json|xlsx)$"),
     q: str | None = Query(None),
+    order_by: str | None = Query(None),
+    tz: str | None = Query(None, description="IANA timezone, e.g. Europe/Berlin"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Export model rows as JSON — honors permissions, field visibility, and tenant scope."""
+    """Export matching records as CSV, JSON or XLSX.
+
+    Field-level policies (field_policies / view_roles) are enforced — hidden fields
+    are omitted from the output. Creates a Job record for audit tracking.
+    """
+    import csv
+    import io
+    import json as _json
+    import sqlalchemy.types as _sa_types
+    from datetime import datetime, timezone as _tz_utc
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    from fastapi.responses import Response
+    from adminfoundry.admin.router import _tenant_filter, _check_model_access
+
     model_admin = _get_admin_or_404(model_name)
     token_payload = getattr(request.state, "token_payload", {})
+    _check_model_access(model_admin, current_user, token_payload, tenant=getattr(request.state, "tenant", None))
 
+    _target_zone = None
+    if tz:
+        try:
+            _target_zone = ZoneInfo(tz)
+        except ZoneInfoNotFoundError:
+            pass
+
+    def _apply_tz(value):
+        if not isinstance(value, datetime):
+            return value
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=_tz_utc.utc)
+        if _target_zone:
+            value = value.astimezone(_target_zone)
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+
+    def _is_dt_col(col) -> bool:
+        return isinstance(col.type, (_sa_types.DateTime, _sa_types.DATETIME, _sa_types.TIMESTAMP))
+
+    # Build query with full filtering
+    stmt = select(model_admin.model)
+    tf = _tenant_filter(request, model_admin)
+    if tf is not None:
+        stmt = stmt.where(tf)
+    rf = policy_engine.get_record_filter(current_user, model_admin, token_payload)
+    if rf is not None:
+        stmt = stmt.where(rf)
+    search = filter_builder.build_search(model_admin, q)
+    if search is not None:
+        stmt = stmt.where(search)
+    for f in filter_builder.build_filters(model_admin, dict(request.query_params)):
+        stmt = stmt.where(f)
+    ordering = filter_builder.build_ordering(model_admin, order_by)
+    if ordering is not None:
+        stmt = stmt.order_by(ordering)
+    stmt = stmt.limit(10_000)
+
+    items = (await db.execute(stmt)).scalars().all()
+
+    # Determine visible columns — apply field-level policy
+    excluded = model_admin.all_protected
+    visible_cols: list[tuple[str, str]] = []
+    for col in model_admin.model.__table__.columns:
+        if col.name in excluded:
+            continue
+        fp = policy_engine.evaluate_field(current_user, model_admin, col.name, token_payload)
+        if not fp.can_view:
+            continue
+        header = f"{col.name} ({tz})" if tz and _is_dt_col(col) else col.name
+        visible_cols.append((col.name, header))
+
+    def _serialize(obj) -> dict:
+        return {header: _apply_tz(getattr(obj, name)) for name, header in visible_cols}
+
+    rows = [_serialize(obj) for obj in items]
+
+    # Track as a job record
     job = await job_service.create_job(
         db, job_type="export", initiator_id=current_user.id, model_name=model_name,
     )
+    await job_service.update_status(
+        db, job, JobStatus.completed, progress=100,
+        result_summary=f"Exported {len(rows)} rows as {format.upper()}",
+        output_data={"row_count": len(rows), "format": format},
+    )
 
-    try:
-        data = await import_export_service.run_export(
-            db, model_admin, current_user, token_payload, q=q,
+    tz_label = (tz or "UTC").replace("/", "-")
+    filename = f"{model_name}_export_{tz_label}"
+
+    if format == "json":
+        content = _json.dumps(rows, default=str, indent=2)
+        return Response(
+            content=content,
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}.json"'},
         )
-        job = await job_service.update_status(
-            db, job, JobStatus.completed, progress=100,
-            result_summary=f"Exported {len(data)} rows",
-            output_data={"row_count": len(data)},
+
+    if format == "xlsx":
+        try:
+            import openpyxl
+        except ImportError:
+            raise HTTPException(status_code=501,
+                                detail="XLSX export requires openpyxl: pip install adminfoundry[xlsx]")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        if rows:
+            ws.append(list(rows[0].keys()))
+            for row in rows:
+                ws.append([str(v) if v is not None else "" for v in row.values()])
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}.xlsx"'},
         )
-        return ExportResult(job_id=job.id, status=job.status, row_count=len(data), data=data)
-    except Exception as exc:
-        await job_service.update_status(db, job, JobStatus.failed, failure_summary=str(exc))
-        raise
+
+    # CSV (default)
+    buf = io.StringIO()
+    if rows:
+        writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: ("" if v is None else str(v)) for k, v in row.items()})
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'},
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -211,7 +211,7 @@ def test_superadmin_sees_all_models_in_navigation():
     assert "users" in model_names
     # roles has global_only_in_root_panel=True — shown in root panel with NULL tenant filter
     assert "roles" in model_names
-    assert "role_permissions" in model_names
+    assert "role_permissions" not in model_names  # managed via permission matrix, not standalone
 
 
 def test_impersonation_token_sees_empty_navigation():
@@ -329,9 +329,9 @@ async def test_admin_navigation_endpoint(client: AsyncClient, superadmin: User):
     items = resp.json()["items"]
     model_names = [i["model"] for i in items]
     assert "users" in model_names
-    # roles / role_permissions have global_only_in_root_panel=True — shown in root panel
+    # roles has global_only_in_root_panel=True — shown in root panel
     assert "roles" in model_names
-    assert "role_permissions" in model_names
+    assert "role_permissions" not in model_names  # managed via permission matrix, not standalone
     # Each item has required fields
     for item in items:
         assert "label" in item
@@ -353,7 +353,10 @@ async def test_admin_capabilities_endpoint(client: AsyncClient, superadmin: User
 
 @pytest.mark.asyncio
 async def test_admin_capabilities_impersonation(client: AsyncClient, superadmin: User):
-    """Impersonation token → all model capabilities are False."""
+    """Impersonation token in tenant context:
+    - tenant-scoped models → full caps (impersonating superadmin can CRUD in that tenant)
+    - non-tenant-scoped models → no caps (only root-panel superadmin can access)
+    """
     imp_token, _ = create_impersonation_token(str(superadmin.id), str(superadmin.id), "00000000-0000-0000-0000-000000000000")
     resp = await client.get(
         "/api/v1/admin/capabilities",
@@ -362,8 +365,12 @@ async def test_admin_capabilities_impersonation(client: AsyncClient, superadmin:
     assert resp.status_code == 200
     data = resp.json()
     assert data["is_impersonating"] is True
-    for model_cap in data["models"]:
-        assert model_cap["can_list"] is False
+    caps_by_model = {m["model"]: m for m in data["models"]}
+    # Non-tenant-scoped models: impersonation token has no access
+    assert caps_by_model["users"]["can_list"] is False
+    assert caps_by_model["audit_logs"]["can_list"] is False
+    # Tenant-scoped models: impersonating superadmin in tenant context has full access
+    assert caps_by_model["roles"]["can_list"] is True
 
 
 @pytest.mark.asyncio

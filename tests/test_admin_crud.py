@@ -399,6 +399,7 @@ def test_superadmin_blocked_from_tenant_scoped_in_root_panel():
 
     model_admin = MagicMock()
     model_admin.tenant_scoped = True
+    model_admin.global_only_in_root_panel = False  # explicit: not allowed from root panel
 
     user = MagicMock()
     user.is_superadmin = True
@@ -407,6 +408,23 @@ def test_superadmin_blocked_from_tenant_scoped_in_root_panel():
         with pytest.raises(HTTPException) as exc_info:
             _check_model_access(model_admin, user, {}, tenant=None)
     assert exc_info.value.status_code == 403
+
+
+def test_superadmin_allowed_global_only_in_root_panel():
+    """Superadmin can access tenant_scoped models with global_only_in_root_panel=True from root panel."""
+    from unittest.mock import MagicMock, patch
+    from adminfoundry.admin.router import _check_model_access
+
+    model_admin = MagicMock()
+    model_admin.tenant_scoped = True
+    model_admin.global_only_in_root_panel = True  # allowed; filter handles tenant_id IS NULL
+
+    user = MagicMock()
+    user.is_superadmin = True
+
+    with patch("adminfoundry.admin.router.settings.MULTI_TENANT", True):
+        # Should not raise
+        _check_model_access(model_admin, user, {}, tenant=None)
 
 
 def test_tenant_admin_access_in_correct_tenant():

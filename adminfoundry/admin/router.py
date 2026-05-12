@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import ValidationError
 from sqlalchemy import select, func
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adminfoundry import signals as _signals
@@ -21,12 +21,28 @@ from adminfoundry.authz.policy_engine import policy_engine
 from adminfoundry.database import get_db, get_admin_db
 from adminfoundry.dependencies import get_current_user, require_superadmin
 from adminfoundry.models.user import User
-from adminfoundry.observability.admin_metrics import get_snapshot as metrics_snapshot
+from adminfoundry.extensions.observability.admin_metrics import get_snapshot as metrics_snapshot
 from adminfoundry.schemas.client_config import ClientConfigResponse
 from adminfoundry.schemas.policy import FieldPolicyMeta, ModelPolicyResponse
 from adminfoundry.settings import settings
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+
+
+async def _resolve_impersonation_tenant(payload: dict, current_tenant, db: AsyncSession):
+    """Return the Tenant for a same-origin impersonation token when TenantMiddleware
+    didn't set it (no subdomain).  Returns current_tenant unchanged if it is already set
+    or if the token carries no tenant_id."""
+    if current_tenant is not None:
+        return current_tenant
+    if not (payload.get("impersonated_by") and payload.get("tenant_id")):
+        return None
+    from adminfoundry.models.tenant import Tenant as _Tenant
+    return (
+        await db.execute(
+            select(_Tenant).where(_Tenant.id == uuid.UUID(payload["tenant_id"]))
+        )
+    ).scalar_one_or_none()
 
 
 def _get_admin_or_404(model_name: str):
@@ -54,15 +70,25 @@ def _check_model_access(model_admin, user, token_payload: dict, tenant=None) -> 
                 detail="Use an impersonation token to access tenant panels",
             )
         if settings.MULTI_TENANT and tenant is None and model_admin.tenant_scoped:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Tenant context required — use impersonation to access tenant-scoped models",
-            )
+            # global_only_in_root_panel models are accessible from the root panel;
+            # _tenant_filter applies WHERE tenant_id IS NULL to scope to global records.
+            if not getattr(model_admin, "global_only_in_root_panel", False):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Tenant context required — use impersonation to access tenant-scoped models",
+                )
         return
 
     if user.is_superadmin and is_impersonating:
         token_tenant_id = token_payload.get("tenant_id")
-        if tenant is None or token_tenant_id != str(tenant.id):
+        # Subdomain mode: token must match the resolved tenant
+        if tenant is not None and token_tenant_id != str(tenant.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Impersonation token is not valid for this tenant",
+            )
+        # Same-origin mode: no subdomain, but token must carry tenant_id
+        if tenant is None and not token_tenant_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Impersonation token is not valid for this tenant",
@@ -92,13 +118,32 @@ def _check_model_access(model_admin, user, token_payload: dict, tenant=None) -> 
             )
 
 
+def _require_superadmin_or_impersonating(user, token_payload: dict, request: Request) -> None:
+    """Allow superadmin (root panel or impersonating) OR tenant admin in their own tenant.
+
+    Raises 403 otherwise.
+    """
+    from adminfoundry.auth_provider import AuthProvider
+    provider = getattr(request.app.state, "auth_provider", AuthProvider())
+    if provider.is_superadmin(user):
+        # Superadmin always allowed (both regular and impersonation tokens).
+        return
+    # Tenant admin: allow if user holds tenant_admin role for the current tenant.
+    tenant = getattr(request.state, "tenant", None)
+    if tenant is not None:
+        for r in (user.roles or []):
+            if r.name == "tenant_admin" and r.tenant_id == tenant.id:
+                return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin required")
+
+
 def _tenant_filter(request: Request, model_admin):
     """Return a SQLAlchemy filter for tenant-scoped models, or None.
 
-    Tenant context present      → WHERE tenant_id = <tenant.id>
-    No tenant (root panel)
-      global_only_in_root_panel → WHERE tenant_id IS NULL  (e.g. Roles)
-      otherwise                 → no filter (e.g. AuditLog — superadmin sees all)
+    Subdomain mode              → WHERE tenant_id = <tenant.id>
+    Same-origin impersonation   → WHERE tenant_id = <token.tenant_id>
+    Root panel, global model    → WHERE tenant_id IS NULL
+    Root panel, non-scoped      → no filter (superadmin sees all)
     """
     if not model_admin.tenant_scoped or not settings.MULTI_TENANT:
         return None
@@ -106,8 +151,12 @@ def _tenant_filter(request: Request, model_admin):
         return None
     tenant = getattr(request.state, "tenant", None)
     if tenant is not None:
-        return model_admin.model.tenant_id == tenant.id
-    if model_admin.global_only_in_root_panel:
+        return model_admin.model.tenant_id == str(tenant.id)
+    # Same-origin impersonation: resolve tenant from token
+    token_payload = getattr(request.state, "token_payload", {})
+    if token_payload.get("impersonated_by") and token_payload.get("tenant_id"):
+        return model_admin.model.tenant_id == token_payload["tenant_id"]
+    if getattr(model_admin, "global_only_in_root_panel", False):
         return model_admin.model.tenant_id.is_(None)
     return None
 
@@ -130,10 +179,42 @@ def _validate_body(schema_class, body: dict):
 
 @router.get("")
 async def list_registered_models(
-    _: User = Depends(require_superadmin),
+    request: Request,
+    current_user: User = Depends(get_current_user),
 ):
-    """Return registry metadata — no protected internals."""
-    return {"models": admin_site.metadata()}
+    """Return registry metadata filtered for the current panel context.
+
+    Root panel (not impersonating): superadmin required; returns non-tenant-scoped models
+    + global_only_in_root_panel.
+    Tenant panel (impersonating or subdomain): returns tenant_scoped models only.
+    Impersonation tokens are allowed here because this is read-only registry metadata
+    needed to populate form selects in the tenant panel.
+    """
+    payload = getattr(request.state, "token_payload", {})
+    tenant = getattr(request.state, "tenant", None)
+    is_impersonating = bool(payload.get("impersonated_by"))
+    in_tenant_context = is_impersonating or tenant is not None
+
+    # Root panel: require superadmin; impersonation tokens may not browse root registry
+    if not in_tenant_context:
+        from adminfoundry.auth_provider import AuthProvider
+        provider = getattr(request.app.state, "auth_provider", AuthProvider())
+        if not provider.is_superadmin(current_user):
+            raise HTTPException(status_code=403, detail="Superadmin required")
+
+    all_meta = admin_site.metadata()
+    if in_tenant_context:
+        models = [
+            m for m in all_meta
+            if getattr(admin_site.get(m["model"]), "tenant_scoped", False)
+        ]
+    else:
+        models = [
+            m for m in all_meta
+            if not getattr(admin_site.get(m["model"]), "tenant_scoped", False)
+            or getattr(admin_site.get(m["model"]), "global_only_in_root_panel", False)
+        ]
+    return {"models": models}
 
 
 # ---------------------------------------------------------------------------
@@ -145,21 +226,28 @@ async def list_registered_models(
 @router.get("/context")
 async def admin_context(
     request: Request,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Return authenticated admin context — user info, tenant, impersonation state."""
     payload = getattr(request.state, "token_payload", {})
+    t = await _resolve_impersonation_tenant(payload, getattr(request.state, "tenant", None), db)
+    if t is not None:
+        request.state.tenant = t
     return build_admin_context(current_user, payload, request)
 
 
 @router.get("/navigation")
 async def admin_navigation(
     request: Request,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Return visible navigation structure for the current user and context."""
     payload = getattr(request.state, "token_payload", {})
-    tenant = getattr(request.state, "tenant", None)
+    tenant = await _resolve_impersonation_tenant(
+        payload, getattr(request.state, "tenant", None), db
+    )
     return build_navigation(current_user, payload, admin_site, tenant=tenant)
 
 
@@ -173,7 +261,10 @@ async def admin_capabilities(
     payload = getattr(request.state, "token_payload", {})
     from adminfoundry.authz.role_caps import fetch_all_model_caps
     all_db_caps = await fetch_all_model_caps(current_user, db)
-    return build_capabilities(current_user, payload, admin_site, all_db_caps or None)
+    in_tenant_context = bool(
+        payload.get("impersonated_by") or getattr(request.state, "tenant", None)
+    )
+    return build_capabilities(current_user, payload, admin_site, all_db_caps or None, in_tenant_context=in_tenant_context)
 
 
 @router.get("/client-config", response_model=ClientConfigResponse)
@@ -231,6 +322,11 @@ async def admin_dashboard(
 ):
     """Return rendered dashboard widgets for the current user."""
     from adminfoundry.dashboard import DEFAULT_WIDGETS
+
+    payload = getattr(request.state, "token_payload", {})
+    t = await _resolve_impersonation_tenant(payload, getattr(request.state, "tenant", None), db)
+    if t is not None:
+        request.state.tenant = t
 
     widgets_cfg = (
         (_admin_config.dashboard_widgets if _admin_config else None) or DEFAULT_WIDGETS
@@ -440,10 +536,13 @@ async def create_object(
 
     # For tenant-scoped models, auto-inject tenant_id from the request context.
     # The field is protected (not in the schema), so the client cannot set it.
-    if model_admin.tenant_scoped and settings.MULTI_TENANT:
+    if model_admin.tenant_scoped and settings.MULTI_TENANT and hasattr(model_admin.model, "tenant_id"):
         tenant = getattr(request.state, "tenant", None)
-        if tenant is not None and hasattr(model_admin.model, "tenant_id"):
+        if tenant is not None:
             data.setdefault("tenant_id", str(tenant.id))
+        elif payload.get("impersonated_by") and payload.get("tenant_id"):
+            # Same-origin impersonation: inject tenant_id from token
+            data.setdefault("tenant_id", payload["tenant_id"])
 
     obj = model_admin.model(**data)
     db.add(obj)
@@ -452,7 +551,19 @@ async def create_object(
         await db.refresh(obj)
     except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc.orig))
+        orig = str(exc.orig)
+        if "UNIQUE constraint" in orig or "unique constraint" in orig:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A record with these values already exists",
+            )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=orig)
+    except OperationalError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {exc.orig}",
+        )
 
     request.state.audit_action = "created"
     request.state.audit_object_id = str(obj.id)
@@ -489,7 +600,7 @@ async def lookup_objects(
     page_size: int = Query(20, ge=1, le=100),
     q: str | None = Query(None),
     db: AsyncSession = Depends(get_admin_db),
-    _: User = Depends(require_superadmin),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Generic async relation-selection lookup for external clients.
@@ -500,8 +611,14 @@ async def lookup_objects(
     protected-field safe.
     """
     model_admin = _get_admin_or_404(model_name)
+    payload = getattr(request.state, "token_payload", {})
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
     stmt = select(model_admin.model)
+
+    tf = _tenant_filter(request, model_admin)
+    if tf is not None:
+        stmt = stmt.where(tf)
 
     search = filter_builder.build_search(model_admin, q)
     if search is not None:
@@ -549,7 +666,10 @@ async def model_policy(
         for f in fields
     ]
     db_caps = await fetch_model_caps(current_user, model_name, db)
-    caps = policy_engine.effective_model_caps(current_user, model_admin, payload, db_caps=db_caps)
+    in_tenant_context = bool(
+        payload.get("impersonated_by") or getattr(request.state, "tenant", None)
+    )
+    caps = policy_engine.effective_model_caps(current_user, model_admin, payload, db_caps=db_caps, in_tenant_context=in_tenant_context)
     return ModelPolicyResponse(
         model=model_name,
         contract_version=CONTRACT_VERSION,
@@ -569,10 +689,14 @@ async def model_policy(
 @router.get("/permission-matrix/{role_id}")
 async def get_permission_matrix(
     role_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    current_user: User = Depends(get_current_user),
 ):
     """Return CRUD caps for every registered model for this role."""
+    payload = getattr(request.state, "token_payload", {})
+    _require_superadmin_or_impersonating(current_user, payload, request)
+
     from sqlalchemy import select as _select
     from adminfoundry.models.role_permission import RolePermission
     rows = (
@@ -581,6 +705,16 @@ async def get_permission_matrix(
         )
     ).scalars().all()
     perms = {r.model_name: r for r in rows}
+
+    # In tenant context, show only tenant-scoped models
+    is_impersonating = bool(payload.get("impersonated_by"))
+    tenant = getattr(request.state, "tenant", None)
+    in_tenant_context = is_impersonating or tenant is not None
+    if in_tenant_context:
+        names = [mn for mn in admin_site.model_names()
+                 if getattr(admin_site.get(mn), "tenant_scoped", False)]
+    else:
+        names = admin_site.model_names()
 
     return [
         {
@@ -591,7 +725,7 @@ async def get_permission_matrix(
             "can_update": perms[mn].can_update if mn in perms else False,
             "can_delete": perms[mn].can_delete if mn in perms else False,
         }
-        for mn in admin_site.model_names()
+        for mn in names
     ]
 
 
@@ -600,9 +734,12 @@ async def save_permission_matrix(
     role_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    current_user: User = Depends(get_current_user),
 ):
     """Replace all RolePermission records for this role with the submitted matrix."""
+    payload = getattr(request.state, "token_payload", {})
+    _require_superadmin_or_impersonating(current_user, payload, request)
+
     from sqlalchemy import delete as _delete, select as _select
     from adminfoundry.models.role_permission import RolePermission
 
@@ -616,11 +753,29 @@ async def save_permission_matrix(
     old_map = {r.model_name: {op: getattr(r, op) for op in ops} for r in old_rows}
 
     await db.execute(_delete(RolePermission).where(RolePermission.role_id == role_id))
+
+    # Resolve tenant_id so matrix records stay consistent with CRUD-created records.
+    injected_tenant_id: uuid.UUID | None = None
+    if settings.MULTI_TENANT:
+        tenant = getattr(request.state, "tenant", None)
+        if tenant is not None:
+            injected_tenant_id = tenant.id
+        elif payload.get("impersonated_by") and payload.get("tenant_id"):
+            try:
+                injected_tenant_id = uuid.UUID(payload["tenant_id"])
+            except (ValueError, AttributeError):
+                pass
+
     new_map: dict = {}
     for entry in body:
         caps = {op: bool(entry.get(op, False)) for op in ops}
         if any(caps.values()):
-            db.add(RolePermission(role_id=role_id, model_name=entry["model_name"], **caps))
+            db.add(RolePermission(
+                role_id=role_id,
+                model_name=entry["model_name"],
+                tenant_id=injected_tenant_id,
+                **caps,
+            ))
             new_map[entry["model_name"]] = caps
 
     # Build audit diff — only models where something changed
@@ -638,6 +793,7 @@ async def save_permission_matrix(
 
     request.state.audit_action = "updated"
     request.state.audit_object_id = str(role_id)
+    request.state.audit_actor = current_user.email
     request.state.audit_changes = changes or None
 
 
@@ -694,138 +850,6 @@ async def bulk_action_direct(
         "affected": len(objects),
         "summary": result.get("summary", f"{len(objects)} object(s) updated"),
     }
-
-
-@router.get("/{model_name}/export")
-async def export_objects(
-    model_name: str,
-    request: Request,
-    format: str = Query("csv", pattern="^(csv|json|xlsx)$"),
-    q: str | None = Query(None),
-    order_by: str | None = Query(None),
-    tz: str | None = Query(None, description="IANA timezone name, e.g. Europe/Berlin"),
-    db: AsyncSession = Depends(get_admin_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Export all matching records as CSV, JSON, or XLSX (max 10 000 rows).
-
-    Pass ``tz`` to convert datetime fields to a specific timezone (IANA name).
-    Defaults to UTC when omitted.
-    """
-    from fastapi.responses import Response, StreamingResponse
-    import csv
-    import io
-    from datetime import datetime, timezone as _tz_utc
-    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-    _target_zone = None
-    if tz:
-        try:
-            _target_zone = ZoneInfo(tz)
-        except ZoneInfoNotFoundError:
-            pass
-
-    def _apply_tz(value):
-        if not isinstance(value, datetime):
-            return value
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=_tz_utc.utc)
-        if _target_zone:
-            value = value.astimezone(_target_zone)
-        # Excel-friendly format: YYYY-MM-DD HH:MM:SS (no T, no microseconds, no offset)
-        return value.strftime("%Y-%m-%d %H:%M:%S")
-
-    model_admin = _get_admin_or_404(model_name)
-    payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
-
-    stmt = select(model_admin.model)
-    tf = _tenant_filter(request, model_admin)
-    if tf is not None:
-        stmt = stmt.where(tf)
-    rf = policy_engine.get_record_filter(current_user, model_admin, payload)
-    if rf is not None:
-        stmt = stmt.where(rf)
-    search = filter_builder.build_search(model_admin, q)
-    if search is not None:
-        stmt = stmt.where(search)
-    for f in filter_builder.build_filters(model_admin, dict(request.query_params)):
-        stmt = stmt.where(f)
-    ordering = filter_builder.build_ordering(model_admin, order_by)
-    if ordering is not None:
-        stmt = stmt.order_by(ordering)
-    stmt = stmt.limit(10_000)
-
-    items = (await db.execute(stmt)).scalars().all()
-
-    import sqlalchemy.types as _sa_types
-
-    def _is_dt_col(col) -> bool:
-        return isinstance(col.type, (_sa_types.DateTime, _sa_types.DATETIME, _sa_types.TIMESTAMP))
-
-    def _col_header(col) -> str:
-        if _is_dt_col(col) and tz:
-            return f"{col.name} ({tz})"
-        return col.name
-
-    def _serialize_export(obj) -> dict:
-        excluded = model_admin.all_protected
-        result = {}
-        for col in obj.__table__.columns:
-            if col.name in excluded:
-                continue
-            result[_col_header(col)] = _apply_tz(getattr(obj, col.name))
-        return result
-
-    rows = [_serialize_export(obj) for obj in items]
-
-    tz_label = (tz or "UTC").replace("/", "-")
-    filename = f"{model_name}_export_{tz_label}"
-
-    if format == "json":
-        import json
-        content = json.dumps(rows, default=str, indent=2)
-        return Response(
-            content=content,
-            media_type="application/json",
-            headers={"Content-Disposition": f'attachment; filename="{filename}.json"'},
-        )
-
-    if format == "xlsx":
-        try:
-            import openpyxl  # type: ignore[import]
-        except ImportError:
-            raise HTTPException(
-                status_code=501,
-                detail="XLSX export requires openpyxl: pip install openpyxl",
-            )
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        if rows:
-            ws.append(list(rows[0].keys()))
-            for row in rows:
-                ws.append([str(v) if v is not None else "" for v in row.values()])
-        buf = io.BytesIO()
-        wb.save(buf)
-        buf.seek(0)
-        return Response(
-            content=buf.getvalue(),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="{filename}.xlsx"'},
-        )
-
-    # CSV (default)
-    buf = io.StringIO()
-    if rows:
-        writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({k: ("" if v is None else str(v)) for k, v in row.items()})
-    return Response(
-        content=buf.getvalue(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'},
-    )
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
@@ -942,6 +966,8 @@ async def delete_object(
     current_user: User = Depends(get_current_user),
 ):
     model_admin = _get_admin_or_404(model_name)
+    if not getattr(model_admin, "allow_delete", True):
+        raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Deletion not allowed for this model")
     payload = getattr(request.state, "token_payload", {})
     _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None))
 
@@ -987,6 +1013,11 @@ def create_coreadmin(app, config=None) -> None:
             _i18n_mod.set_default_language(config.default_language)
 
     app.include_router(router)
+
+    # Jobs + Import/Export — always-on, no extra pip deps
+    from adminfoundry.extensions.jobs.models import Job as _Job  # noqa: F401 — register table with Base.metadata
+    from adminfoundry.extensions.jobs.router import router as _jobs_router
+    app.include_router(_jobs_router)
 
     from adminfoundry.routers import admin_ui as _admin_ui_module
     _admin_ui_module._locale_defaults = {

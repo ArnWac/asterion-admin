@@ -9,7 +9,8 @@ import adminfoundry.models.user  # noqa: F401 — register model
 import adminfoundry.models.role  # noqa: F401 — register model
 import adminfoundry.models.tenant  # noqa: F401 — register model
 import adminfoundry.models.revoked_token  # noqa: F401 — register model
-import adminfoundry.models.rate_limit  # noqa: F401 — register model
+import adminfoundry.models.audit_log  # noqa: F401 — register model
+import adminfoundry.models.impersonation_log  # noqa: F401 — register model
 import adminfoundry.models.password_reset_token  # noqa: F401 — register model
 
 config = context.config

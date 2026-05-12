@@ -30,7 +30,7 @@ async def health_dashboard(db: AsyncSession = Depends(get_db)):
         db_status = "degraded"
 
     # Metrics counters (in-process)
-    from adminfoundry.observability.admin_metrics import get_snapshot
+    from adminfoundry.extensions.observability.admin_metrics import get_snapshot
     metrics = get_snapshot()
 
     # Active sessions
@@ -84,7 +84,7 @@ async def prometheus_metrics(db: AsyncSession = Depends(get_db)):
     protecting /metrics via network policy, not HTTP auth.  Do NOT
     expose protected field content or token internals here.
     """
-    from adminfoundry.observability.admin_metrics import get_snapshot
+    from adminfoundry.extensions.observability.admin_metrics import get_snapshot
     from adminfoundry.services.session_security import session_security
 
     snap = get_snapshot()

@@ -92,6 +92,8 @@ class ModelAdmin:
     field_choices_urls: dict[str, str] = {}
     # True: render permission matrix section in detail/edit view (for role-like models)
     permission_matrix: bool = False
+    # False: block deletion at the API level (for immutable models like audit logs)
+    allow_delete: bool = True
 
     # Extra virtual fields only present in the create form (not model columns).
     # Dict of {field_name: python_type}, e.g. {"password": str}.

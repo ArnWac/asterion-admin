@@ -15,7 +15,8 @@
       <span class="app-admin-label">ADMIN</span>
     </div>
     <div id="alert" class="alert" role="alert" aria-live="assertive"></div>
-    <form id="login-form" novalidate aria-label="Login form">
+    <noscript><p style="color:#c0392b;margin-bottom:1rem;text-align:center">JavaScript is required to use this admin interface.</p></noscript>
+    <form id="login-form" method="post" action="javascript:void(0)" novalidate aria-label="Login form">
       <div class="form-group">
         <label for="email">Email</label>
         <input type="email" id="email" name="email" required autofocus autocomplete="email" aria-required="true">

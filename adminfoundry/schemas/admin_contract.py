@@ -86,3 +86,5 @@ class ModelContractMeta(BaseModel):
     create_redirect: str = "list"
     # True: render permission matrix section (role-like models)
     permission_matrix: bool = False
+    # False: deletion blocked at API level (e.g. immutable audit logs)
+    allow_delete: bool = True

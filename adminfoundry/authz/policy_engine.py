@@ -87,19 +87,30 @@ class PolicyEngine:
         return RecordPolicy(can_read=allowed, can_update=allowed, can_delete=allowed)
 
     def effective_model_caps(
-        self, user, model_admin, token_payload: dict, *, db_caps: dict | None = None
+        self, user, model_admin, token_payload: dict, *, db_caps: dict | None = None,
+        in_tenant_context: bool = False,
     ) -> dict:
         """Return CRUD capability flags for a user on a model.
 
         db_caps: pre-fetched merged RolePermission dict from DB; when provided it
         overrides the ModelAdmin config-based role check (but never overrides
         superadmin / impersonation logic).
+        in_tenant_context: True when request is in a tenant panel (subdomain or impersonation).
         """
         if self._privileged(user, token_payload):
             return dict(
                 can_list=True, can_create=True, can_read=True,
                 can_update=True, can_delete=True,
             )
+        # In tenant context: impersonating superadmins and tenant_admin role holders
+        # get full caps on tenant-scoped models. _check_model_access enforces this at
+        # the API boundary; here we just reflect what the user can do so the UI is correct.
+        if in_tenant_context and getattr(model_admin, "tenant_scoped", False):
+            if user.is_superadmin or "tenant_admin" in _user_role_names(user):
+                return dict(
+                    can_list=True, can_create=True, can_read=True,
+                    can_update=True, can_delete=True,
+                )
         # DB-backed permissions take precedence over ModelAdmin config
         if db_caps is not None:
             return db_caps

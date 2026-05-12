@@ -124,8 +124,18 @@ function fmtAPIError(err) {
   if (err instanceof APIError) {
     const d = err.body?.detail;
     if (typeof d === 'string') return d;
-    if (d?.errors) return d.errors.map(e => `${e.loc?.join('.')}: ${e.msg}`).join('; ');
+    if (d?.errors) return d.errors.map(e => `${e.loc?.slice(-1).join('.')}: ${e.msg}`).join('; ');
+    if (Array.isArray(d)) return d.map(e => `${e.loc?.slice(-1).join('.')}: ${e.msg}`).join('; ');
     return JSON.stringify(d || err.body);
+  }
+  // GET failures throw plain Error with raw response text — try to parse JSON
+  if (err instanceof Error) {
+    try {
+      const body = JSON.parse(err.message);
+      const d = body?.detail;
+      if (typeof d === 'string') return d;
+      if (d?.errors) return d.errors.map(e => `${e.loc?.slice(-1).join('.')}: ${e.msg}`).join('; ');
+    } catch (_) {}
   }
   return err.message || String(err);
 }
@@ -163,7 +173,10 @@ async function initNav(activeModel) {
       banner.style.alignItems = 'center';
       banner.style.justifyContent = 'space-between';
       const msg = document.createElement('span');
-      msg.textContent = T('label_impersonating', {by: ctx.impersonated_by});
+      msg.textContent = T('label_impersonating', {
+        for: ctx.full_name || ctx.email || '—',
+        tenant: ctx.tenant?.name || ctx.tenant?.slug || '—',
+      });
       const exitBtn = document.createElement('button');
       exitBtn.textContent = T('btn_exit_tenant_panel');
       exitBtn.style.cssText = 'margin-left:1rem;padding:.25rem .75rem;font-size:.8rem;cursor:pointer;border:1px solid #172b4d;border-radius:4px;background:#fff;color:#172b4d';
@@ -203,6 +216,22 @@ async function initNav(activeModel) {
 }
 
 // ---------------------------------------------------------------------------
+// Tenant impersonation helper (shared by list and detail pages)
+// ---------------------------------------------------------------------------
+async function enterTenantPanel(tenantId, slug) {
+  const resp = await API.post(`/tenants/${tenantId}/impersonate`, {});
+  const cur = localStorage.getItem(TOKEN_KEY);
+  const curR = localStorage.getItem(REFRESH_KEY);
+  if (cur) localStorage.setItem('adminfoundry_prev_access', cur);
+  if (curR) localStorage.setItem('adminfoundry_prev_refresh', curR);
+  localStorage.setItem(TOKEN_KEY, resp.access_token);
+  localStorage.removeItem(REFRESH_KEY);
+  // Stay on same origin — localStorage is origin-scoped and a subdomain redirect
+  // would lose the token. The backend resolves tenant context from the token's tenant_id.
+  window.location.href = window.location.protocol + '//' + window.location.host + UI_BASE + '/dashboard';
+}
+
+// ---------------------------------------------------------------------------
 // List page
 // ---------------------------------------------------------------------------
 async function initList(model) {
@@ -235,7 +264,7 @@ async function initList(model) {
 
   // Trigger download from export endpoint
   function _doExport(fmt) {
-    let url = `${API_BASE}/admin/${model}/export?format=${fmt}`;
+    let url = `${API_BASE}/jobs/admin/${model}/export?format=${fmt}`;
     if (q) url += `&q=${encodeURIComponent(q)}`;
     if (orderBy) url += `&order_by=${encodeURIComponent(orderBy)}`;
     // Use tenant timezone (org reference) — falls back to UTC on server if unset
@@ -411,9 +440,16 @@ async function initList(model) {
             }
             return `<td>${fmtCell(item[c])}</td>`;
           }).join('');
+          const enterTenantBtn = (model === 'tenants' && item.slug && !_adminCtx?.is_impersonating && !_adminCtx?.tenant)
+            ? `<button class="btn btn-sm" data-enter-tenant="${esc(id)}" data-tenant-slug="${esc(String(item.slug))}" title="${T('btn_enter_tenant_panel')}" style="font-size:.75rem;white-space:nowrap;margin-left:.25rem">${T('btn_enter_tenant_panel')}</button>`
+            : '';
+          const deleteBtn = meta?.allow_delete !== false
+            ? `<a class="btn btn-sm btn-icon" href="${UI_BASE}/${model}/${id}/delete" title="${T('action_delete')}" aria-label="${T('action_delete')}" style="color:#de350b"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></a>`
+            : '';
           const actions = `<td style="white-space:nowrap;width:1%;padding-right:.75rem">
             <a class="btn btn-sm btn-icon" href="${UI_BASE}/${model}/${id}" title="${T('action_view')}" aria-label="${T('action_view')}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></a>
             <a class="btn btn-sm btn-icon" href="${UI_BASE}/${model}/${id}/edit" title="${T('action_edit')}" aria-label="${T('action_edit')}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></a>
+            ${enterTenantBtn}${deleteBtn}
           </td>`;
           return `<tr>${checkTd}${cells}${actions}</tr>`;
         }).join('');
@@ -489,6 +525,19 @@ async function initList(model) {
     page = 1; load();
   });
 
+  // "Enter tenant panel" button clicks (delegated, tenants list only)
+  document.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-enter-tenant]');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    try {
+      await enterTenantPanel(btn.dataset.enterTenant, btn.dataset.tenantSlug);
+    } catch (err) {
+      btn.disabled = false;
+      showError(fmtAPIError(err));
+    }
+  });
+
   await initNav(model);
   setBreadcrumb([{ label: 'Home', href: UI_BASE + '/dashboard' }, { label: meta?.label_plural || model, href: '' }]);
   await load();
@@ -532,16 +581,7 @@ async function initDetail(model, objectId) {
       enterBtn.onclick = async () => {
         enterBtn.disabled = true;
         try {
-          const resp = await API.post(`/tenants/${objectId}/impersonate`, {});
-          // Save current tokens so the exit button can restore them
-          const cur = localStorage.getItem(TOKEN_KEY);
-          const curR = localStorage.getItem(REFRESH_KEY);
-          if (cur) localStorage.setItem('adminfoundry_prev_access', cur);
-          if (curR) localStorage.setItem('adminfoundry_prev_refresh', curR);
-          localStorage.setItem(TOKEN_KEY, resp.access_token);
-          localStorage.removeItem(REFRESH_KEY);
-          const port = window.location.port ? ':' + window.location.port : '';
-          window.location.href = `${window.location.protocol}//${item.slug}.${window.location.hostname}${port}${UI_BASE}/dashboard`;
+          await enterTenantPanel(objectId, item.slug);
         } catch (e) {
           enterBtn.disabled = false;
           showError(fmtAPIError(e));
@@ -609,7 +649,7 @@ async function initDetail(model, objectId) {
       }
     } catch (err) {
       console.error('History load failed:', err);
-      historyEl.innerHTML = `<p style="color:#586069;font-size:.82rem">${T('error_history_unavailable')}: ${esc(String(err))}</p>`;
+      historyEl.innerHTML = `<p style="color:#586069;font-size:.82rem">${T('error_history_unavailable')}</p>`;
     }
   }
 
@@ -969,12 +1009,21 @@ function fmtDate(val) {
     return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}${tzSuffix}`;
   }
   if (fmt === 'us') {
-    return d.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }) + tzSuffix;
+    try {
+      return d.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }) + tzSuffix;
+    } catch (_) {
+      return d.toLocaleString() + tzSuffix;
+    }
   }
   // locale: delegate timezone display to Intl directly
-  return showTz
-    ? d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short', timeZoneName: 'short' })
-    : d.toLocaleString();
+  if (showTz) {
+    try {
+      return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short', timeZoneName: 'short' });
+    } catch (_) {
+      return d.toLocaleString() + tzSuffix;
+    }
+  }
+  return d.toLocaleString();
 }
 
 function fmtCell(val) {
@@ -986,6 +1035,9 @@ function fmtCell(val) {
   }
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(val)) {
     return esc(fmtDate(val));
+  }
+  if (val !== null && typeof val === 'object') {
+    return `<pre style="margin:0;font-size:.8rem;white-space:pre-wrap;max-height:12rem;overflow:auto">${esc(JSON.stringify(val, null, 2))}</pre>`;
   }
   return esc(String(val));
 }
@@ -1198,74 +1250,6 @@ async function initConfirmDelete(model, objectId) {
         btn.textContent = 'Confirm Delete';
       }
     });
-  }
-
-  await initNav(model);
-}
-
-// ---------------------------------------------------------------------------
-// Break-glass initiation page
-// ---------------------------------------------------------------------------
-async function initBreakGlass(model, objectId) {
-  if (!Auth.isLoggedIn()) { Auth.redirectToLogin(); return; }
-  const formEl = document.getElementById('bg-form');
-  const fieldsEl = document.getElementById('bg-fields');
-  const backLink = document.getElementById('back-link');
-  if (backLink) backLink.href = `${UI_BASE}/${model}/${objectId}`;
-
-  try {
-    const meta = await API.get(`/admin/${model}/meta`);
-    document.getElementById('page-title').textContent = T('page_title_breakglass', {label: meta.label || model});
-
-    // Only show non-protected, non-readonly fields as editable targets
-    const editableFields = (meta.fields || []).filter(
-      f => !f.readonly && !['id', 'created_at', 'updated_at'].includes(f.name)
-    );
-
-    if (!editableFields.length) {
-      fieldsEl.innerHTML = `<div class="fallback-notice">${T('error_no_breakglass_fields')}</div>`;
-    } else {
-      fieldsEl.innerHTML = `<p style="font-size:.85rem;color:#586069;margin-bottom:.75rem">${T('text_select_fields_to_change')}</p>` +
-        editableFields.map(f => buildFieldInput(f)).join('');
-    }
-
-    formEl.addEventListener('submit', async e => {
-      e.preventDefault();
-      const reasonEl = document.getElementById('bg-reason');
-      const reasonErrEl = document.getElementById('reason-error');
-      const reason = reasonEl ? reasonEl.value.trim() : '';
-
-      if (reason.length < 10) {
-        if (reasonErrEl) { reasonErrEl.textContent = T('error_reason_too_short'); reasonErrEl.style.display = 'block'; }
-        reasonEl && reasonEl.focus();
-        return;
-      }
-      if (reasonErrEl) reasonErrEl.style.display = 'none';
-
-      const changes = {};
-      editableFields.forEach(f => {
-        const el = formEl.querySelector(`[name="${f.name}"]`);
-        if (!el || el.value === '') return;
-        if (f.field_type === 'boolean') changes[f.name] = el.checked;
-        else if (f.field_type === 'integer') changes[f.name] = parseInt(el.value, 10);
-        else if (f.field_type === 'float') changes[f.name] = parseFloat(el.value);
-        else changes[f.name] = el.value;
-      });
-
-      if (!Object.keys(changes).length) {
-        showError(T('error_no_fields_changed'));
-        return;
-      }
-
-      try {
-        await API.post(`/break-glass/${model}/${objectId}`, { reason, changes });
-        window.location.href = `${UI_BASE}/${model}/${objectId}`;
-      } catch (err) {
-        showError(fmtAPIError(err));
-      }
-    });
-  } catch (e) {
-    fieldsEl.innerHTML = `<div class="alert alert-error" style="display:block">${esc(fmtAPIError(e))}</div>`;
   }
 
   await initNav(model);
@@ -1497,4 +1481,4 @@ async function initDashboard() {
 }
 
 // Expose globally
-window.AdminUI = { Auth, API, Prefs, DarkMode, T, applyI18n, initNav, initList, initDetail, initCreate, initUpdate, initConfirmDelete, initBreakGlass, initSettings, initDashboard, openInlineCreate, showToast, showError, showSuccess };
+window.AdminUI = { Auth, API, Prefs, DarkMode, T, applyI18n, initNav, initList, initDetail, initCreate, initUpdate, initConfirmDelete, initSettings, initDashboard, openInlineCreate, enterTenantPanel, showToast, showError, showSuccess };

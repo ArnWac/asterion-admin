@@ -25,7 +25,6 @@ class CoreAdminConfig:
             enable_multi_tenant=False,
             enable_basic_audit=True,
             enable_workflows=False,
-            extensions=[JobsExtension()],
         )
     """
 

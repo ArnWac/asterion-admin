@@ -156,6 +156,7 @@ async def impersonate(
     await db.commit()
     await db.refresh(log)
 
+    request.state.tenant = tenant
     request.state.audit_action = "impersonation_started"
     request.state.audit_actor = current_user.email
     request.state.audit_user_id = str(current_user.id)
@@ -192,6 +193,8 @@ async def revoke_impersonation(
     log.revoked_at = datetime.now(timezone.utc)
     await db.commit()
 
+    from types import SimpleNamespace
+    request.state.tenant = SimpleNamespace(id=log.tenant_id)
     request.state.audit_action = "impersonation_revoked"
     request.state.audit_actor = current_user.email
     request.state.audit_user_id = str(current_user.id)

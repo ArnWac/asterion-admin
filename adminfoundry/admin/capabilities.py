@@ -18,21 +18,25 @@ def _model_caps(
     token_payload: dict,
     registry: Registry,
     all_db_caps: dict | None = None,
+    in_tenant_context: bool = False,
 ) -> ModelCapabilities:
     model_admin = registry.get(model_name)
     if model_admin is None:
-        can_all = user.is_superadmin and not bool(token_payload.get("impersonated_by"))
+        can_all = policy_engine._privileged(user, token_payload)
         return ModelCapabilities(
             model=model_name, can_list=can_all, can_create=can_all,
             can_read=can_all, can_update=can_all, can_delete=can_all,
         )
     db_caps = all_db_caps.get(model_name) if all_db_caps else None
-    caps = policy_engine.effective_model_caps(user, model_admin, token_payload, db_caps=db_caps)
+    caps = policy_engine.effective_model_caps(
+        user, model_admin, token_payload, db_caps=db_caps, in_tenant_context=in_tenant_context
+    )
     return ModelCapabilities(model=model_name, **caps)
 
 
 def build_capabilities(
-    user, token_payload: dict, registry: Registry, all_db_caps: dict | None = None
+    user, token_payload: dict, registry: Registry, all_db_caps: dict | None = None,
+    in_tenant_context: bool = False,
 ) -> CapabilitiesResponse:
     is_impersonating = bool(token_payload.get("impersonated_by"))
 
@@ -42,7 +46,7 @@ def build_capabilities(
         is_impersonating=is_impersonating,
         impersonated_by=token_payload.get("impersonated_by"),
         models=[
-            _model_caps(name, user, token_payload, registry, all_db_caps)
+            _model_caps(name, user, token_payload, registry, all_db_caps, in_tenant_context)
             for name in registry.model_names()
         ],
     )

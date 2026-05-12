@@ -78,7 +78,7 @@ class AdminMetricsWidget(DashboardWidget):
     superadmin_only = True
 
     async def get_data(self, user: Any, db: Any, request: Any) -> dict:
-        from adminfoundry.observability.admin_metrics import get_snapshot
+        from adminfoundry.extensions.observability.admin_metrics import get_snapshot
         m = get_snapshot()
         error_rate = (
             f"{round(m['request_errors'] / m['request_count'] * 100)}%" if m["request_count"] else "—"

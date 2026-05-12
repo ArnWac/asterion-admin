@@ -275,3 +275,44 @@ async def test_tenant_endpoints_superadmin_only(client: AsyncClient, db: AsyncSe
     await db.refresh(user)
     resp = await client.get("/api/v1/tenants", headers=auth(user))
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Tenant locale fields
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_tenant_locale_fields_stored(db: AsyncSession):
+    """Locale fields (timezone, language, date_format, date_pattern) are persisted."""
+    t = Tenant(
+        name="Locale Corp",
+        slug="locale-corp",
+        is_active=True,
+        timezone="Europe/Berlin",
+        language="de",
+        date_format="eu",
+        date_pattern=None,
+    )
+    db.add(t)
+    await db.commit()
+    await db.refresh(t)
+
+    assert t.timezone == "Europe/Berlin"
+    assert t.language == "de"
+    assert t.date_format == "eu"
+    assert t.date_pattern is None
+
+
+@pytest.mark.asyncio
+async def test_tenant_locale_fields_independent_per_tenant(db: AsyncSession):
+    """Two tenants can carry different locale settings without interfering."""
+    t1 = Tenant(name="Acme", slug="acme", is_active=True, timezone="Europe/Berlin", language="de")
+    t2 = Tenant(name="Globex", slug="globex", is_active=True, timezone="America/New_York", language="en")
+    db.add(t1)
+    db.add(t2)
+    await db.commit()
+    await db.refresh(t1)
+    await db.refresh(t2)
+
+    assert t1.timezone != t2.timezone
+    assert t1.language != t2.language

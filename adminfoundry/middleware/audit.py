@@ -33,7 +33,18 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 return response
 
             user_id_str = getattr(request.state, "audit_user_id", None)
+            # Resolve tenant_id from request.state.tenant (set by TenantMiddleware from
+            # subdomain, or explicitly by handlers that know the tenant).
+            # Fallback: same-origin impersonation embeds tenant_id in the token payload.
             tenant = getattr(request.state, "tenant", None)
+            tenant_id: uuid.UUID | None = tenant.id if tenant is not None else None
+            if tenant_id is None:
+                _payload = getattr(request.state, "token_payload", {})
+                if _payload.get("impersonated_by") and _payload.get("tenant_id"):
+                    try:
+                        tenant_id = uuid.UUID(_payload["tenant_id"])
+                    except (ValueError, AttributeError):
+                        pass
             xff = request.headers.get("X-Forwarded-For")
             ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else None)
             log_data = {
@@ -41,7 +52,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 "path": str(request.url.path),
                 "status_code": response.status_code,
                 "user_id": uuid.UUID(user_id_str) if user_id_str else None,
-                "tenant_id": tenant.id if tenant else None,
+                "tenant_id": tenant_id,
                 "action": getattr(request.state, "audit_action", None),
                 "object_id": getattr(request.state, "audit_object_id", None),
                 "actor": getattr(request.state, "audit_actor", None),

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from adminfoundry.auth import create_access_token, hash_password
 from adminfoundry.authz.policy_engine import PolicyEngine
 from adminfoundry.authz.role_caps import fetch_model_caps, fetch_all_model_caps
+from adminfoundry.models.audit_log import AuditLog
 from adminfoundry.models.role import Role
 from adminfoundry.models.role_permission import RolePermission
 from adminfoundry.models.user import User
@@ -187,14 +188,44 @@ async def test_capabilities_endpoint_reflects_role_permissions(
 
 
 # ---------------------------------------------------------------------------
-# role_permissions is no longer a standalone admin model — managed via permission matrix
+# Audit: save_permission_matrix must record actor
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_role_permissions_in_admin_registry(
+async def test_permission_matrix_save_records_audit_actor(
+    client: AsyncClient, superadmin: User, db: AsyncSession
+):
+    """save_permission_matrix must set audit_actor — otherwise change history shows 'Unknown'."""
+    role = await _make_role(db, "audited-role")
+
+    resp = await client.put(
+        f"/api/v1/admin/permission-matrix/{role.id}",
+        headers=auth(superadmin),
+        json=[{
+            "model_name": "users",
+            "can_list": True, "can_create": False, "can_update": False, "can_delete": False,
+        }],
+    )
+    assert resp.status_code == 204
+
+    log = (await db.execute(
+        select(AuditLog)
+        .where(AuditLog.object_id == str(role.id), AuditLog.action == "updated")
+    )).scalar_one_or_none()
+    assert log is not None
+    assert log.actor == superadmin.email
+
+
+# ---------------------------------------------------------------------------
+# role_permissions is managed via the permission matrix on roles, not as a
+# standalone admin model — verify it is NOT registered separately.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_role_permissions_not_in_admin_registry(
     client: AsyncClient, superadmin: User
 ):
     resp = await client.get("/api/v1/admin", headers=auth(superadmin))
     assert resp.status_code == 200
     models = [m["model"] for m in resp.json()["models"]]
-    assert "role_permissions" in models
+    assert "role_permissions" not in models

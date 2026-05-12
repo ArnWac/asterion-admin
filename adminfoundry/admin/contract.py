@@ -197,6 +197,7 @@ def build_model_contract(model_admin: ModelAdmin, registry=None) -> ModelContrac
         list_editable=getattr(model_admin, "list_editable", []),
         create_redirect=getattr(model_admin, "create_redirect", "list"),
         permission_matrix=getattr(model_admin, "permission_matrix", False),
+        allow_delete=getattr(model_admin, "allow_delete", True),
     )
 
 

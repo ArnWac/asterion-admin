@@ -9,10 +9,26 @@ from adminfoundry.admin.actions import AdminAction
 from adminfoundry.auth import hash_password
 from adminfoundry.models.audit_log import AuditLog
 from adminfoundry.models.role import Role
-from adminfoundry.models.role_permission import RolePermission
+from adminfoundry.models.role_permission import RolePermission  # noqa: F401 — registers table with Base.metadata
 from adminfoundry.models.tenant import Tenant
 from adminfoundry.models.user import User
 from adminfoundry.settings import settings
+
+
+class BulkDeleteAction(AdminAction):
+    name = "delete"
+    label = "Delete selected"
+    danger = True
+    confirm = True
+    bulk = True
+    single = False
+
+    async def execute(self, objects, db, user):
+        count = len(objects)
+        for obj in objects:
+            await db.delete(obj)
+        await db.commit()
+        return {"summary": f"Deleted {count} record(s)", "affected": count}
 
 
 class DeactivateUsersAction(AdminAction):
@@ -67,7 +83,7 @@ class UserAdmin(ModelAdmin):
         if plain:
             data["hashed_password"] = hash_password(plain)
         return data
-    actions = [DeactivateUsersAction()]
+    actions = [DeactivateUsersAction(), BulkDeleteAction()]
 
 
 class RoleAdmin(ModelAdmin):
@@ -84,7 +100,7 @@ class RoleAdmin(ModelAdmin):
     global_only_in_root_panel = True
     permission_matrix = True
     create_redirect = "detail"
-    actions = []
+    actions = [BulkDeleteAction()]
 
 
 class TenantAdmin(ModelAdmin):
@@ -100,23 +116,6 @@ class TenantAdmin(ModelAdmin):
     actions = [DisableTenantAction()]
 
 
-class RolePermissionAdmin(ModelAdmin):
-    model = RolePermission
-    label = "Role Permission"
-    label_plural = "Role Permissions"
-    description = "CRUD capability grants per role per model"
-    list_display = ["role_id", "model_name", "can_list", "can_create", "can_update", "can_delete"]
-    filter_fields = ["can_list", "can_create", "can_update", "can_delete"]
-    ordering = ["model_name"]
-    readonly_fields = ["id", "created_at", "updated_at"]
-    protected_fields = ["tenant_id"]
-    tenant_scoped = True
-    global_only_in_root_panel = True
-    # model_name field: populated from registered models in the admin registry
-    field_choices_urls = {"model_name": "/api/v1/admin"}
-    actions = []
-
-
 class AuditLogAdmin(ModelAdmin):
     model = AuditLog
     label = "Audit Log"
@@ -130,12 +129,12 @@ class AuditLogAdmin(ModelAdmin):
     readonly_fields = ["id", "created_at", "updated_at", "method", "path", "status_code",
                        "user_id", "tenant_id", "action", "object_id", "actor", "changes"]
     tenant_scoped = False  # B2C: audit logs are superadmin-only, not visible to tenants
+    allow_delete = False
     actions = []
 
 
 admin_site.register(UserAdmin())
 admin_site.register(RoleAdmin())
-admin_site.register(RolePermissionAdmin())
 admin_site.register(AuditLogAdmin())
 if settings.MULTI_TENANT:
     admin_site.register(TenantAdmin())

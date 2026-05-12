@@ -121,15 +121,22 @@ async def lifespan(app: FastAPI):
             print("\nSuperadmin: admin@example.com / admin123")
 
         # Demo-Tenants + je ein tenant_admin-User
-        for slug, name in [("acme", "Acme Corp"), ("globex", "Globex Inc")]:
+        tenant_configs = [
+            ("acme",   "Acme Corp",  "Europe/Berlin",   "de", "eu",     None),
+            ("globex", "Globex Inc", "America/New_York", "en", "us",     None),
+        ]
+        for slug, name, tz, lang, dfmt, dpat in tenant_configs:
             tenant = (await session.execute(
                 select(Tenant).where(Tenant.slug == slug)
             )).scalars().first()
             if not tenant:
-                tenant = Tenant(name=name, slug=slug, is_active=True)
+                tenant = Tenant(
+                    name=name, slug=slug, is_active=True,
+                    timezone=tz, language=lang, date_format=dfmt, date_pattern=dpat,
+                )
                 session.add(tenant)
                 await session.flush()
-                print(f"Tenant angelegt: {slug}")
+                print(f"Tenant angelegt: {slug} ({tz}, {lang}, {dfmt})")
 
             # Role "tenant_admin" für diesen Tenant
             role = (await session.execute(
