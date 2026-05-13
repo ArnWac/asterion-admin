@@ -76,7 +76,7 @@ async def resolve_tenant(request: Request) -> TenantContext | None:
     if not slug:
         return None
 
-    from adminfoundry.redis_client import get_redis
+    from adminfoundry.cache import get_redis
     client = get_redis()
 
     if client:

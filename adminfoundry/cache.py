@@ -88,3 +88,32 @@ def configure(backend_url: str | None) -> None:
         cache = RedisBackend(backend_url)
     else:
         raise ValueError(f"Unsupported cache backend URL: {backend_url!r}")
+
+
+# ---------------------------------------------------------------------------
+# Raw Redis client — shared singleton for rate-limit, token-blacklist, tenancy
+# ---------------------------------------------------------------------------
+
+_redis_client = None
+
+
+def get_redis():
+    """Return a shared async Redis client, or None if unavailable."""
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    from adminfoundry.settings import settings
+    if not settings.REDIS_URL:
+        return None
+    try:
+        import redis.asyncio as aioredis
+    except ImportError:
+        return None
+    _redis_client = aioredis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return _redis_client
+
+
+def clear_redis_client() -> None:
+    """Reset the cached client — used in tests or after config changes."""
+    global _redis_client
+    _redis_client = None

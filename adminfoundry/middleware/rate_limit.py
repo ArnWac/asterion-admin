@@ -54,7 +54,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             ip = request.client.host if request.client else "unknown"
             key = f"rl:{prefix}:{method or 'ANY'}:{ip}"
 
-            from adminfoundry.redis_client import get_redis
+            from adminfoundry.cache import get_redis
             client = get_redis()
             blocked = (
                 await _check_redis(client, key, max_req, window)

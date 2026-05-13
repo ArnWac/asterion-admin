@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from adminfoundry.admin.registry import admin_site
 from adminfoundry.admin.serializer import serializer
-from adminfoundry.models.change_request import ChangeRequest, ChangeRequestStatus
+from adminfoundry.extensions.workflows.models import ChangeRequest, ChangeRequestStatus
 
 
 class WorkflowService:
@@ -83,7 +83,6 @@ class WorkflowService:
             return
 
         proposed = json.loads(cr.proposed_data) if cr.proposed_data else {}
-        # Strip protected and readonly fields before applying
         protected = model_admin.all_protected
         readonly_set = set(model_admin.readonly_fields)
         safe = {k: v for k, v in proposed.items() if k not in protected and k not in readonly_set}

@@ -74,10 +74,3 @@ def configure(backend: Any) -> None:
 def generate_path(filename: str, prefix: str = "") -> str:
     """Return a unique storage path for *filename*."""
     return _make_unique_path(filename, prefix)
-
-
-# Backward-compat: S3Storage lives in adminfoundry.extensions.storage_s3 but is
-# re-exported here so `from adminfoundry.storage import S3Storage` keeps working.
-# boto3 is only imported inside S3Storage.__init__, so this line does not pull
-# boto3 at module import time.
-from adminfoundry.extensions.storage_s3 import S3Storage  # noqa: E402, F401

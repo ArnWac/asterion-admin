@@ -14,7 +14,7 @@ async def blacklist_token(jti: str, exp: float | int, db: AsyncSession) -> None:
     exp_f = float(exp)
     _revoked[jti] = exp_f
 
-    from adminfoundry.redis_client import get_redis
+    from adminfoundry.cache import get_redis
     client = get_redis()
     if client:
         ttl = max(1, int(exp_f - time.time()))
@@ -34,7 +34,7 @@ async def is_blacklisted(jti: str, db: AsyncSession) -> bool:
         return cached_exp > now
 
     # 2. Redis (shared across workers — authoritative when configured)
-    from adminfoundry.redis_client import get_redis
+    from adminfoundry.cache import get_redis
     client = get_redis()
     if client:
         result = await client.get(f"{_REDIS_PREFIX}{jti}")

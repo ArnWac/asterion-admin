@@ -89,21 +89,21 @@ def print_banner() -> None:
     tenant_lines = []
     for slug, _name, _tz in TENANTS:
         tenant_lines.append(f"""  {slug}
-    X-Tenant-Slug: {slug}
+    URL:          http://{slug}.localhost:8000/admin-ui
     tenant admin: admin@{slug}.test
     password:     {TENANT_ADMIN_PASSWORD}
 """)
     print(f"""
 adminfoundry demo ready
 
-Admin UI:
+Admin UI (root / superadmin panel):
   http://127.0.0.1:8000/admin-ui
 
 Global superadmin (demo only):
   email:    {SUPERADMIN_EMAIL}
   password: {SUPERADMIN_PASSWORD}
 
-Tenants:
+Tenants (*.localhost resolves to 127.0.0.1 on modern OSes):
 {''.join(tenant_lines)}""")
 
 

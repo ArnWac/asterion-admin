@@ -23,15 +23,14 @@ class CoreAdminConfig:
         config = CoreAdminConfig(
             enable_builtin_ui=True,
             enable_multi_tenant=False,
-            enable_basic_audit=True,
-            enable_workflows=False,
         )
     """
 
     # Core features
     enable_builtin_ui: bool = True
     enable_multi_tenant: bool = False
-    enable_basic_audit: bool = True
+    # "header" uses X-Tenant-Slug; "subdomain" extracts from the first hostname segment
+    tenant_resolution: str = "header"
 
     # Locale defaults — applied as the initial value for all users who have
     # not yet saved a personal preference. Users can override in Settings.
@@ -85,7 +84,6 @@ class CoreAdminConfig:
         return cls(
             enable_builtin_ui=s.get("enable_builtin_ui", True),
             enable_multi_tenant=s.get("enable_multi_tenant", False),
-            enable_basic_audit=s.get("enable_basic_audit", True),
             default_language=s.get("default_language", "en"),
             default_date_format=s.get("default_date_format", "locale"),
             default_date_pattern=s.get("default_date_pattern", "%Y-%m-%d %H:%M"),
@@ -98,7 +96,7 @@ class CoreAdminConfig:
         return cls(
             enable_builtin_ui=getattr(settings, "ENABLE_BUILTIN_ADMIN_UI", True),
             enable_multi_tenant=getattr(settings, "MULTI_TENANT", False),
-            enable_basic_audit=True,
+            tenant_resolution=getattr(settings, "TENANT_RESOLUTION_STRATEGY", "header"),
             auth_provider=None,
             include_auth_routes=True,
         )
@@ -116,6 +114,6 @@ class CoreAdminConfig:
         return {
             "enable_builtin_ui": self.enable_builtin_ui,
             "enable_multi_tenant": self.enable_multi_tenant,
-            "enable_basic_audit": self.enable_basic_audit,
+            "tenant_resolution": self.tenant_resolution,
             "enabled_extensions": self.enabled_extension_names(),
         }

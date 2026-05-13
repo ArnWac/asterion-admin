@@ -2,7 +2,19 @@
 
 ## Overview
 
-Multi-tenancy is opt-in (`MULTI_TENANT=true`). When disabled, all tenant logic is bypassed and the app behaves as a single-tenant system.
+Multi-tenancy is opt-in. When disabled, all tenant logic is bypassed and the app behaves as a single-tenant system.
+
+Enable it explicitly in `CoreAdminConfig`:
+
+```python
+config = CoreAdminConfig.from_settings(settings)
+config.enable_multi_tenant = True
+config.tenant_resolution = "subdomain"   # or "header"
+
+app = create_admin(config=config, title="My SaaS Admin", lifespan=lifespan)
+```
+
+`create_admin()` adds `TenantMiddleware` automatically when `enable_multi_tenant=True` and propagates both flags into the settings singleton so the middleware and resolver see the correct values at runtime.
 
 ## TenantContext
 
@@ -34,11 +46,13 @@ Host: acme.yourdomain.com  →  slug = "acme"
 
 The first subdomain part is extracted. RESERVED_SLUGS (`api`, `admin`, `www`, etc.) are skipped to avoid accidental resolution.
 
-### Header strategy (default)
+### Header strategy
 
 ```
 X-Tenant-Slug: acme  →  slug = "acme"
 ```
+
+Set `config.tenant_resolution = "header"` (the `CoreAdminConfig` default).
 
 ## Caching
 
@@ -87,7 +101,6 @@ Per-tenant PostgreSQL engine cache in `tenancy/schema_strategy.py`:
 - Impersonation tokens carry `tenant_id` and `impersonated_by` in the JWT payload.
 - `resolve_impersonation_tenant()` (in `tenancy/resolver.py`) resolves the tenant from the token when `TenantMiddleware` didn't set one (same-origin mode — no subdomain).
 
-## Known Inconsistency / Follow-up
+## Known Limitation / Follow-up
 
-- `CoreAdminConfig` class name uses the old `core` prefix. Renaming it is a separate cleanup task.
 - `is_superadmin_context` on `TenantContext` is set to `False` by default. Setting it to `True` for the root panel is a follow-up task.

@@ -30,11 +30,12 @@ def test_import_adminfoundry_without_optional_deps():
     _run("import adminfoundry")
 
 
-def test_import_cache_storage_webhooks_without_optional_deps():
+def test_import_cache_storage_without_optional_deps():
     _run(
         "import adminfoundry; "
-        "from adminfoundry import cache, storage, webhooks, signals; "
-        "from adminfoundry.extensions.storage_s3 import S3Storage"
+        "from adminfoundry import cache, storage, signals; "
+        "from adminfoundry.extensions.storage_s3 import S3Storage; "
+        "from adminfoundry.extensions.webhooks import register, clear"
     )
 
 

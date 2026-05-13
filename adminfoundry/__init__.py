@@ -5,7 +5,7 @@ from adminfoundry.admin.registry import admin_site
 from adminfoundry.admin.router import create_admin
 from adminfoundry.auth_provider import AuthProvider
 from adminfoundry.core.config import CoreAdminConfig
-from adminfoundry import signals, webhooks
+from adminfoundry import signals
 from adminfoundry.cache import cache
 from adminfoundry.storage import storage
 from adminfoundry.i18n import t
@@ -33,7 +33,6 @@ __all__ = [
     "DisableTenantAction",
     "EnableTenantAction",
     "signals",
-    "webhooks",
     "cache",
     "storage",
     "t",

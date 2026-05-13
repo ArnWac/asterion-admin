@@ -13,9 +13,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 import examples.basic_single.admin_config  # noqa: F401 — register admins
-from adminfoundry.admin.router import create_admin
-from adminfoundry.core.config import CoreAdminConfig
-from adminfoundry.routers import auth, health
+from adminfoundry import create_admin, CoreAdminConfig
+from adminfoundry.settings import settings
 from examples.basic_single.seed import seed, print_banner
 
 
@@ -26,8 +25,8 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="adminfoundry — basic_single", lifespan=lifespan)
-app.include_router(auth.router)
-app.include_router(health.router)
-
-create_admin(app, config=CoreAdminConfig())
+app = create_admin(
+    config=CoreAdminConfig.from_settings(settings),
+    title="adminfoundry — basic_single",
+    lifespan=lifespan,
+)

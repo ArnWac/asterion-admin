@@ -150,9 +150,10 @@ async def test_middleware_disabled_tenant_blocked(db: AsyncSession, db_engine):
 
     with patch.object(tenant_mod, "AsyncSessionLocal", fake_session_local):
         with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
-            transport = ASGITransport(app=main_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as ac:
-                resp = await ac.get("/health", headers={"X-Tenant-Slug": "disabled-co"})
+            with patch("adminfoundry.settings.settings.TENANT_RESOLUTION_STRATEGY", "header"):
+                transport = ASGITransport(app=main_app)
+                async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                    resp = await ac.get("/health", headers={"X-Tenant-Slug": "disabled-co"})
     assert resp.status_code == 403
 
 
@@ -173,9 +174,10 @@ async def test_middleware_unknown_tenant_404(db: AsyncSession, db_engine):
 
     with patch.object(tenant_mod, "AsyncSessionLocal", fake_session_local):
         with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
-            transport = ASGITransport(app=main_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as ac:
-                resp = await ac.get("/health", headers={"X-Tenant-Slug": "no-such-tenant"})
+            with patch("adminfoundry.settings.settings.TENANT_RESOLUTION_STRATEGY", "header"):
+                transport = ASGITransport(app=main_app)
+                async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                    resp = await ac.get("/health", headers={"X-Tenant-Slug": "no-such-tenant"})
     assert resp.status_code == 404
 
 
@@ -200,9 +202,10 @@ async def test_middleware_active_tenant_passes(db: AsyncSession, db_engine):
 
     with patch.object(tenant_mod, "AsyncSessionLocal", fake_session_local):
         with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
-            transport = ASGITransport(app=main_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as ac:
-                resp = await ac.get("/health", headers={"X-Tenant-Slug": "active-co"})
+            with patch("adminfoundry.settings.settings.TENANT_RESOLUTION_STRATEGY", "header"):
+                transport = ASGITransport(app=main_app)
+                async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                    resp = await ac.get("/health", headers={"X-Tenant-Slug": "active-co"})
     assert resp.status_code == 200
 
 

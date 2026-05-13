@@ -23,7 +23,6 @@ from adminfoundry.authz.policy_engine import policy_engine
 from adminfoundry.database import get_db, get_admin_db
 from adminfoundry.dependencies import get_current_user, require_superadmin
 from adminfoundry.models.user import User
-from adminfoundry.extensions.observability.admin_metrics import get_snapshot as metrics_snapshot
 from adminfoundry.schemas.client_config import ClientConfigResponse
 from adminfoundry.schemas.policy import FieldPolicyMeta, ModelPolicyResponse
 from adminfoundry.settings import settings
@@ -327,7 +326,8 @@ async def admin_metrics(
     _: User = Depends(require_superadmin),
 ):
     """Return admin operational metrics snapshot — no secrets or protected field content."""
-    return metrics_snapshot()
+    from adminfoundry.extensions.observability.admin_metrics import get_snapshot
+    return get_snapshot()
 
 
 @router.get("/dashboard")
@@ -345,7 +345,8 @@ async def admin_dashboard(
         request.state.tenant = t
 
     _user_widgets = _admin_config.dashboard_widgets if _admin_config else None
-    widgets_cfg = _user_widgets if _user_widgets is not None else DEFAULT_WIDGETS
+    base_widgets = _user_widgets if _user_widgets is not None else DEFAULT_WIDGETS
+    widgets_cfg = list(base_widgets) + _extension_widgets
     provider = getattr(request.app.state, "auth_provider", None)
     is_super = provider.is_superadmin(current_user) if provider else getattr(current_user, "is_superadmin", False)
 
@@ -1166,68 +1167,192 @@ async def hard_delete_object(
     await _signals.emit("post_delete", model_name=model_name, object_id=str(object_id), user=current_user)
 
 
-def create_admin(app, config=None) -> None:
-    """Register the admin router on a FastAPI app.
+def _make_lifespan(user_lifespan, enable_cleanup: bool, cleanup_interval: int):
+    """Return a lifespan that optionally composes periodic cleanup with user_lifespan."""
+    if not enable_cleanup:
+        return user_lifespan
 
-    config: optional CoreAdminConfig instance.  When provided, enabled-feature
-    metadata is surfaced through /admin/context and diagnostics.
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _cleanup_ctx(app):
+        import asyncio
+        from adminfoundry.cleanup import periodic_cleanup
+        task = asyncio.create_task(periodic_cleanup(interval_seconds=cleanup_interval))
+        try:
+            yield
+        finally:
+            task.cancel()
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+
+    if user_lifespan is None:
+        return _cleanup_ctx
+
+    @asynccontextmanager
+    async def _composed(app):
+        async with user_lifespan(app):
+            async with _cleanup_ctx(app):
+                yield
+
+    return _composed
+
+
+def create_admin(
+    app=None,
+    *,
+    config=None,
+    title: str | None = None,
+    lifespan=None,
+    **fastapi_kwargs,
+):
+    """Create and return a fully configured FastAPI admin app.
+
+    **Factory mode** — preferred for new projects::
+
+        app = create_admin(
+            config=CoreAdminConfig.from_settings(settings),
+            title="My Admin",
+            lifespan=lifespan,
+        )
+
+    **Existing-app mode** — mount AdminFoundry onto an already-created app::
+
+        existing_app = FastAPI(...)
+        create_admin(existing_app, config=config)
+
+    In both modes the full wiring is applied and the app is returned.
+    ``config`` must always be passed as a keyword argument.
     """
+    from fastapi import FastAPI
+    from adminfoundry.core.config import CoreAdminConfig
+
+    config = config or CoreAdminConfig()
+
     global _admin_config
     _admin_config = config
 
+    if app is None:
+        effective_lifespan = _make_lifespan(
+            lifespan,
+            settings.ENABLE_CLEANUP_TASK,
+            settings.CLEANUP_INTERVAL_SECONDS,
+        )
+        app = FastAPI(title=title or "adminfoundry", lifespan=effective_lifespan, **fastapi_kwargs)
+
+    _setup_state(app, config)
+    _install_exception_handlers(app)
+    _install_middleware(app, config)
+    _install_core_routers(app, config)
+    _install_admin_crud(app, config)
+    _install_extensions(app, config)
+    _install_admin_ui(app, config)
+    _install_audit(app)
+
+    return app
+
+
+def _setup_state(app, config) -> None:
     from adminfoundry.auth_provider import AuthProvider
-    provider = (config.auth_provider if config else None) or AuthProvider()
-    if config is not None and config.user_model is not None:
+    provider = config.auth_provider or AuthProvider()
+    if config.user_model is not None:
         from adminfoundry.models.protocols import validate_user_model
         validate_user_model(config.user_model)
         provider.user_model = config.user_model
     app.state.auth_provider = provider
 
-    if config:
-        from adminfoundry import cache as _cache_mod, storage as _storage_mod, i18n as _i18n_mod
-        if config.cache_backend:
-            _cache_mod.configure(config.cache_backend)
-        if config.storage_backend:
-            _storage_mod.configure(config.storage_backend)
-        if config.default_language:
-            _i18n_mod.set_default_language(config.default_language)
+    from adminfoundry import cache as _cache_mod, storage as _storage_mod, i18n as _i18n_mod
+    if config.cache_backend:
+        _cache_mod.configure(config.cache_backend)
+    if config.storage_backend:
+        _storage_mod.configure(config.storage_backend)
+    if config.default_language:
+        _i18n_mod.set_default_language(config.default_language)
 
+
+def _install_exception_handlers(app) -> None:
+    from fastapi.exceptions import RequestValidationError
+    from adminfoundry.middleware.errors import validation_exception_handler
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
+
+def _install_middleware(app, config) -> None:
+    # FastAPI stacks middleware in reverse — first added is innermost (closest to handler).
+    # This order mirrors the proven stack in basic_multi.
+    from adminfoundry.middleware.errors import UnhandledExceptionMiddleware
+    from adminfoundry.middleware.security_headers import SecurityHeadersMiddleware
+    from adminfoundry.middleware.rate_limit import RateLimitMiddleware
+    from adminfoundry.middleware.logging import RequestLoggingMiddleware
+
+    app.add_middleware(UnhandledExceptionMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
+    if config.enable_multi_tenant:
+        # Propagate explicit config into the settings singleton so TenantMiddleware
+        # and the slug extractor use the values set in CoreAdminConfig, not env vars.
+        settings.MULTI_TENANT = True
+        settings.TENANT_RESOLUTION_STRATEGY = config.tenant_resolution
+        from adminfoundry.middleware.tenant import TenantMiddleware
+        app.add_middleware(TenantMiddleware)
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(RequestLoggingMiddleware)
+
+
+def _install_core_routers(app, config) -> None:
+    from adminfoundry.routers import health, users, roles
+    app.include_router(health.router)
+    app.include_router(users.router)
+    app.include_router(roles.router)
+    if config.include_auth_routes:
+        from adminfoundry.routers import auth
+        app.include_router(auth.router)
+    if config.enable_multi_tenant:
+        from adminfoundry.routers import tenants
+        app.include_router(tenants.router)
+
+
+def _install_admin_crud(app, config) -> None:
     app.include_router(router)
 
-    # Jobs + Import/Export — always-on, no extra pip deps
-    from adminfoundry.extensions.jobs.models import Job as _Job  # noqa: F401 — register table with Base.metadata
-    from adminfoundry.extensions.jobs.router import router as _jobs_router
-    app.include_router(_jobs_router)
 
-    # Approval workflow
-    from adminfoundry.routers.workflow import router as _workflow_router
-    app.include_router(_workflow_router)
+def _install_extensions(app, config) -> None:
+    global _extension_widgets
+    _extension_widgets = []
+    for ext in config.extensions:
+        ext.get_models()  # import side-effect registers extension tables with Base.metadata
+        for ext_router in ext.get_routers():
+            app.include_router(ext_router)
+        if hasattr(ext, "get_dashboard_widgets"):
+            _extension_widgets.extend(ext.get_dashboard_widgets())
 
+
+def _install_admin_ui(app, config) -> None:
     from adminfoundry.routers import admin_ui as _admin_ui_module
     _admin_ui_module._locale_defaults = {
-        "language": config.default_language if config else "en",
-        "date_format": config.default_date_format if config else "locale",
-        "date_pattern": config.default_date_pattern if config else "%Y-%m-%d %H:%M",
-        "show_timezone": config.default_show_timezone if config else False,
+        "language": config.default_language,
+        "date_format": config.default_date_format,
+        "date_pattern": config.default_date_pattern,
+        "show_timezone": config.default_show_timezone,
     }
-    _admin_ui_module._extra_i18n = config.extra_i18n if config else {}
+    _admin_ui_module._extra_i18n = config.extra_i18n
 
-    if config is None or config.enable_builtin_ui:
-        from adminfoundry.settings import settings
+    if config.enable_builtin_ui:
         from adminfoundry.routers.admin_ui import router as admin_ui_router, get_static_app
         ui_path = settings.ADMIN_UI_PATH
         app.mount(f"{ui_path}/static", get_static_app(), name="admin-static")
         app.include_router(admin_ui_router, prefix=ui_path)
 
-    # Always include the audit endpoint (required for change history in the UI)
+
+def _install_audit(app) -> None:
     from adminfoundry.routers.audit import router as audit_router
     app.include_router(audit_router)
-
-    # Add audit middleware when enabled (writes a log entry after every response)
-    if config is None or config.enable_basic_audit:
-        from adminfoundry.middleware.audit import AuditMiddleware
-        app.add_middleware(AuditMiddleware)
+    # Audit middleware is always active — core infrastructure, not optional
+    from adminfoundry.middleware.audit import AuditMiddleware
+    app.add_middleware(AuditMiddleware)
 
 
 # Module-level config reference — set by create_admin; None until wired
 _admin_config = None
+# Extension-contributed dashboard widgets — collected during create_admin
+_extension_widgets: list = []

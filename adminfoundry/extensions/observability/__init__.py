@@ -3,7 +3,8 @@
 Provides: request/action/audit counters, contract version tracking, client type tracking.
 Replace the in-process counters with Prometheus or OpenTelemetry in production.
 
-Always-on: no configuration needed — counters are collected automatically.
+Optional: add ObservabilityExtension() to CoreAdminConfig.extensions to enable.
+Counters are collected by middleware automatically once the extension is registered.
 """
 from adminfoundry.extensions import ExtensionBase
 
@@ -11,7 +12,6 @@ from adminfoundry.extensions import ExtensionBase
 class ObservabilityExtension(ExtensionBase):
     name = "observability"
     version = "0.1.0"
-    tier = "core"
     is_optional = True
 
     def get_capabilities(self) -> dict:

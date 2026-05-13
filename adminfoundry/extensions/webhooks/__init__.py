@@ -5,7 +5,7 @@ No database table, no admin UI required.
 
 Usage::
 
-    from adminfoundry import webhooks
+    from adminfoundry.extensions import webhooks
 
     webhooks.register(
         url="https://my-service.com/hooks/adminfoundry",

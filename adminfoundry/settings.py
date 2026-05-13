@@ -41,8 +41,6 @@ class Settings(BaseSettings):
     ADMIN_UI_PATH: str = "/admin-ui"
     ADMIN_TITLE: str = "adminfoundry"
 
-    ENABLE_WORKFLOWS: bool = True
-
     # Step-up window: how recent a login must be for protected actions (minutes)
     STEP_UP_WINDOW_MINUTES: int = 15
 

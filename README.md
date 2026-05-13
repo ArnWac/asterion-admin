@@ -26,7 +26,6 @@ pip install adminfoundry[xlsx]    # Excel (.xlsx) export
 ## Quickstart (single-tenant)
 
 ```python
-from fastapi import FastAPI
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import String
 
@@ -54,9 +53,10 @@ class ArticleAdmin(ModelAdmin):
 
 admin_site.register(ArticleAdmin())
 
-app = FastAPI()
-create_admin(app, config=CoreAdminConfig())
+app = create_admin(config=CoreAdminConfig(), title="My Admin")
 ```
+
+`create_admin()` is a factory: it creates the FastAPI app, installs all core middleware, routers, and the built-in UI, and returns the configured app. Pass an existing app as the first argument to mount AdminFoundry onto it instead.
 
 See [`examples/basic_single/`](examples/basic_single/) for a runnable version.
 
@@ -67,7 +67,7 @@ See [`examples/basic_single/`](examples/basic_single/) for a runnable version.
 1. Define a SQLAlchemy model that inherits from `TimestampedBase` (gives you `id`, `created_at`, `updated_at`).
 2. Subclass `ModelAdmin` and set `model = YourModel`. Pick `list_display`, `search_fields`, `filter_fields`, `readonly_fields`.
 3. Call `admin_site.register(YourAdmin())` at import time.
-4. Call `create_admin(app, config=CoreAdminConfig())` after your routers are mounted.
+4. Call `app = create_admin(config=CoreAdminConfig(), title="My Admin")` to get a fully wired app.
 
 Common attributes:
 
@@ -87,13 +87,17 @@ Common attributes:
 ## Multi-tenant
 
 ```python
-from adminfoundry.middleware.tenant import TenantMiddleware
+from adminfoundry import create_admin, CoreAdminConfig
+from adminfoundry.settings import settings
 
-app = FastAPI()
-app.add_middleware(TenantMiddleware)   # resolves tenant from subdomain or X-Tenant-Slug header
+config = CoreAdminConfig.from_settings(settings)
+config.enable_multi_tenant = True
+config.tenant_resolution = "subdomain"   # or "header" for X-Tenant-Slug
 
-create_admin(app, config=CoreAdminConfig(enable_multi_tenant=True))
+app = create_admin(config=config, title="My SaaS Admin", lifespan=lifespan)
 ```
+
+`create_admin()` adds `TenantMiddleware` automatically when `enable_multi_tenant=True`. No manual middleware wiring required.
 
 See [`examples/basic_multi/`](examples/basic_multi/) for a runnable subdomain-based SaaS example.
 

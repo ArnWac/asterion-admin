@@ -12,9 +12,8 @@ adminfoundry/
   auth_provider.py         # AuthProvider — pluggable user-model bridge
   dependencies.py          # FastAPI Depends: get_current_user, require_superadmin, require_role
   signals.py               # Async event bus
-  webhooks.py              # Webhook dispatcher
-  cache.py                 # Cache abstraction (Redis or memory)
-  storage.py               # File storage abstraction
+  cache.py                 # Cache abstraction (Redis or in-process memory)
+  storage.py               # File storage abstraction (local; S3 in extensions/storage_s3.py)
   i18n.py                  # t() translation helper
   dashboard.py             # DashboardWidget registry
 
@@ -69,36 +68,40 @@ adminfoundry/
 
   schemas/                 # Pydantic request/response models
   core/config.py           # CoreAdminConfig
-  extensions/              # Optional: jobs, import_export, billing, observability, workflows
+  extensions/              # Optional: jobs, import_export, billing, observability, workflows, webhooks, storage_s3
   authz/                   # Policy engine, role-based caps
 
 examples/
-  default/                 # Full-featured reference app (wires all middleware + extensions)
-  basic_single_tenant/     # Minimal single-tenant quickstart
-  basic_multi_tenant/      # Minimal multi-tenant quickstart (subdomain resolution)
-  blog/                    # Single-tenant blog demo with computed fields
-  saas/                    # Multi-tenant SaaS demo with demo data
+  basic_single/            # Minimal single-tenant blog: PostAdmin + UserAdmin
+  basic_multi/             # Multi-tenant SaaS: subdomain resolution, WorkflowsExtension
 ```
 
 ## Public API
 
 ```python
 from adminfoundry import (
-    create_admin,       # Register admin router on a FastAPI app
+    create_admin,       # Factory: creates and returns a fully configured FastAPI app
     ModelAdmin,         # Base class for admin configuration
     admin_site,         # Global registry singleton
     CoreAdminConfig,    # Framework configuration
     AuthProvider,       # Pluggable auth bridge
     DashboardWidget,    # Dashboard widget descriptor
     signals,            # Async event bus
-    webhooks,           # Webhook dispatcher
-    cache,              # Cache abstraction
-    storage,            # Storage abstraction
+    cache,              # Cache abstraction (Redis or in-process)
+    storage,            # Storage abstraction (local or S3)
     t,                  # i18n translation helper
 )
 ```
 
-**Note:** `CoreAdminConfig` class name is a known inconsistency (the factory was renamed `create_admin`; the config class retains the old prefix). This will be cleaned up in a future pass.
+`create_admin()` supports two modes:
+
+```python
+# Factory mode — preferred
+app = create_admin(config=config, title="My Admin", lifespan=lifespan)
+
+# Existing-app mode — mount onto an already-created FastAPI instance
+create_admin(existing_app, config=config)
+```
 
 ## Request Flow
 

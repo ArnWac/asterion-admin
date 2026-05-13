@@ -6,15 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from adminfoundry.database import get_db
 from adminfoundry.dependencies import get_current_user, require_superadmin
-from adminfoundry.models.change_request import ChangeRequest
-from adminfoundry.models.user import User
-from adminfoundry.schemas.change_request import (
+from adminfoundry.extensions.workflows.models import ChangeRequest
+from adminfoundry.extensions.workflows.schemas import (
     ChangeRequestCreate,
     ChangeRequestRead,
     ReviewRequest,
     RevertRequest,
 )
-from adminfoundry.services.workflow import workflow_service
+from adminfoundry.extensions.workflows.service import workflow_service
+from adminfoundry.models.user import User
 
 router = APIRouter(prefix="/api/v1/workflow", tags=["workflow"])
 

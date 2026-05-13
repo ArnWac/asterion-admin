@@ -8,7 +8,7 @@ def test_all_core_tables_registered_in_metadata():
         "users", "roles", "tenants", "audit_logs",
         "revoked_tokens", "password_reset_tokens",
         "user_roles", "role_permissions",
-        "change_requests", "impersonation_logs",
+        "impersonation_logs",
     }
     missing = expected - set(Base.metadata.tables)
     assert not missing, f"missing tables: {missing}"
@@ -16,7 +16,7 @@ def test_all_core_tables_registered_in_metadata():
 
 def test_models_all_matches_exports():
     expected = {
-        "AuditLog", "ChangeRequest", "ImpersonationLog",
+        "AuditLog", "ImpersonationLog",
         "PasswordResetToken", "RevokedToken",
         "Role", "RolePermission", "Tenant", "User",
         "user_roles",

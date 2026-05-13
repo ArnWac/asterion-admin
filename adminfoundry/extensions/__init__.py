@@ -26,8 +26,6 @@ class ExtensionBase(ABC):
     # Extension identity
     name: str = ""
     version: str = "0.1.0"
-    # tier: "core" | "commercial" | "enterprise" | "experimental" | "parked"
-    tier: str = "core"
     # If False, startup_check() failure halts the app
     is_optional: bool = True
 
@@ -51,6 +49,10 @@ class ExtensionBase(ABC):
         """Return capability flags exposed through /admin/capabilities."""
         return {}
 
+    def get_dashboard_widgets(self) -> list:
+        """Return DashboardWidget instances contributed by this extension."""
+        return []
+
     def get_settings_schema(self) -> type | None:
         """Return a Pydantic model class for extension-specific settings, or None."""
         return None
@@ -72,11 +74,10 @@ class ExtensionBase(ABC):
             "status": "ok",
             "extension": self.name,
             "version": self.version,
-            "tier": self.tier,
         }
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name!r}, tier={self.tier!r})"
+        return f"{self.__class__.__name__}(name={self.name!r})"
 
 
 class ExtensionRegistry:
@@ -129,7 +130,6 @@ class ExtensionRegistry:
             {
                 "name": ext.name,
                 "version": ext.version,
-                "tier": ext.tier,
                 "is_optional": ext.is_optional,
             }
             for ext in self._extensions
