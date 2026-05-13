@@ -1,15 +1,16 @@
+from __future__ import annotations
 import uuid
-from sqlalchemy import String, Column, ForeignKey, Table, UniqueConstraint
+from typing import TYPE_CHECKING
+from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from adminfoundry.models.base import TimestampedBase, Base, GUID
+from adminfoundry.models.associations import user_roles
+from adminfoundry.models.base import GUID, TimestampedBase
 
-# Association table — no ORM class needed for this phase
-user_roles = Table(
-    "user_roles",
-    Base.metadata,
-    Column("user_id", GUID, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", GUID, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-)
+if TYPE_CHECKING:
+    from adminfoundry.models.user import User
+
+
+__all__ = ["Role", "user_roles"]
 
 
 class Role(TimestampedBase):
@@ -23,4 +24,8 @@ class Role(TimestampedBase):
     description: Mapped[str | None] = mapped_column(String(32), nullable=True)
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+
+    users: Mapped[list["User"]] = relationship(
+        "User", secondary=user_roles, back_populates="roles"
     )

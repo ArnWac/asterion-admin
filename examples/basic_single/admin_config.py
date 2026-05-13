@@ -4,7 +4,7 @@ from adminfoundry import (
     BulkDeleteAction, DeactivateUsersAction, ActivateUsersAction,
 )
 from adminfoundry.auth import hash_password
-from adminfoundry.models.user import User
+from adminfoundry.models import User
 
 from examples.basic_single.models import Post
 

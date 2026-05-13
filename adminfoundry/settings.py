@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     AUDIT_LOG_RETENTION_DAYS: int = 90  # 0 = keep forever
     PASSWORD_MIN_LENGTH: int = 8
 
+    # Cleanup task (caller must still wire `asyncio.create_task(periodic_cleanup())`)
+    ENABLE_CLEANUP_TASK: bool = True
+    CLEANUP_INTERVAL_SECONDS: int = 3600
+
     # 2FA / TOTP
     ENFORCE_2FA_FOR_SUPERADMIN: bool = False
     TOTP_ISSUER: str = "adminfoundry"

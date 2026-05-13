@@ -359,6 +359,21 @@ async def _doctor():
         raise typer.Exit(code=1)
 
 
+@app.command("cleanup")
+def cleanup(
+    once: bool = typer.Option(
+        False, "--once", help="Run the cleanup pass once and exit."
+    ),
+):
+    """Purge expired revoked tokens, password-reset tokens, and old audit logs."""
+    if not once:
+        typer.echo("Pass --once to run the cleanup pass now.", err=True)
+        raise typer.Exit(code=1)
+    from adminfoundry.cleanup import _run_cleanup
+    asyncio.run(_run_cleanup())
+    typer.echo("Cleanup complete.")
+
+
 # ---------------------------------------------------------------------------
 # migrate sub-commands (Alembic wrapper)
 # ---------------------------------------------------------------------------

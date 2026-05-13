@@ -7,8 +7,8 @@ from sqlalchemy import select
 
 from adminfoundry.auth import hash_password
 from adminfoundry.database import AsyncSessionLocal, engine
+from adminfoundry.models import User
 from adminfoundry.models.base import Base
-from adminfoundry.models.user import User
 
 # Trigger admin registrations so all model tables are imported.
 import examples.basic_single.admin_config  # noqa: F401

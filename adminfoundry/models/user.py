@@ -3,6 +3,7 @@ import uuid
 from typing import TYPE_CHECKING
 from sqlalchemy import String, Boolean, ForeignKey, Integer, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from adminfoundry.models.associations import user_roles
 from adminfoundry.models.base import TimestampedBase, GUID
 
 if TYPE_CHECKING:
@@ -30,5 +31,5 @@ class User(TimestampedBase):
     token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     roles: Mapped[list[Role]] = relationship(
-        "Role", secondary="user_roles", lazy="selectin"
+        "Role", secondary=user_roles, back_populates="users", lazy="selectin"
     )

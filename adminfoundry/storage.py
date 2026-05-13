@@ -53,38 +53,6 @@ class LocalStorage:
         return f"{self.base_url}/{path}"
 
 
-class S3Storage:
-    """S3-compatible storage — requires ``pip install boto3``."""
-
-    def __init__(
-        self,
-        bucket: str,
-        *,
-        region: str = "us-east-1",
-        base_url: str | None = None,
-        endpoint_url: str | None = None,
-    ) -> None:
-        try:
-            import boto3
-        except ImportError as exc:
-            raise RuntimeError(
-                "S3 storage requires boto3: pip install boto3"
-            ) from exc
-        self.bucket = bucket
-        self._s3 = boto3.client("s3", region_name=region, endpoint_url=endpoint_url)
-        self._base_url = base_url or f"https://{bucket}.s3.{region}.amazonaws.com"
-
-    async def save(self, path: str, file: BinaryIO) -> str:
-        self._s3.upload_fileobj(file, self.bucket, path)
-        return path
-
-    async def delete(self, path: str) -> None:
-        self._s3.delete_object(Bucket=self.bucket, Key=path)
-
-    def url(self, path: str) -> str:
-        return f"{self._base_url}/{path}"
-
-
 def _make_unique_path(filename: str, prefix: str = "") -> str:
     """Generate a collision-resistant storage path."""
     suffix = Path(filename).suffix.lower()
@@ -106,3 +74,10 @@ def configure(backend: Any) -> None:
 def generate_path(filename: str, prefix: str = "") -> str:
     """Return a unique storage path for *filename*."""
     return _make_unique_path(filename, prefix)
+
+
+# Backward-compat: S3Storage lives in adminfoundry.extensions.storage_s3 but is
+# re-exported here so `from adminfoundry.storage import S3Storage` keeps working.
+# boto3 is only imported inside S3Storage.__init__, so this line does not pull
+# boto3 at module import time.
+from adminfoundry.extensions.storage_s3 import S3Storage  # noqa: E402, F401
