@@ -352,7 +352,7 @@ def test_field_policy_meta_schema():
 # ---------------------------------------------------------------------------
 
 def test_build_model_contract_for_user_superadmin_all_visible():
-    from adminfoundry.admin_config import UserAdmin
+    from examples.default.admin_config import UserAdmin
     admin = admin_site.get("users")
     user = _make_superadmin()
     contract = build_model_contract_for_user(admin, user, {})

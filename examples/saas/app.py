@@ -35,10 +35,10 @@ from fastapi import FastAPI
 from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
-import adminfoundry.admin_config  # noqa: F401 — registriert User, Role, Tenant
+import examples.default.admin_config  # noqa: F401 — registers User, Role, Tenant, AuditLog
 from adminfoundry.admin import admin_site
 from adminfoundry.admin.model_admin import ModelAdmin
-from adminfoundry.admin.router import create_coreadmin
+from adminfoundry.admin.router import create_admin
 from adminfoundry.auth import hash_password
 from adminfoundry.core.config import CoreAdminConfig
 from adminfoundry.database import AsyncSessionLocal
@@ -74,8 +74,8 @@ class Project(TimestampedBase):
 #   → nur sichtbar wenn ein Tenant-Kontext gesetzt ist (Tenant-Panel)
 #   → Superadmin ohne Tenant-Kontext sieht es nicht (bewusst)
 #
-# UserAdmin / RoleAdmin / TenantAdmin kommen aus adminfoundry.admin_config
-#   → admin_only=True, kein tenant_scoped → nur im Superadmin-Panel
+# UserAdmin / RoleAdmin / TenantAdmin come from examples.default.admin_config
+#   → admin_only=True, not tenant_scoped → superadmin panel only
 # ---------------------------------------------------------------------------
 
 class ProjectAdmin(ModelAdmin):
@@ -194,7 +194,7 @@ app.include_router(auth.router)
 app.include_router(health.router)
 app.include_router(tenants.router)
 
-create_coreadmin(app, config=CoreAdminConfig(enable_multi_tenant=True))
+create_admin(app, config=CoreAdminConfig(enable_multi_tenant=True))
 
 app.mount(f"{settings.ADMIN_UI_PATH}/static", get_static_app(), name="admin-static")
 app.include_router(admin_ui_router, prefix=settings.ADMIN_UI_PATH)

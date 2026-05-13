@@ -2,7 +2,7 @@
 Builds renderer-independent admin contract metadata from ModelAdmin configuration
 and SQLAlchemy column introspection.  No ORM objects or backend internals are exposed.
 
-Contract versioning policy (Phase 9):
+Contract versioning policy:
 - CONTRACT_VERSION major bump = backward-incompatible change (field removed/renamed,
   type changed, semantic altered).
 - Same version = additive change only (new optional field added).

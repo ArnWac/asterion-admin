@@ -48,7 +48,6 @@ class ModelAdmin:
     # Use False for AuditLog (superadmin should see all tenants' logs).
     global_only_in_root_panel: bool = False
 
-    # --- Phase 6: UI contract metadata ---
     # Human-readable labels; defaults derived from model class name if unset
     label: str | None = None
     label_plural: str | None = None
@@ -61,7 +60,6 @@ class ModelAdmin:
     # Defaults to list_display[0] if unset; falls back to id.
     lookup_field: str | None = None
 
-    # --- Phase 10: fine-grained authorization ---
     # {field_name: {"view_roles": list[str]|None, "edit_roles": list[str]|None}}
     # None = unrestricted; [] = deny non-superadmin; ["role"] = requires that role
     field_policies: dict = {}
@@ -76,10 +74,10 @@ class ModelAdmin:
     # roles that grant base CRUD access when admin_only=False
     access_roles: list = []
 
-    # Phase 11: action names that should be executed asynchronously (via job system)
+    # action names to execute asynchronously via the job system
     async_actions: list[str] = []
 
-    # Phase 13: require approval workflow before applying changes
+    # require approval workflow before applying changes
     requires_approval: bool = False
 
     # Inline-editable relationships (SQLAlchemy relationship attr names)

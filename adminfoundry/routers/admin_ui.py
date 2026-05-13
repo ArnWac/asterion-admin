@@ -1,6 +1,6 @@
 """Built-in lightweight admin UI router.
 
-Serves HTML shells; all data loading is done client-side via the Phase 6
+Serves HTML shells; all data loading is done client-side via the
 admin contract API endpoints. Enabled only when ENABLE_BUILTIN_ADMIN_UI=True.
 """
 from pathlib import Path
@@ -20,7 +20,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 router = APIRouter(tags=["admin-ui"])
 
-# Populated by create_coreadmin(); read by _tmpl() to embed locale defaults in every page.
+# Populated by create_admin(); read by _tmpl() to embed locale defaults in every page.
 _locale_defaults: dict = {"language": "en", "date_format": "locale", "date_pattern": "%Y-%m-%d %H:%M", "show_timezone": False}
 # Extra i18n strings from CoreAdminConfig.extra_i18n — merged on top of built-in strings in the browser.
 _extra_i18n: dict = {}

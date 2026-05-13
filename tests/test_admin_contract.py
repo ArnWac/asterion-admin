@@ -116,13 +116,15 @@ def test_contract_snapshot_user_admin():
     assert "is_active" in contract.filter_fields
     assert "id" in contract.readonly_fields
 
-    # Actions snapshot
-    assert len(contract.actions) == 1
-    action = contract.actions[0]
-    assert action.name == "deactivate"
-    assert action.danger is True
-    assert action.confirm is True
-    assert action.bulk is True
+    # Actions snapshot — UserAdmin has DeactivateUsersAction + BulkDeleteAction
+    assert len(contract.actions) == 2
+    action_names = {a.name for a in contract.actions}
+    assert "deactivate" in action_names
+    assert "delete" in action_names
+    deactivate = next(a for a in contract.actions if a.name == "deactivate")
+    assert deactivate.danger is True
+    assert deactivate.confirm is True
+    assert deactivate.bulk is True
 
     # Protected fields absent
     field_names = [f.name for f in contract.fields]
@@ -139,7 +141,9 @@ def test_contract_snapshot_role_admin():
     assert contract.label_plural == "Permissions"
     assert contract.description == "Permission groups assignable to users — CRUD capabilities configured below"
     assert contract.tenant_scoped is True
-    assert contract.actions == []
+    # RoleAdmin has BulkDeleteAction
+    assert len(contract.actions) == 1
+    assert contract.actions[0].name == "delete"
 
     field_names = [f.name for f in contract.fields]
     assert "name" in field_names

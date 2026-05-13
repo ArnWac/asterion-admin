@@ -27,24 +27,9 @@ from adminfoundry.extensions.observability.admin_metrics import get_snapshot as 
 from adminfoundry.schemas.client_config import ClientConfigResponse
 from adminfoundry.schemas.policy import FieldPolicyMeta, ModelPolicyResponse
 from adminfoundry.settings import settings
+from adminfoundry.tenancy.resolver import resolve_impersonation_tenant as _resolve_impersonation_tenant
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
-
-
-async def _resolve_impersonation_tenant(payload: dict, current_tenant, db: AsyncSession):
-    """Return the Tenant for a same-origin impersonation token when TenantMiddleware
-    didn't set it (no subdomain).  Returns current_tenant unchanged if it is already set
-    or if the token carries no tenant_id."""
-    if current_tenant is not None:
-        return current_tenant
-    if not (payload.get("impersonated_by") and payload.get("tenant_id")):
-        return None
-    from adminfoundry.models.tenant import Tenant as _Tenant
-    return (
-        await db.execute(
-            select(_Tenant).where(_Tenant.id == uuid.UUID(payload["tenant_id"]))
-        )
-    ).scalar_one_or_none()
 
 
 async def _enforce_method_caps(
@@ -250,8 +235,7 @@ async def list_registered_models(
 
 
 # ---------------------------------------------------------------------------
-# Phase 6 — admin contract endpoints
-# These fixed-path routes must appear BEFORE /{model_name} to prevent FastAPI
+# Fixed-path admin contract endpoints — must appear BEFORE /{model_name} to prevent FastAPI
 # from matching "context"/"navigation"/"capabilities" as a model_name parameter.
 # ---------------------------------------------------------------------------
 
@@ -1182,7 +1166,7 @@ async def hard_delete_object(
     await _signals.emit("post_delete", model_name=model_name, object_id=str(object_id), user=current_user)
 
 
-def create_coreadmin(app, config=None) -> None:
+def create_admin(app, config=None) -> None:
     """Register the admin router on a FastAPI app.
 
     config: optional CoreAdminConfig instance.  When provided, enabled-feature
@@ -1215,6 +1199,10 @@ def create_coreadmin(app, config=None) -> None:
     from adminfoundry.extensions.jobs.router import router as _jobs_router
     app.include_router(_jobs_router)
 
+    # Approval workflow
+    from adminfoundry.routers.workflow import router as _workflow_router
+    app.include_router(_workflow_router)
+
     from adminfoundry.routers import admin_ui as _admin_ui_module
     _admin_ui_module._locale_defaults = {
         "language": config.default_language if config else "en",
@@ -1241,5 +1229,5 @@ def create_coreadmin(app, config=None) -> None:
         app.add_middleware(AuditMiddleware)
 
 
-# Module-level config reference — set by create_coreadmin; None until wired
+# Module-level config reference — set by create_admin; None until wired
 _admin_config = None

@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
-from adminfoundry.database import get_db, get_or_create_tenant_engine
+from adminfoundry.database import get_db
+from adminfoundry.tenancy.schema_strategy import get_or_create_tenant_engine
 from adminfoundry.pagination import paginate
 from adminfoundry.dependencies import require_superadmin
 from adminfoundry.models.tenant import Tenant

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy import text
 from sqlalchemy.pool import StaticPool, NullPool
-from adminfoundry.main import app
+from examples.default.app import app
 from adminfoundry.database import get_db, get_admin_db
 from adminfoundry.models.base import Base
 from adminfoundry.models.user import User

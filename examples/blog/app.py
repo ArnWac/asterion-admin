@@ -9,11 +9,11 @@ from fastapi import FastAPI
 from sqlalchemy import String, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
-import adminfoundry.admin_config  # noqa: F401 — registriert User, Role, Tenant
+import examples.default.admin_config  # noqa: F401 — registers User, Role, Tenant, AuditLog
 from adminfoundry.admin import admin_site
 from adminfoundry.admin.actions import AdminAction
 from adminfoundry.admin.model_admin import ModelAdmin
-from adminfoundry.admin.router import create_coreadmin
+from adminfoundry.admin.router import create_admin
 from adminfoundry.auth import hash_password
 from adminfoundry.core.config import CoreAdminConfig
 from adminfoundry.database import AsyncSessionLocal
@@ -127,7 +127,7 @@ app = FastAPI(title="Blog Admin", lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(health.router)
 
-create_coreadmin(app, config=CoreAdminConfig(
+create_admin(app, config=CoreAdminConfig(
     default_date_format="eu",
     default_show_timezone=True,
 ))

@@ -66,7 +66,7 @@ def test_support_matrix_quality_flags():
 def _make_app_enabled():
     """Return a fresh app with ENABLE_BUILTIN_ADMIN_UI=True."""
     import importlib
-    import adminfoundry.main as m
+    import examples.default.app as m
     importlib.reload(m)
     return m.app
 
@@ -75,7 +75,7 @@ def _make_app_disabled():
     """Return a fresh app with ENABLE_BUILTIN_ADMIN_UI=False."""
     with patch("adminfoundry.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
         import importlib
-        import adminfoundry.main as m
+        import examples.default.app as m
         importlib.reload(m)
         return m.app
 
@@ -257,7 +257,7 @@ async def test_api_unaffected_when_ui_disabled(db_engine):
     """Disabling the built-in UI must not break API routes."""
     with patch("adminfoundry.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
         import importlib
-        import adminfoundry.main as m
+        import examples.default.app as m
         importlib.reload(m)
         disabled_app = m.app
 
@@ -272,7 +272,7 @@ async def test_ui_routes_absent_when_disabled(db_engine):
     """When UI disabled, /admin-ui/login should 404."""
     with patch("adminfoundry.settings.settings.ENABLE_BUILTIN_ADMIN_UI", False):
         import importlib
-        import adminfoundry.main as m
+        import examples.default.app as m
         importlib.reload(m)
         disabled_app = m.app
 

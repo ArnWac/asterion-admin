@@ -41,5 +41,5 @@ class AdminContextResponse(BaseModel):
     is_impersonating: bool
     impersonated_by: str | None
     tenant: TenantContext | None
-    # Phase 15: enabled feature flags (additive, always present)
+    # enabled feature flags (additive, always present)
     enabled_features: dict | None = None

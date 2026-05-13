@@ -30,14 +30,14 @@ SUPPORTED_FEATURES: dict[str, bool] = {
     "protected_field_filtering": True,
     # Advanced flows
     "dangerous_actions": True,
-    "bulk_actions": True,         # Phase 11
+    "bulk_actions": True,
     "audit_log_view": False,
-    "export": True,               # Phase 11
-    "import": True,               # Phase 11
+    "export": True,
+    "import": True,
     # Relation handling
     "relation_selection": True,
     # Workflow
-    "workflow_approval": False,   # Phase 13 backend only; UI deferred
+    "workflow_approval": False,
     # Quality
     "localization_ready": True,
     "accessibility_baseline": True,

@@ -13,10 +13,10 @@ from adminfoundry.middleware.logging import RequestLoggingMiddleware, configure_
 from adminfoundry.middleware.tenant import TenantMiddleware
 from adminfoundry.middleware.security_headers import SecurityHeadersMiddleware
 from adminfoundry.middleware.rate_limit import RateLimitMiddleware
-from adminfoundry.admin.router import create_coreadmin
+from adminfoundry.admin.router import create_admin
 from adminfoundry.auth_provider import AuthProvider
 from adminfoundry.cleanup import periodic_cleanup
-import adminfoundry.admin_config  # noqa: F401 — trigger admin registrations
+import examples.default.admin_config  # noqa: F401 — trigger admin registrations
 
 config = CoreAdminConfig.from_settings(settings)
 
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
             pass
 
 
-app = FastAPI(title="coreAdmin API", lifespan=lifespan)
+app = FastAPI(title="Adminfoundry Admin", lifespan=lifespan)
 app.state.auth_provider = config.auth_provider or AuthProvider()
 
 app.add_middleware(UnhandledExceptionMiddleware)
@@ -69,7 +69,7 @@ for _ext in config.extensions:
     for _ext_router in _ext.get_routers():
         app.include_router(_ext_router)
 
-create_coreadmin(app, config=config)
+create_admin(app, config=config)
 
 if config.enable_builtin_ui:
     from adminfoundry.routers.admin_ui import router as admin_ui_router, get_static_app

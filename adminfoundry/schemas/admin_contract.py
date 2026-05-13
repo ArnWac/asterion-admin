@@ -10,7 +10,7 @@ class RelationMeta(BaseModel):
 
 
 class RendererHints(BaseModel):
-    """Phase 14: optional advanced renderer hints for enterprise clients."""
+    """Optional advanced renderer hints for enterprise clients."""
     advanced_widget: str | None = None
     column_width: str | None = None
     inline_editable: bool = False
@@ -34,7 +34,6 @@ class FieldMeta(BaseModel):
     policy_visible: bool = True
     policy_editable: bool = True
     create_only: bool = False
-    # Phase 14: optional advanced renderer hints
     renderer_hints: RendererHints | None = None
     # URL to fetch <select> choices from (response: {models:[]} or {items:[]})
     choices_url: str | None = None
@@ -47,7 +46,6 @@ class ActionMeta(BaseModel):
     confirm: bool = False
     bulk: bool = False
     single: bool = True
-    # Phase 11: async execution hint for clients
     async_execution: bool = False
 
 
@@ -76,7 +74,6 @@ class ModelContractMeta(BaseModel):
     ordering: list[str]
     readonly_fields: list[str]
     actions: list[ActionMeta]
-    # Phase 13: workflow capability flag
     requires_approval: bool = False
     # Inline-editable relationships
     inline_relations: list[InlineRelationMeta] = []

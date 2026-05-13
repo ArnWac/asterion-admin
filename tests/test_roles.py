@@ -91,7 +91,7 @@ async def test_duplicate_role_assignment_rejected(client: AsyncClient, superadmi
 async def test_require_role_passes_with_role(client: AsyncClient, superadmin: User, db: AsyncSession):
     """require_role dependency: user with role gets through."""
     from adminfoundry.dependencies import require_role
-    from adminfoundry.main import app
+    from examples.default.app import app
 
     user = User(email="hasrole@example.com", hashed_password=hash_password("pw"), is_active=True, is_superadmin=False)
     db.add(user)
@@ -129,7 +129,7 @@ async def test_require_role_fails_without_role(client: AsyncClient, db: AsyncSes
     await db.refresh(user)
 
     # Build a minimal test app with a require_role-protected route
-    from adminfoundry.main import app as main_app
+    from examples.default.app import app as main_app
     from adminfoundry.database import get_db
 
     async def override_db():

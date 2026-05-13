@@ -131,8 +131,8 @@ async def test_middleware_passthrough_when_flag_false(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_middleware_disabled_tenant_blocked(db: AsyncSession, db_engine):
     """Middleware returns 403 when resolved tenant is disabled (MULTI_TENANT=true)."""
-    from adminfoundry.middleware import tenant as tenant_mod
-    from adminfoundry.main import app as main_app
+    from adminfoundry.tenancy import resolver as tenant_mod
+    from examples.default.app import app as main_app
 
     disabled = Tenant(name="Disabled Co", slug="disabled-co", is_active=False)
     db.add(disabled)
@@ -159,8 +159,8 @@ async def test_middleware_disabled_tenant_blocked(db: AsyncSession, db_engine):
 @pytest.mark.asyncio
 async def test_middleware_unknown_tenant_404(db: AsyncSession, db_engine):
     """Middleware returns 404 for unknown tenant slug."""
-    from adminfoundry.middleware import tenant as tenant_mod
-    from adminfoundry.main import app as main_app
+    from adminfoundry.tenancy import resolver as tenant_mod
+    from examples.default.app import app as main_app
 
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
 
@@ -182,8 +182,8 @@ async def test_middleware_unknown_tenant_404(db: AsyncSession, db_engine):
 @pytest.mark.asyncio
 async def test_middleware_active_tenant_passes(db: AsyncSession, db_engine):
     """Middleware stores tenant in state and lets request through."""
-    from adminfoundry.middleware import tenant as tenant_mod
-    from adminfoundry.main import app as main_app
+    from adminfoundry.tenancy import resolver as tenant_mod
+    from examples.default.app import app as main_app
 
     active = Tenant(name="Active Co", slug="active-co", is_active=True)
     db.add(active)
@@ -209,8 +209,8 @@ async def test_middleware_active_tenant_passes(db: AsyncSession, db_engine):
 @pytest.mark.asyncio
 async def test_middleware_no_header_stores_none(db: AsyncSession, db_engine):
     """When MULTI_TENANT=true but no header, request proceeds (tenant=None)."""
-    from adminfoundry.middleware import tenant as tenant_mod
-    from adminfoundry.main import app as main_app
+    from adminfoundry.tenancy import resolver as tenant_mod
+    from examples.default.app import app as main_app
 
     with patch("adminfoundry.settings.settings.MULTI_TENANT", True):
         transport = ASGITransport(app=main_app)
