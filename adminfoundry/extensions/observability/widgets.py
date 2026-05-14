@@ -1,8 +1,8 @@
 """Dashboard widgets contributed by ObservabilityExtension.
 
-Reads from the neutral core runtime counter store at
-`adminfoundry.runtime_metrics`. Never exposes secrets, token internals, or
-protected field content.
+Reads from the observability counter store at
+`adminfoundry.extensions.observability.admin_metrics`. Never exposes secrets,
+token internals, or protected field content.
 """
 from typing import Any
 
@@ -17,7 +17,7 @@ class AdminMetricsWidget(DashboardWidget):
     superadmin_only = True
 
     async def get_data(self, user: Any, db: Any, request: Any) -> dict:
-        from adminfoundry.runtime_metrics import get_snapshot
+        from adminfoundry.extensions.observability.admin_metrics import get_snapshot
         m = get_snapshot()
         error_rate = (
             f"{round(m['request_errors'] / m['request_count'] * 100)}%" if m["request_count"] else "—"

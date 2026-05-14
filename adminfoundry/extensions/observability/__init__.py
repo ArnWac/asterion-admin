@@ -1,12 +1,12 @@
-"""Observability extension — admin metrics dashboard widgets and (future) exporters.
+"""Observability extension — admin metrics dashboard widgets, Prometheus exporter,
+and the in-process runtime counter store.
 
-Reads from the neutral core runtime counter store at `adminfoundry.runtime_metrics`.
-The counter store itself lives in core so that core middleware and health endpoints
-can write/read without depending on this extension being registered.
+All metric state lives inside this extension namespace. Core infrastructure
+must not import from here — counters are written by middleware stubs and read
+only when ObservabilityExtension is registered.
 
 Optional: add ObservabilityExtension() to CoreAdminConfig.extensions to enable
-the metrics dashboard widget. Future versions may contribute Prometheus/OTel
-exporters here as well.
+the metrics dashboard widget and /metrics + /api/v1/admin/metrics routes.
 """
 from adminfoundry.extensions import ExtensionBase
 from adminfoundry.extensions.observability.widgets import AdminMetricsWidget
@@ -26,11 +26,15 @@ class ObservabilityExtension(ExtensionBase):
             "client_type_tracking": True,
         }
 
+    def get_routers(self) -> list:
+        from adminfoundry.extensions.observability.router import prometheus_router
+        return [prometheus_router]
+
     def get_dashboard_widgets(self) -> list:
         return [AdminMetricsWidget()]
 
     def startup_check(self) -> None:
-        from adminfoundry.runtime_metrics import get_snapshot  # noqa: F401
+        from adminfoundry.extensions.observability.admin_metrics import get_snapshot  # noqa: F401
 
 
 __all__ = ["ObservabilityExtension", "AdminMetricsWidget"]

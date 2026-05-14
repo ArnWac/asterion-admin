@@ -1,10 +1,9 @@
-"""Neutral in-process runtime counter store.
+"""In-process runtime counter store owned by ObservabilityExtension.
 
-Core middleware and health/runtime endpoints write to and read from this module.
-The optional ObservabilityExtension contributes dashboard widgets and exporters
-that read from this module — core must not import from the extension namespace.
-
+Tracks request/action counters, audit failures, contract version usage, and
+client type distribution. Core middleware writes here when counters are wired.
 Never exposes secrets, token internals, or protected field content.
+
 Replace with Prometheus/OpenTelemetry counters in production.
 """
 from collections import defaultdict

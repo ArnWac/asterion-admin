@@ -19,6 +19,7 @@ from fastapi import FastAPI
 import examples.basic_multi.admin_config  # noqa: F401 — register admins
 
 from adminfoundry import create_admin, CoreAdminConfig
+from adminfoundry.extensions.observability import ObservabilityExtension
 from adminfoundry.extensions.workflows import WorkflowsExtension
 from examples.basic_multi.seed import seed, print_banner
 
@@ -28,7 +29,7 @@ config = CoreAdminConfig(
     secret_key=os.environ.get("SECRET_KEY", "dev-secret"),
     enable_multi_tenant=True,
     tenant_resolution="subdomain",
-    extensions=[WorkflowsExtension()],
+    extensions=[WorkflowsExtension(), ObservabilityExtension()],
 )
 
 

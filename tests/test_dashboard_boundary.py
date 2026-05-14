@@ -58,21 +58,21 @@ def test_observability_extension_contributes_admin_metrics_widget():
     assert all(isinstance(w, DashboardWidget) for w in widgets)
 
 
-def test_runtime_metrics_importable_without_extension():
-    """The neutral core counter store must be importable without any extension."""
-    from adminfoundry.runtime_metrics import get_snapshot
+def test_observability_metrics_importable():
+    """The observability counter store must be importable from the extension namespace."""
+    from adminfoundry.extensions.observability.admin_metrics import get_snapshot
     snap = get_snapshot()
     assert "request_count" in snap
     assert "audit_write_failures" in snap
 
 
-def test_old_admin_metrics_path_is_removed():
-    """No shim: the old extensions.observability.admin_metrics path must not exist."""
+def test_runtime_metrics_core_module_does_not_exist():
+    """runtime_metrics must not exist as a core module — metrics belong to observability."""
     import importlib
     import pytest as _pytest
 
     with _pytest.raises(ImportError):
-        importlib.import_module("adminfoundry.extensions.observability.admin_metrics")
+        importlib.import_module("adminfoundry.runtime_metrics")
 
 
 def test_old_middleware_tenant_shim_is_removed():

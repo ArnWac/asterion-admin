@@ -325,8 +325,15 @@ async def client_config(
 async def admin_metrics(
     _: User = Depends(require_superadmin),
 ):
-    """Return admin operational metrics snapshot — no secrets or protected field content."""
-    from adminfoundry.runtime_metrics import get_snapshot
+    """Return admin operational metrics snapshot.
+
+    Only available when ObservabilityExtension is registered; returns 404 otherwise.
+    """
+    if _admin_config is None or not any(
+        getattr(e, "name", None) == "observability" for e in _admin_config.extensions
+    ):
+        raise HTTPException(status_code=404, detail="ObservabilityExtension not enabled")
+    from adminfoundry.extensions.observability.admin_metrics import get_snapshot
     return get_snapshot()
 
 
