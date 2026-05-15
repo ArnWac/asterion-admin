@@ -6,7 +6,7 @@ token internals, or protected field content.
 """
 from typing import Any
 
-from adminfoundry.dashboard import DashboardWidget
+from adminfoundry.admin.dashboard.widget import DashboardWidget
 
 
 class AdminMetricsWidget(DashboardWidget):

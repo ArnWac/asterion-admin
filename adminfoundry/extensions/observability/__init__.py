@@ -27,8 +27,8 @@ class ObservabilityExtension(ExtensionBase):
         }
 
     def get_routers(self) -> list:
-        from adminfoundry.extensions.observability.router import prometheus_router
-        return [prometheus_router]
+        from adminfoundry.extensions.observability.router import prometheus_router, admin_metrics_router
+        return [prometheus_router, admin_metrics_router]
 
     def get_dashboard_widgets(self) -> list:
         return [AdminMetricsWidget()]
