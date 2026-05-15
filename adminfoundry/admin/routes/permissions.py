@@ -18,6 +18,16 @@ from adminfoundry.settings import settings
 router = APIRouter()
 
 
+def _scoped_model_names(payload: dict, request: Request) -> list[str]:
+    is_impersonating = bool(payload.get("impersonated_by"))
+    tenant = getattr(request.state, "tenant", None)
+    in_tenant_context = is_impersonating or tenant is not None
+    if in_tenant_context:
+        return [mn for mn in admin_site.model_names()
+                if getattr(admin_site.get(mn), "tenant_scoped", False)]
+    return admin_site.model_names()
+
+
 @router.get("/permission-matrix/template")
 async def get_permission_matrix_template(
     request: Request,
@@ -26,15 +36,7 @@ async def get_permission_matrix_template(
     """Return the full model list with all permissions false — used by the create-role form."""
     payload = getattr(request.state, "token_payload", {})
     _require_superadmin_or_impersonating(current_user, payload, request)
-
-    is_impersonating = bool(payload.get("impersonated_by"))
-    tenant = getattr(request.state, "tenant", None)
-    in_tenant_context = is_impersonating or tenant is not None
-    if in_tenant_context:
-        names = [mn for mn in admin_site.model_names()
-                 if getattr(admin_site.get(mn), "tenant_scoped", False)]
-    else:
-        names = admin_site.model_names()
+    names = _scoped_model_names(payload, request)
 
     return [
         {
@@ -69,14 +71,7 @@ async def get_permission_matrix(
     ).scalars().all()
     perms = {r.model_name: r for r in rows}
 
-    is_impersonating = bool(payload.get("impersonated_by"))
-    tenant = getattr(request.state, "tenant", None)
-    in_tenant_context = is_impersonating or tenant is not None
-    if in_tenant_context:
-        names = [mn for mn in admin_site.model_names()
-                 if getattr(admin_site.get(mn), "tenant_scoped", False)]
-    else:
-        names = admin_site.model_names()
+    names = _scoped_model_names(payload, request)
 
     return [
         {

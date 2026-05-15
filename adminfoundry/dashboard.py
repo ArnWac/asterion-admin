@@ -21,7 +21,7 @@ Widget types
 - ``counts`` — model record counts table (built-in, generated automatically)
 """
 # Canonical location is adminfoundry.admin.dashboard — this module is a compat re-export.
-from adminfoundry.admin.dashboard.widget import DashboardWidget, DashboardWidgetContext
+from adminfoundry.admin.dashboard.widget import DashboardWidget
 from adminfoundry.admin.dashboard.builtins import ModelCountsWidget, DEFAULT_WIDGETS
 
-__all__ = ["DashboardWidget", "DashboardWidgetContext", "ModelCountsWidget", "DEFAULT_WIDGETS"]
+__all__ = ["DashboardWidget", "ModelCountsWidget", "DEFAULT_WIDGETS"]

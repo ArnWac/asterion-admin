@@ -281,9 +281,10 @@ def _install_extensions(app, config) -> None:
         ext.get_models()  # import side-effect registers extension tables with Base.metadata
         for ext_router in ext.get_routers():
             app.include_router(ext_router)
-        dashboard_registry.register_from_extension(ext)
-        if hasattr(ext, "get_dashboard_widgets"):
-            _extension_widgets.extend(ext.get_dashboard_widgets())
+        widgets = ext.get_dashboard_widgets() if hasattr(ext, "get_dashboard_widgets") else []
+        for w in widgets:
+            dashboard_registry.register(w)
+        _extension_widgets.extend(widgets)
 
 
 def _install_admin_ui(app, config) -> None:
