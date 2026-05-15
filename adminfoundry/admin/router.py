@@ -255,12 +255,12 @@ def _install_extensions(app, config) -> None:
     # Reset singletons so create_admin() can be called multiple times (e.g., in tests)
     extension_registry._extensions.clear()
 
-    base = list(DEFAULT_WIDGETS)
-    if config.dashboard_widgets is not None:
-        if getattr(config, "dashboard_widgets_mode", "append") == "replace":
-            base = list(config.dashboard_widgets)
-        else:
-            base = base + list(config.dashboard_widgets)
+    if config.dashboard_widgets is not None and config.dashboard_widgets_mode == "replace":
+        base = list(config.dashboard_widgets)
+    elif config.dashboard_widgets is not None:
+        base = list(DEFAULT_WIDGETS) + list(config.dashboard_widgets)
+    else:
+        base = list(DEFAULT_WIDGETS)
     dashboard_registry.reset(base=base)
 
     for ext in config.extensions:

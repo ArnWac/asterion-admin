@@ -1,4 +1,5 @@
 """Admin dashboard and compatibility endpoints."""
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, Request
@@ -45,25 +46,20 @@ async def admin_dashboard(
         is_superadmin=is_super,
     )
 
-    widgets: list[DashboardWidgetResponse] = []
-    for w in dashboard_registry.all():
+    async def _fetch(w) -> DashboardWidgetResponse | None:
         if not await w.is_visible(ctx):
-            continue
-        error: str | None = None
-        data: dict = {}
+            return None
         try:
             data = await w.get_data(ctx)
+            error = None
         except Exception:
             _log.exception("Dashboard widget %r failed", w.id)
+            data = {}
             error = "widget_failed"
-        widgets.append(DashboardWidgetResponse(
-            id=w.id,
-            title=w.title,
-            type=w.type,
-            data=data,
-            error=error,
-        ))
-    return DashboardResponse(widgets=widgets)
+        return DashboardWidgetResponse(id=w.id, title=w.title, type=w.type, data=data, error=error)
+
+    results = await asyncio.gather(*(_fetch(w) for w in dashboard_registry.all()))
+    return DashboardResponse(widgets=[r for r in results if r is not None])
 
 
 @router.get("/compatibility")
