@@ -32,7 +32,6 @@ class LocalStorage:
     def __init__(self, base_dir: str = "uploads", base_url: str = "/uploads") -> None:
         self.base_dir = Path(base_dir)
         self.base_url = base_url.rstrip("/")
-        self.base_dir.mkdir(parents=True, exist_ok=True)
 
     async def save(self, path: str, file: BinaryIO) -> str:
         dest = self.base_dir / path

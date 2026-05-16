@@ -128,12 +128,12 @@ def install_extensions(app: "FastAPI", runtime: "AdminRuntime") -> None:
     from adminfoundry.admin.registry import admin_site as _admin_site
     config = runtime.config
 
-    if config.dashboard_widgets is not None and config.dashboard_widgets_mode == "replace":
-        base = list(config.dashboard_widgets)
-    elif config.dashboard_widgets is not None:
-        base = list(DEFAULT_WIDGETS) + list(config.dashboard_widgets)
-    else:
+    if config.dashboard_widgets is None:
         base = list(DEFAULT_WIDGETS)
+    elif config.dashboard_widgets_mode == "replace":
+        base = list(config.dashboard_widgets)
+    else:
+        base = list(DEFAULT_WIDGETS) + list(config.dashboard_widgets)
     runtime.dashboard_registry.reset(base=base)
 
     for ext in config.extensions:

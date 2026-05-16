@@ -110,9 +110,9 @@ _CATALOGS: dict[str, dict[str, str]] = {
 
 def t(key: str, lang: str | None = None, **vars: str) -> str:
     """Translate *key* to *lang* (falls back to English, then the key itself)."""
-    resolved = lang or "en"
-    catalog = _CATALOGS.get(resolved) or _CATALOGS.get("en") or {}
-    text = catalog.get(key) or (_CATALOGS.get("en") or {}).get(key, key)
+    en = _CATALOGS.get("en") or {}
+    catalog = _CATALOGS.get(lang or "en") or en
+    text = catalog.get(key) or en.get(key, key)
     if vars:
         for k, v in vars.items():
             text = text.replace(f"{{{k}}}", str(v))

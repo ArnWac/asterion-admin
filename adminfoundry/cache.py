@@ -69,7 +69,15 @@ class RedisBackend:
         await self._client.flushdb()
 
 
-def make_cache(backend_url: str | None):
+class CacheBackend:
+    """Protocol for cache backends."""
+    async def get(self, key: str): ...
+    async def set(self, key: str, value, ttl: int | None = None) -> None: ...
+    async def delete(self, key: str) -> None: ...
+    async def clear(self) -> None: ...
+
+
+def make_cache(backend_url: str | None) -> "CacheBackend":
     """Return the appropriate cache backend for *backend_url*."""
     if not backend_url or backend_url == "memory":
         return InMemoryBackend()
