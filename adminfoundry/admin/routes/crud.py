@@ -29,6 +29,7 @@ from adminfoundry.dependencies import get_current_user, require_superadmin
 from adminfoundry.models.user import User
 from adminfoundry.pagination import paginate
 from adminfoundry.schemas.policy import FieldPolicyMeta, ModelPolicyResponse
+from adminfoundry.tenancy.dependencies import require_tenant_membership
 
 router = APIRouter()
 
@@ -44,11 +45,13 @@ async def list_objects(
     trash: bool = Query(False, description="Show only soft-deleted records"),
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
-    await _enforce_method_caps(model_admin, current_user, payload, "list", db)
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
+    await _enforce_method_caps(model_admin, current_user, payload, "list", db, membership=membership)
 
     stmt = select(model_admin.model)
 
@@ -93,11 +96,13 @@ async def create_object(
     request: Request,
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
-    await _enforce_method_caps(model_admin, current_user, payload, "create", db)
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
+    await _enforce_method_caps(model_admin, current_user, payload, "create", db, membership=membership)
 
     create_schema = schema_builder.build_create_schema(model_admin)
     body = await request.json()
@@ -157,6 +162,7 @@ async def import_objects(
     dry_run: bool = Query(True),
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     """Import records from a CSV file.
 
@@ -167,8 +173,9 @@ async def import_objects(
     if not getattr(model_admin, "allow_import", False):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Import not enabled for this model")
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
-    await _enforce_method_caps(model_admin, current_user, payload, "create", db)
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
+    await _enforce_method_caps(model_admin, current_user, payload, "create", db, membership=membership)
 
     content = await file.read()
     try:
@@ -226,11 +233,13 @@ async def model_meta(
     model_name: str,
     request: Request,
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     """Return full field and action contract metadata for a registered model."""
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
     return build_model_contract(model_admin, registry=admin_site)
 
 
@@ -243,11 +252,13 @@ async def lookup_objects(
     q: str | None = Query(None),
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     """Generic async relation-selection lookup — returns lightweight {id, label} items."""
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
 
     stmt = select(model_admin.model)
 
@@ -285,10 +296,12 @@ async def model_policy(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     """Return effective field policies and capability flags for the current user."""
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
+    membership = getattr(request.state, "tenant_membership", None)
 
     from adminfoundry.admin.contract import build_field_metadata
     from adminfoundry.authz.role_caps import fetch_model_caps
@@ -300,7 +313,7 @@ async def model_policy(
         )
         for f in fields
     ]
-    db_caps = await fetch_model_caps(current_user, model_name, db)
+    db_caps = await fetch_model_caps(current_user, model_name, db, membership=membership)
     in_tenant_context = bool(
         payload.get("impersonated_by") or getattr(request.state, "tenant", None)
     )
@@ -325,13 +338,15 @@ async def bulk_action_direct(
     request: Request,
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     """Execute a declared bulk action directly — no job queue required."""
     from adminfoundry.admin.actions import AdminAction as _AdminAction
 
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
 
     body = await request.json()
     action_name: str = body.get("action", "")
@@ -350,9 +365,11 @@ async def bulk_action_direct(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Action '{action_name}' does not support bulk execution")
 
-    objects = (
-        await db.execute(select(model_admin.model).where(model_admin.model.id.in_(object_ids)))
-    ).scalars().all()
+    stmt = select(model_admin.model).where(model_admin.model.id.in_(object_ids))
+    tf = _tenant_filter(request, model_admin)
+    if tf is not None:
+        stmt = stmt.where(tf)
+    objects = (await db.execute(stmt)).scalars().all()
 
     if not isinstance(action_def, _AdminAction):
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -408,15 +425,19 @@ async def get_object(
     request: Request,
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
-    await _enforce_method_caps(model_admin, current_user, payload, "read", db)
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
+    await _enforce_method_caps(model_admin, current_user, payload, "read", db, membership=membership)
 
-    obj = (
-        await db.execute(select(model_admin.model).where(model_admin.model.id == object_id))
-    ).scalar_one_or_none()
+    stmt = select(model_admin.model).where(model_admin.model.id == object_id)
+    tf = _tenant_filter(request, model_admin)
+    if tf is not None:
+        stmt = stmt.where(tf)
+    obj = (await db.execute(stmt)).scalar_one_or_none()
     if obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found")
 
@@ -437,19 +458,23 @@ async def update_object(
     request: Request,
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     model_admin = _get_admin_or_404(model_name)
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
-    await _enforce_method_caps(model_admin, current_user, payload, "update", db)
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
+    await _enforce_method_caps(model_admin, current_user, payload, "update", db, membership=membership)
 
     update_schema = schema_builder.build_update_schema(model_admin)
     body = await request.json()
     validated = _validate_body(update_schema, body)
 
-    obj = (
-        await db.execute(select(model_admin.model).where(model_admin.model.id == object_id))
-    ).scalar_one_or_none()
+    stmt = select(model_admin.model).where(model_admin.model.id == object_id)
+    tf = _tenant_filter(request, model_admin)
+    if tf is not None:
+        stmt = stmt.where(tf)
+    obj = (await db.execute(stmt)).scalar_one_or_none()
     if obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found")
 
@@ -491,17 +516,21 @@ async def delete_object(
     request: Request,
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     model_admin = _get_admin_or_404(model_name)
     if not getattr(model_admin, "allow_delete", True):
         raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Deletion not allowed for this model")
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
-    await _enforce_method_caps(model_admin, current_user, payload, "delete", db)
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
+    await _enforce_method_caps(model_admin, current_user, payload, "delete", db, membership=membership)
 
-    obj = (
-        await db.execute(select(model_admin.model).where(model_admin.model.id == object_id))
-    ).scalar_one_or_none()
+    stmt = select(model_admin.model).where(model_admin.model.id == object_id)
+    tf = _tenant_filter(request, model_admin)
+    if tf is not None:
+        stmt = stmt.where(tf)
+    obj = (await db.execute(stmt)).scalar_one_or_none()
     if obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found")
 
@@ -536,22 +565,24 @@ async def restore_object(
     request: Request,
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     """Restore a soft-deleted record from trash."""
     model_admin = _get_admin_or_404(model_name)
     if not _model_supports_soft_delete(model_admin):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Soft-delete not enabled for this model")
     payload = getattr(request.state, "token_payload", {})
-    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request))
+    membership = getattr(request.state, "tenant_membership", None)
+    _check_model_access(model_admin, current_user, payload, tenant=getattr(request.state, "tenant", None), multi_tenant=_get_multi_tenant_flag(request), membership=membership)
 
-    obj = (
-        await db.execute(
-            select(model_admin.model).where(
-                model_admin.model.id == object_id,
-                model_admin.model.deleted_at.is_not(None),
-            )
-        )
-    ).scalar_one_or_none()
+    stmt = select(model_admin.model).where(
+        model_admin.model.id == object_id,
+        model_admin.model.deleted_at.is_not(None),
+    )
+    tf = _tenant_filter(request, model_admin)
+    if tf is not None:
+        stmt = stmt.where(tf)
+    obj = (await db.execute(stmt)).scalar_one_or_none()
     if obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found or not in trash")
 

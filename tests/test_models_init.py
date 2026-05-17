@@ -18,8 +18,8 @@ def test_models_all_matches_exports():
     expected = {
         "AuditLog", "ImpersonationLog",
         "PasswordResetToken", "RevokedToken",
-        "Role", "RolePermission", "Tenant", "User",
-        "user_roles",
+        "Role", "RolePermission", "Tenant", "TenantMembership", "User",
+        "membership_roles", "user_roles",
     }
     assert set(models.__all__) == expected
     for name in expected:

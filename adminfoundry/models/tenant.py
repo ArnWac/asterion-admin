@@ -1,6 +1,11 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Boolean, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from adminfoundry.models.base import TimestampedBase
+
+if TYPE_CHECKING:
+    from adminfoundry.models.tenant_membership import TenantMembership
 
 
 class Tenant(TimestampedBase):
@@ -23,6 +28,10 @@ class Tenant(TimestampedBase):
     # IP allowlist: JSON array of CIDR strings, e.g. ["10.0.0.0/8", "203.0.113.5/32"].
     # Null means unrestricted. Enforced in TenantMiddleware.
     allowed_cidrs: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    memberships: Mapped[list[TenantMembership]] = relationship(
+        "TenantMembership", back_populates="tenant", cascade="all, delete-orphan"
+    )
 
     @property
     def schema_name(self) -> str:

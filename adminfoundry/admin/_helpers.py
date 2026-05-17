@@ -22,7 +22,7 @@ def _get_multi_tenant_flag(request: Request) -> bool:
 
 
 async def _enforce_method_caps(
-    model_admin, user, token_payload: dict, method: str, db: AsyncSession
+    model_admin, user, token_payload: dict, method: str, db: AsyncSession, membership=None
 ) -> None:
     """Enforce per-HTTP-method RolePermission DB check for non-superadmin users.
 
@@ -33,7 +33,7 @@ async def _enforce_method_caps(
     if user.is_superadmin:
         return
     from adminfoundry.authz.role_caps import fetch_model_caps
-    caps = await fetch_model_caps(user, model_admin.model_name, db)
+    caps = await fetch_model_caps(user, model_admin.model_name, db, membership=membership)
     if caps is None:
         return  # no DB rows → ModelAdmin config already checked by _check_model_access
     cap_key = {
@@ -61,7 +61,14 @@ def _get_admin_or_404(model_name: str):
     return model_admin
 
 
-def _check_model_access(model_admin, user, token_payload: dict, tenant=None, multi_tenant: bool = False) -> None:
+def _check_model_access(
+    model_admin,
+    user,
+    token_payload: dict,
+    tenant=None,
+    multi_tenant: bool = False,
+    membership=None,
+) -> None:
     """Raise 403 if the user lacks access to this model's admin CRUD interface.
 
     Superadmin without impersonation token in a tenant context → 403 (must use impersonation).
@@ -106,19 +113,22 @@ def _check_model_access(model_admin, user, token_payload: dict, tenant=None, mul
             detail="Only tenant-scoped models are accessible during tenant impersonation",
         )
 
-    # Tenant admin: a user who holds the "tenant_admin" role scoped to the current tenant
-    # gets full CRUD access to all tenant-scoped models in that tenant's panel.
+    # Roles come from membership (not user.roles) to prevent cross-tenant leakage.
     if tenant is not None and model_admin.tenant_scoped:
-        for r in (user.roles or []):
-            if r.name == "tenant_admin" and r.tenant_id == tenant.id:
+        membership_roles = (membership.roles if membership is not None else [])
+        for r in membership_roles:
+            if r.name == "tenant_admin" and str(r.tenant_id) == str(tenant.id):
                 return
 
     if getattr(model_admin, "admin_only", True):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin required")
     access_roles = getattr(model_admin, "access_roles", [])
     if access_roles:
-        user_role_names = {r.name for r in (user.roles or [])}
-        if not user_role_names.intersection(access_roles):
+        effective_roles = (
+            {r.name for r in (membership.roles or [])} if membership is not None
+            else {r.name for r in (user.roles or [])}
+        )
+        if not effective_roles.intersection(access_roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )

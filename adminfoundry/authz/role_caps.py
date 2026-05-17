@@ -5,9 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from adminfoundry.models.role_permission import RolePermission
 
 
-async def fetch_model_caps(user, model_name: str, db: AsyncSession) -> dict | None:
+def _role_ids_from(user, membership) -> list:
+    # In tenant context use membership roles only — prevents cross-tenant role leakage.
+    if membership is not None:
+        return [r.id for r in (getattr(membership, "roles", None) or [])]
+    return [r.id for r in (getattr(user, "roles", None) or [])]
+
+
+async def fetch_model_caps(
+    user, model_name: str, db: AsyncSession, membership=None
+) -> dict | None:
     """Return merged caps dict for user+model, or None if no DB records exist."""
-    role_ids = [r.id for r in (getattr(user, "roles", None) or [])]
+    role_ids = _role_ids_from(user, membership)
     if not role_ids:
         return None
     rows = (
@@ -29,9 +38,9 @@ async def fetch_model_caps(user, model_name: str, db: AsyncSession) -> dict | No
     }
 
 
-async def fetch_all_model_caps(user, db: AsyncSession) -> dict[str, dict]:
+async def fetch_all_model_caps(user, db: AsyncSession, membership=None) -> dict[str, dict]:
     """Return {model_name: caps_dict} for all RolePermissions of the user's roles."""
-    role_ids = [r.id for r in (getattr(user, "roles", None) or [])]
+    role_ids = _role_ids_from(user, membership)
     if not role_ids:
         return {}
     rows = (

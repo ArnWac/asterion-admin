@@ -8,6 +8,7 @@ from adminfoundry.models.base import TimestampedBase, GUID
 
 if TYPE_CHECKING:
     from adminfoundry.models.role import Role
+    from adminfoundry.models.tenant_membership import TenantMembership
 
 
 class User(TimestampedBase):
@@ -18,6 +19,7 @@ class User(TimestampedBase):
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Deprecated: use TenantMembership for tenant authorization. Kept for data migration.
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -30,6 +32,10 @@ class User(TimestampedBase):
     # Incremented on privilege change to invalidate all outstanding access tokens
     token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # Global/root roles only. Tenant-scoped roles live on TenantMembership.roles.
     roles: Mapped[list[Role]] = relationship(
         "Role", secondary=user_roles, back_populates="users", lazy="selectin"
+    )
+    memberships: Mapped[list[TenantMembership]] = relationship(
+        "TenantMembership", back_populates="user", cascade="all, delete-orphan"
     )

@@ -16,7 +16,28 @@ from adminfoundry.auth import (
 )
 from adminfoundry.database import get_db
 from adminfoundry.dependencies import get_current_user
+from adminfoundry.models.tenant_membership import TenantMembership
 from adminfoundry.models.user import User
+
+
+async def _gate_tenant_membership(user: User, request: Request, db: AsyncSession) -> None:
+    """Raise 403 if user has no active TenantMembership for the request's tenant."""
+    tenant = getattr(request.state, "tenant", None)
+    if tenant is None or user.is_superadmin:
+        return
+    exists = (
+        await db.execute(
+            select(TenantMembership)
+            .where(TenantMembership.user_id == user.id)
+            .where(TenantMembership.tenant_id == tenant.id)
+            .where(TenantMembership.is_active == True)  # noqa: E712
+        )
+    ).scalar_one_or_none()
+    if exists is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this tenant",
+        )
 from adminfoundry.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -81,6 +102,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account inactive")
 
+    await _gate_tenant_membership(user, request, db)
     clear_failures(email)
 
     if settings.ENFORCE_2FA_FOR_SUPERADMIN and user.is_superadmin and not user.totp_enabled:
@@ -122,6 +144,7 @@ async def verify_2fa(
     if user is None or not user.is_active or not user.totp_enabled:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA session")
 
+    await _gate_tenant_membership(user, request, db)
     code_ok = _totp_valid(user.totp_secret, body.code) or _check_backup_code(user, body.code)
     if not code_ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from adminfoundry.admin.registry import admin_site as _admin_site
 from adminfoundry.dependencies import get_current_user as _get_current_user
 from adminfoundry.models.user import User as _User
+from adminfoundry.tenancy.dependencies import require_tenant_membership as _require_tenant_membership
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 async def list_registered_models(
     request: Request,
     current_user: _User = Depends(_get_current_user),
+    _membership=Depends(_require_tenant_membership),
 ):
     """Return registry metadata filtered for the current panel context."""
     payload = getattr(request.state, "token_payload", {})

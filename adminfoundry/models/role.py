@@ -3,10 +3,11 @@ import uuid
 from typing import TYPE_CHECKING
 from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from adminfoundry.models.associations import user_roles
+from adminfoundry.models.associations import membership_roles, user_roles
 from adminfoundry.models.base import GUID, TimestampedBase
 
 if TYPE_CHECKING:
+    from adminfoundry.models.tenant_membership import TenantMembership
     from adminfoundry.models.user import User
 
 
@@ -26,6 +27,11 @@ class Role(TimestampedBase):
         GUID, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
+    # Global/root role → User assignments
     users: Mapped[list["User"]] = relationship(
         "User", secondary=user_roles, back_populates="roles"
+    )
+    # Tenant-scoped role → TenantMembership assignments
+    memberships: Mapped[list["TenantMembership"]] = relationship(
+        "TenantMembership", secondary=membership_roles, back_populates="roles"
     )

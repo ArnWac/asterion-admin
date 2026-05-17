@@ -12,6 +12,7 @@ from adminfoundry.admin.ui_renderer import get_support_matrix
 from adminfoundry.database import get_admin_db
 from adminfoundry.dependencies import get_current_user
 from adminfoundry.models.user import User
+from adminfoundry.tenancy.dependencies import require_tenant_membership
 from adminfoundry.tenancy.resolver import resolve_impersonation_tenant as _resolve_impersonation_tenant
 
 _log = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ async def admin_dashboard(
     request: Request,
     db: AsyncSession = Depends(get_admin_db),
     current_user: User = Depends(get_current_user),
+    _membership=Depends(require_tenant_membership),
 ):
     """Return rendered dashboard widgets for the current user."""
     runtime = request.app.state.adminfoundry
