@@ -270,9 +270,11 @@ def test_tenant_admin_user_sees_all_tenant_scoped_in_nav():
 
     user = MagicMock()
     user.is_superadmin = False
-    user.roles = [role]
 
-    nav = build_navigation(user, {}, admin_site, tenant=tenant)
+    membership = MagicMock()
+    membership.roles = [role]
+
+    nav = build_navigation(user, {}, admin_site, tenant=tenant, membership=membership)
 
     model_names = [item.model for item in nav.items]
     assert "roles" in model_names

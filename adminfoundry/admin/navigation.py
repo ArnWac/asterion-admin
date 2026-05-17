@@ -4,7 +4,7 @@ from adminfoundry.admin.registry import Registry
 from adminfoundry.schemas.navigation import NavItem, NavigationResponse
 
 
-def build_navigation(user, token_payload: dict, registry: Registry, tenant=None) -> NavigationResponse:
+def build_navigation(user, token_payload: dict, registry: Registry, tenant=None, membership=None) -> NavigationResponse:
     """Return visible navigation items.
 
     Superadmin root panel (no tenant, not impersonating): all models visible.
@@ -40,11 +40,12 @@ def build_navigation(user, token_payload: dict, registry: Registry, tenant=None)
                     tenant_scoped=True,
                 ))
     elif not user.is_superadmin and tenant is not None:
+        effective_roles = list(membership.roles) if membership is not None else []
         is_tenant_admin = any(
-            r.name == "tenant_admin" and r.tenant_id == tenant.id
-            for r in (user.roles or [])
+            r.name == "tenant_admin" and str(r.tenant_id) == str(tenant.id)
+            for r in effective_roles
         )
-        user_role_names = {r.name for r in (user.roles or [])}
+        user_role_names = {r.name for r in effective_roles}
         for admin in registry.all():
             if not admin.tenant_scoped:
                 continue
