@@ -146,10 +146,9 @@ def _require_superadmin_or_impersonating(user, token_payload: dict, request: Req
         return
     tenant = getattr(request.state, "tenant", None)
     if tenant is not None:
-        # Roles come from membership (not user.roles) to prevent cross-tenant leakage.
-        effective_roles = list(membership.roles) if membership is not None else []
-        for r in effective_roles:
-            if r.name == "tenant_admin" and str(r.tenant_id) == str(tenant.id):
+        tenant_id_str = str(tenant.id)
+        for r in (membership.roles if membership is not None else []):
+            if r.name == "tenant_admin" and str(r.tenant_id) == tenant_id_str:
                 return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin required")
 
