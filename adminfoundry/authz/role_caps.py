@@ -6,16 +6,49 @@ from adminfoundry.models.role_permission import RolePermission
 
 
 def _role_ids_from(user, membership) -> list:
-    # In tenant context use membership roles only — prevents cross-tenant role leakage.
     if membership is not None:
         return [r.id for r in (getattr(membership, "roles", None) or [])]
     return [r.id for r in (getattr(user, "roles", None) or [])]
 
 
+def _caps_from_permission_keys(keys: set[str], model_name: str) -> dict | None:
+    """Derive structured caps dict from flat permission_key strings."""
+    prefix = f"admin.{model_name}."
+    relevant = {k for k in keys if k.startswith(prefix)}
+    if not relevant:
+        return None
+    return {
+        "can_list": f"{prefix}list" in relevant,
+        "can_create": f"{prefix}create" in relevant,
+        "can_read": f"{prefix}list" in relevant,
+        "can_update": f"{prefix}update" in relevant,
+        "can_delete": f"{prefix}delete" in relevant,
+    }
+
+
+def _all_caps_from_permission_keys(keys: set[str]) -> dict[str, dict]:
+    """Derive {model_name: caps_dict} from flat permission_key strings."""
+    models: dict[str, dict] = {}
+    for key in keys:
+        parts = key.split(".")
+        if len(parts) == 3 and parts[0] == "admin":
+            mn, action = parts[1], parts[2]
+            if mn not in models:
+                models[mn] = dict(can_list=False, can_create=False, can_read=False, can_update=False, can_delete=False)
+            if action == "list":
+                models[mn]["can_list"] = True
+                models[mn]["can_read"] = True
+            elif action in ("create", "update", "delete"):
+                models[mn][f"can_{action}"] = True
+    return models
+
+
 async def fetch_model_caps(
-    user, model_name: str, db: AsyncSession, membership=None
+    user, model_name: str, db: AsyncSession, tenant_auth=None, membership=None
 ) -> dict | None:
     """Return merged caps dict for user+model, or None if no DB records exist."""
+    if tenant_auth is not None:
+        return _caps_from_permission_keys(tenant_auth.permission_keys, model_name)
     role_ids = _role_ids_from(user, membership)
     if not role_ids:
         return None
@@ -38,8 +71,10 @@ async def fetch_model_caps(
     }
 
 
-async def fetch_all_model_caps(user, db: AsyncSession, membership=None) -> dict[str, dict]:
+async def fetch_all_model_caps(user, db: AsyncSession, tenant_auth=None, membership=None) -> dict[str, dict]:
     """Return {model_name: caps_dict} for all RolePermissions of the user's roles."""
+    if tenant_auth is not None:
+        return _all_caps_from_permission_keys(tenant_auth.permission_keys)
     role_ids = _role_ids_from(user, membership)
     if not role_ids:
         return {}

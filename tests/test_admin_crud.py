@@ -428,6 +428,7 @@ def test_tenant_admin_access_in_correct_tenant():
     import uuid
     from unittest.mock import MagicMock
     from adminfoundry.admin._helpers import _check_model_access
+    from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
 
     tenant_id = uuid.uuid4()
     tenant = MagicMock()
@@ -435,20 +436,22 @@ def test_tenant_admin_access_in_correct_tenant():
 
     role = MagicMock()
     role.name = "tenant_admin"
-    role.tenant_id = tenant_id
 
     user = MagicMock()
     user.is_superadmin = False
-    user.roles = [role]
 
-    membership = MagicMock()
-    membership.roles = [role]
+    tenant_ctx = TenantContext.from_dict({
+        "id": str(tenant_id), "slug": "test", "name": "Test", "is_active": True,
+    })
+    tenant_auth = TenantAuthContext(
+        tenant=tenant_ctx, membership=MagicMock(), roles=[role], permission_keys=set()
+    )
 
     model_admin = MagicMock()
     model_admin.tenant_scoped = True
 
     # Must not raise
-    _check_model_access(model_admin, user, {}, tenant=tenant, membership=membership)
+    _check_model_access(model_admin, user, {}, tenant=tenant, tenant_auth=tenant_auth)
 
 
 def test_tenant_admin_blocked_from_wrong_tenant():

@@ -15,7 +15,7 @@ from adminfoundry.database import get_db
 from adminfoundry.dependencies import get_current_user
 from adminfoundry.models.user import User
 from adminfoundry.schemas.client_config import ClientConfigResponse
-from adminfoundry.tenancy.dependencies import require_tenant_membership
+from adminfoundry.tenancy.dependencies import require_tenant_auth_context
 from adminfoundry.tenancy.resolver import resolve_impersonation_tenant as _resolve_impersonation_tenant
 
 router = APIRouter()
@@ -40,15 +40,15 @@ async def admin_navigation(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _membership=Depends(require_tenant_membership),
+    _tenant_auth=Depends(require_tenant_auth_context),
 ):
     """Return visible navigation structure for the current user and context."""
     payload = getattr(request.state, "token_payload", {})
     tenant = await _resolve_impersonation_tenant(
         payload, getattr(request.state, "tenant", None), db
     )
-    membership = getattr(request.state, "tenant_membership", None)
-    return build_navigation(current_user, payload, admin_site, tenant=tenant, membership=membership)
+    tenant_auth = getattr(request.state, "tenant_auth", None)
+    return build_navigation(current_user, payload, admin_site, tenant=tenant, tenant_auth=tenant_auth)
 
 
 @router.get("/capabilities")
@@ -56,19 +56,19 @@ async def admin_capabilities(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _membership=Depends(require_tenant_membership),
+    _tenant_auth=Depends(require_tenant_auth_context),
 ):
     """Return UI-safe capability metadata for the current user and context."""
     payload = getattr(request.state, "token_payload", {})
     from adminfoundry.authz.role_caps import fetch_all_model_caps
-    membership = getattr(request.state, "tenant_membership", None)
-    all_db_caps = await fetch_all_model_caps(current_user, db, membership=membership)
+    tenant_auth = getattr(request.state, "tenant_auth", None)
+    all_db_caps = await fetch_all_model_caps(current_user, db, tenant_auth=tenant_auth)
     in_tenant_context = bool(
         payload.get("impersonated_by") or getattr(request.state, "tenant", None)
     )
     return build_capabilities(
         current_user, payload, admin_site, all_db_caps or None,
-        in_tenant_context=in_tenant_context, membership=membership,
+        in_tenant_context=in_tenant_context, tenant_auth=tenant_auth,
     )
 
 

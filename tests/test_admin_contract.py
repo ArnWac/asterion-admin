@@ -259,6 +259,7 @@ def test_tenant_admin_user_sees_all_tenant_scoped_in_nav():
     """User with tenant_admin role sees all tenant_scoped models in tenant panel."""
     import uuid
     from unittest.mock import MagicMock
+    from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
 
     tenant_id = uuid.uuid4()
     tenant = MagicMock()
@@ -266,15 +267,18 @@ def test_tenant_admin_user_sees_all_tenant_scoped_in_nav():
 
     role = MagicMock()
     role.name = "tenant_admin"
-    role.tenant_id = tenant_id
 
     user = MagicMock()
     user.is_superadmin = False
 
-    membership = MagicMock()
-    membership.roles = [role]
+    tenant_ctx = TenantContext.from_dict({
+        "id": str(tenant_id), "slug": "test", "name": "Test", "is_active": True,
+    })
+    tenant_auth = TenantAuthContext(
+        tenant=tenant_ctx, membership=MagicMock(), roles=[role], permission_keys=set()
+    )
 
-    nav = build_navigation(user, {}, admin_site, tenant=tenant, membership=membership)
+    nav = build_navigation(user, {}, admin_site, tenant=tenant, tenant_auth=tenant_auth)
 
     model_names = [item.model for item in nav.items]
     assert "roles" in model_names

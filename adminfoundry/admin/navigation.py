@@ -4,7 +4,7 @@ from adminfoundry.admin.registry import Registry
 from adminfoundry.schemas.navigation import NavItem, NavigationResponse
 
 
-def build_navigation(user, token_payload: dict, registry: Registry, tenant=None, membership=None) -> NavigationResponse:
+def build_navigation(user, token_payload: dict, registry: Registry, tenant=None, tenant_auth=None, membership=None) -> NavigationResponse:
     """Return visible navigation items.
 
     Superadmin root panel (no tenant, not impersonating): all models visible.
@@ -18,9 +18,9 @@ def build_navigation(user, token_payload: dict, registry: Registry, tenant=None,
     if user.is_superadmin and not is_impersonating:
         for admin in registry.all():
             if tenant is not None and not admin.tenant_scoped:
-                continue  # hide global models in tenant context
+                continue
             if tenant is None and admin.tenant_scoped and not admin.global_only_in_root_panel:
-                continue  # hide pure tenant models in root panel; global_only_in_root_panel ones stay
+                continue
             items.append(NavItem(
                 model=admin.model_name,
                 label=admin.display_label,
@@ -29,7 +29,6 @@ def build_navigation(user, token_payload: dict, registry: Registry, tenant=None,
                 tenant_scoped=admin.tenant_scoped,
             ))
     elif user.is_superadmin and is_impersonating and tenant is not None:
-        # Self-impersonation to enter a tenant panel: show tenant-scoped models
         for admin in registry.all():
             if admin.tenant_scoped:
                 items.append(NavItem(
@@ -40,20 +39,20 @@ def build_navigation(user, token_payload: dict, registry: Registry, tenant=None,
                     tenant_scoped=True,
                 ))
     elif not user.is_superadmin and tenant is not None:
-        effective_roles = list(membership.roles) if membership is not None else []
-        is_tenant_admin = any(
-            r.name == "tenant_admin" and str(r.tenant_id) == str(tenant.id)
-            for r in effective_roles
-        )
-        user_role_names = {r.name for r in effective_roles}
+        if tenant_auth is not None:
+            is_tenant_admin = tenant_auth.has_role("tenant_admin")
+            user_role_names = tenant_auth.role_names()
+        else:
+            effective_roles = list(membership.roles) if membership is not None else []
+            is_tenant_admin = any(
+                r.name == "tenant_admin" and str(r.tenant_id) == str(tenant.id)
+                for r in effective_roles
+            )
+            user_role_names = {r.name for r in effective_roles}
         for admin in registry.all():
             if not admin.tenant_scoped:
                 continue
-            if is_tenant_admin:
-                # Tenant admin sees all tenant-scoped models
-                pass
-            else:
-                # Regular user: only models explicitly opened via access_roles
+            if not is_tenant_admin:
                 if getattr(admin, "admin_only", True):
                     continue
                 access_roles = getattr(admin, "access_roles", [])

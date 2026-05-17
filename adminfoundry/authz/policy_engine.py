@@ -3,14 +3,15 @@ from __future__ import annotations
 from adminfoundry.authz.rules import FieldPolicy, RecordPolicy
 
 
-def _effective_role_names(user, membership=None) -> frozenset:
-    # In tenant context use membership roles only — prevents cross-tenant role leakage.
+def _effective_role_names(user, tenant_auth=None, membership=None) -> frozenset:
+    if tenant_auth is not None:
+        return tenant_auth.role_names()
     if membership is not None:
         return frozenset(r.name for r in (getattr(membership, "roles", None) or []))
     return frozenset(r.name for r in (getattr(user, "roles", None) or []))
 
 
-def _roles_allow(required_roles: list[str] | None, user, membership=None) -> bool:
+def _roles_allow(required_roles: list[str] | None, user, tenant_auth=None, membership=None) -> bool:
     """
     None  → unrestricted (any user passes)
     []    → deny (superadmin-only; non-superadmin always fails here)
@@ -20,7 +21,7 @@ def _roles_allow(required_roles: list[str] | None, user, membership=None) -> boo
         return True
     if not required_roles:
         return False
-    return bool(_effective_role_names(user, membership).intersection(required_roles))
+    return bool(_effective_role_names(user, tenant_auth=tenant_auth, membership=membership).intersection(required_roles))
 
 
 class PolicyEngine:
@@ -30,7 +31,7 @@ class PolicyEngine:
         return user.is_superadmin and not bool(token_payload.get("impersonated_by"))
 
     def evaluate_field(
-        self, user, model_admin, field_name: str, token_payload: dict, *, record=None, membership=None
+        self, user, model_admin, field_name: str, token_payload: dict, *, record=None, tenant_auth=None, membership=None
     ) -> FieldPolicy:
         if self._privileged(user, token_payload):
             return FieldPolicy(can_view=True, can_edit=True)
@@ -48,13 +49,12 @@ class PolicyEngine:
         if policy is None:
             return FieldPolicy(can_view=True, can_edit=True)
 
-        can_view = _roles_allow(policy.get("view_roles"), user, membership)
-        # No view right means no edit right either
-        can_edit = can_view and _roles_allow(policy.get("edit_roles"), user, membership)
+        can_view = _roles_allow(policy.get("view_roles"), user, tenant_auth=tenant_auth, membership=membership)
+        can_edit = can_view and _roles_allow(policy.get("edit_roles"), user, tenant_auth=tenant_auth, membership=membership)
         return FieldPolicy(can_view=can_view, can_edit=can_edit)
 
     def can_perform_action(
-        self, user, model_admin, action_name: str, token_payload: dict, membership=None
+        self, user, model_admin, action_name: str, token_payload: dict, tenant_auth=None, membership=None
     ) -> bool:
         if self._privileged(user, token_payload):
             return True
@@ -62,7 +62,7 @@ class PolicyEngine:
         policy = action_policies.get(action_name)
         if policy is None:
             return True
-        return _roles_allow(policy.get("roles"), user, membership)
+        return _roles_allow(policy.get("roles"), user, tenant_auth=tenant_auth, membership=membership)
 
     def get_record_filter(self, user, model_admin, token_payload: dict):
         """Return a SQLAlchemy WHERE clause to scope list queries, or None."""
@@ -91,7 +91,7 @@ class PolicyEngine:
 
     def effective_model_caps(
         self, user, model_admin, token_payload: dict, *, db_caps: dict | None = None,
-        in_tenant_context: bool = False, membership=None,
+        in_tenant_context: bool = False, tenant_auth=None, membership=None,
     ) -> dict:
         """Return CRUD capability flags for a user on a model."""
         if self._privileged(user, token_payload):
@@ -99,16 +99,12 @@ class PolicyEngine:
                 can_list=True, can_create=True, can_read=True,
                 can_update=True, can_delete=True,
             )
-        # In tenant context: impersonating superadmins and tenant_admin role holders
-        # get full caps on tenant-scoped models. _check_model_access enforces this at
-        # the API boundary; here we just reflect what the user can do so the UI is correct.
         if in_tenant_context and getattr(model_admin, "tenant_scoped", False):
-            if user.is_superadmin or "tenant_admin" in _effective_role_names(user, membership):
+            if user.is_superadmin or "tenant_admin" in _effective_role_names(user, tenant_auth=tenant_auth, membership=membership):
                 return dict(
                     can_list=True, can_create=True, can_read=True,
                     can_update=True, can_delete=True,
                 )
-        # DB-backed permissions take precedence over ModelAdmin config
         if db_caps is not None:
             return db_caps
         if getattr(model_admin, "admin_only", True):
@@ -117,17 +113,17 @@ class PolicyEngine:
                 can_update=False, can_delete=False,
             )
         access_roles = getattr(model_admin, "access_roles", [])
-        if not _roles_allow(access_roles if access_roles else None, user, membership):
+        if not _roles_allow(access_roles if access_roles else None, user, tenant_auth=tenant_auth, membership=membership):
             return dict(
                 can_list=False, can_create=False, can_read=False,
                 can_update=False, can_delete=False,
             )
         return dict(
             can_list=True,
-            can_create=self.can_perform_action(user, model_admin, "create", token_payload, membership),
+            can_create=self.can_perform_action(user, model_admin, "create", token_payload, tenant_auth=tenant_auth, membership=membership),
             can_read=True,
-            can_update=self.can_perform_action(user, model_admin, "update", token_payload, membership),
-            can_delete=self.can_perform_action(user, model_admin, "delete", token_payload, membership),
+            can_update=self.can_perform_action(user, model_admin, "update", token_payload, tenant_auth=tenant_auth, membership=membership),
+            can_delete=self.can_perform_action(user, model_admin, "delete", token_payload, tenant_auth=tenant_auth, membership=membership),
         )
 
 

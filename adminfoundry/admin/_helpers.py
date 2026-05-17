@@ -22,7 +22,7 @@ def _get_multi_tenant_flag(request: Request) -> bool:
 
 
 async def _enforce_method_caps(
-    model_admin, user, token_payload: dict, method: str, db: AsyncSession, membership=None
+    model_admin, user, token_payload: dict, method: str, db: AsyncSession, tenant_auth=None, membership=None
 ) -> None:
     """Enforce per-HTTP-method RolePermission DB check for non-superadmin users.
 
@@ -33,7 +33,7 @@ async def _enforce_method_caps(
     if user.is_superadmin:
         return
     from adminfoundry.authz.role_caps import fetch_model_caps
-    caps = await fetch_model_caps(user, model_admin.model_name, db, membership=membership)
+    caps = await fetch_model_caps(user, model_admin.model_name, db, tenant_auth=tenant_auth, membership=membership)
     if caps is None:
         return  # no DB rows → ModelAdmin config already checked by _check_model_access
     cap_key = {
@@ -67,6 +67,7 @@ def _check_model_access(
     token_payload: dict,
     tenant=None,
     multi_tenant: bool = False,
+    tenant_auth=None,
     membership=None,
 ) -> None:
     """Raise 403 if the user lacks access to this model's admin CRUD interface.
@@ -113,28 +114,32 @@ def _check_model_access(
             detail="Only tenant-scoped models are accessible during tenant impersonation",
         )
 
-    # Roles come from membership (not user.roles) to prevent cross-tenant leakage.
     if tenant is not None and model_admin.tenant_scoped:
-        membership_roles = (membership.roles if membership is not None else [])
-        for r in membership_roles:
-            if r.name == "tenant_admin" and str(r.tenant_id) == str(tenant.id):
+        if tenant_auth is not None:
+            if tenant_auth.has_role("tenant_admin"):
                 return
+        elif membership is not None:
+            for r in membership.roles:
+                if r.name == "tenant_admin" and str(r.tenant_id) == str(tenant.id):
+                    return
 
     if getattr(model_admin, "admin_only", True):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin required")
     access_roles = getattr(model_admin, "access_roles", [])
     if access_roles:
-        effective_roles = (
-            {r.name for r in (membership.roles or [])} if membership is not None
-            else {r.name for r in (user.roles or [])}
-        )
+        if tenant_auth is not None:
+            effective_roles = tenant_auth.role_names()
+        elif membership is not None:
+            effective_roles = {r.name for r in (membership.roles or [])}
+        else:
+            effective_roles = {r.name for r in (user.roles or [])}
         if not effective_roles.intersection(access_roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
 
 
-def _require_superadmin_or_impersonating(user, token_payload: dict, request: Request, membership=None) -> None:
+def _require_superadmin_or_impersonating(user, token_payload: dict, request: Request, tenant_auth=None, membership=None) -> None:
     """Allow superadmin (root panel or impersonating) OR tenant admin in their own tenant."""
     runtime = _get_runtime(request)
     if runtime is not None:
@@ -146,10 +151,14 @@ def _require_superadmin_or_impersonating(user, token_payload: dict, request: Req
         return
     tenant = getattr(request.state, "tenant", None)
     if tenant is not None:
-        tenant_id_str = str(tenant.id)
-        for r in (membership.roles if membership is not None else []):
-            if r.name == "tenant_admin" and str(r.tenant_id) == tenant_id_str:
+        if tenant_auth is not None:
+            if tenant_auth.has_role("tenant_admin"):
                 return
+        elif membership is not None:
+            tenant_id_str = str(tenant.id)
+            for r in membership.roles:
+                if r.name == "tenant_admin" and str(r.tenant_id) == tenant_id_str:
+                    return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin required")
 
 

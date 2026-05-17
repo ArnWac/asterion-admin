@@ -258,10 +258,11 @@ async def test_global_user_role_does_not_grant_tenant_access(
 # 5. PolicyEngine uses membership roles in tenant context
 # ---------------------------------------------------------------------------
 
-def test_policy_engine_effective_model_caps_uses_membership_roles():
-    """effective_model_caps returns full caps when membership has tenant_admin role."""
+def test_policy_engine_effective_model_caps_uses_tenant_auth():
+    """effective_model_caps returns full caps when tenant_auth has tenant_admin role."""
     from unittest.mock import MagicMock
     from adminfoundry.authz.policy_engine import policy_engine
+    from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
 
     user = MagicMock()
     user.is_superadmin = False
@@ -270,17 +271,20 @@ def test_policy_engine_effective_model_caps_uses_membership_roles():
     tenant_id = uuid.uuid4()
     role = MagicMock()
     role.name = "tenant_admin"
-    role.tenant_id = tenant_id
 
-    membership = MagicMock()
-    membership.roles = [role]
+    tenant_ctx = TenantContext.from_dict({
+        "id": str(tenant_id), "slug": "test", "name": "Test", "is_active": True,
+    })
+    tenant_auth = TenantAuthContext(
+        tenant=tenant_ctx, membership=MagicMock(), roles=[role], permission_keys=set()
+    )
 
     model_admin = MagicMock()
     model_admin.tenant_scoped = True
     model_admin.admin_only = True
 
     caps = policy_engine.effective_model_caps(
-        user, model_admin, {}, in_tenant_context=True, membership=membership
+        user, model_admin, {}, in_tenant_context=True, tenant_auth=tenant_auth
     )
     assert caps["can_list"] is True
     assert caps["can_update"] is True
@@ -326,3 +330,102 @@ async def test_tenant_scoped_role_rejected_from_user_roles_endpoint(
     )
     assert resp.status_code == 400, resp.text
     assert "TenantMembership" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# 7. require_tenant_auth_context — membership gate
+# ---------------------------------------------------------------------------
+
+def _tenant_state(tenant):
+    """SimpleNamespace with tenant set so getattr(state, 'tenant', None) works."""
+    from types import SimpleNamespace
+    from adminfoundry.tenancy.context import TenantContext
+    return SimpleNamespace(
+        tenant=TenantContext.from_dict({
+            "id": str(tenant.id),
+            "slug": tenant.slug,
+            "name": tenant.name,
+            "is_active": tenant.is_active,
+        }),
+        token_payload={},
+    )
+
+
+@pytest.mark.asyncio
+async def test_require_tenant_auth_context_no_tenant_returns_none(
+    db: AsyncSession,
+    user_a: User,
+):
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+    from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+
+    request = MagicMock()
+    request.state = SimpleNamespace()  # no .tenant
+    result = await require_tenant_auth_context(request=request, current_user=user_a, db=db)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_require_tenant_auth_context_rejects_missing_membership(
+    db: AsyncSession,
+    user_a: User,
+    tenant_a: Tenant,
+):
+    from unittest.mock import MagicMock
+    from fastapi import HTTPException
+    from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+
+    request = MagicMock()
+    request.state = _tenant_state(tenant_a)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await require_tenant_auth_context(request=request, current_user=user_a, db=db)
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_require_tenant_auth_context_rejects_inactive_membership(
+    db: AsyncSession,
+    user_a: User,
+    tenant_a: Tenant,
+):
+    from unittest.mock import MagicMock
+    from fastapi import HTTPException
+    from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+
+    inactive = TenantMembership(user_id=user_a.id, tenant_id=tenant_a.id, is_active=False)
+    db.add(inactive)
+    await db.commit()
+
+    request = MagicMock()
+    request.state = _tenant_state(tenant_a)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await require_tenant_auth_context(request=request, current_user=user_a, db=db)
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_require_tenant_auth_context_returns_ctx_with_valid_membership(
+    db: AsyncSession,
+    user_a: User,
+    tenant_a: Tenant,
+):
+    from unittest.mock import MagicMock
+    from adminfoundry.tenancy.context import TenantAuthContext
+    from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+
+    m = TenantMembership(user_id=user_a.id, tenant_id=tenant_a.id, is_active=True)
+    db.add(m)
+    await db.commit()
+
+    request = MagicMock()
+    request.state = _tenant_state(tenant_a)
+
+    ctx = await require_tenant_auth_context(request=request, current_user=user_a, db=db)
+    assert isinstance(ctx, TenantAuthContext)
+    assert ctx.membership.user_id == user_a.id
+    # On SQLite roles are empty (no tenant schema); PostgreSQL tests in Phase 7
+    assert isinstance(ctx.roles, list)
+    assert isinstance(ctx.permission_keys, set)
