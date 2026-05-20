@@ -136,6 +136,7 @@ ignore = [
 # subclasses get fresh copies via __init_subclass__.
 "adminfoundry/registry/**" = ["RUF012"]
 "adminfoundry/builtins/**" = ["RUF012"]
+"examples/**" = ["RUF012"]
 
 [tool.ruff.format]
 quote-style = "double"
