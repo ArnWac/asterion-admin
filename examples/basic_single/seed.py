@@ -1,4 +1,5 @@
 """Seed the single-tenant demo: one superadmin. Idempotent."""
+
 from __future__ import annotations
 
 import asyncio
@@ -6,14 +7,12 @@ import os
 
 from sqlalchemy import select
 
+# Ensure the app-local Post table is registered in GlobalModel.metadata.
+import examples.basic_single.models  # noqa: F401
 from adminfoundry.auth.password import hash_password
 from adminfoundry.db.session import DatabaseManager
 from adminfoundry.models import User
 from adminfoundry.models.base import GlobalModel
-
-# Ensure the app-local Post table is registered in GlobalModel.metadata.
-import examples.basic_single.models  # noqa: F401
-
 
 ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASSWORD = "admin123"  # demo only
@@ -24,17 +23,19 @@ async def seed(db: DatabaseManager) -> None:
         await conn.run_sync(GlobalModel.metadata.create_all)
 
     async with db.session() as session:
-        existing = (await session.execute(
-            select(User).where(User.email == ADMIN_EMAIL)
-        )).scalars().first()
+        existing = (
+            (await session.execute(select(User).where(User.email == ADMIN_EMAIL))).scalars().first()
+        )
         if existing is None:
-            session.add(User(
-                email=ADMIN_EMAIL,
-                hashed_password=hash_password(ADMIN_PASSWORD),
-                full_name="Admin",
-                is_active=True,
-                is_superadmin=True,
-            ))
+            session.add(
+                User(
+                    email=ADMIN_EMAIL,
+                    hashed_password=hash_password(ADMIN_PASSWORD),
+                    full_name="Admin",
+                    is_active=True,
+                    is_superadmin=True,
+                )
+            )
             await session.commit()
 
 

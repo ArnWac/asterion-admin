@@ -6,6 +6,7 @@ Run:
 
 Admin UI: http://127.0.0.1:8000/admin
 """
+
 from __future__ import annotations
 
 import os
@@ -16,7 +17,6 @@ from fastapi import FastAPI
 from adminfoundry import CoreAdminConfig, create_admin
 from examples.basic_single.admin_config import register
 from examples.basic_single.seed import print_banner, seed
-
 
 config = CoreAdminConfig(
     database_url=os.environ.get(

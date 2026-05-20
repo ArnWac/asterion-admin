@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from adminfoundry import AdminRegistry, ModelAdmin
 from adminfoundry.actions import BulkDeleteAction
-
 from examples.basic_single.models import Post
 
 
