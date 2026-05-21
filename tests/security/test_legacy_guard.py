@@ -20,7 +20,11 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "adminfoundry"
 
 FORBIDDEN_PATTERNS: dict[str, re.Pattern[str]] = {
     "admin_site": re.compile(r"\badmin_site\b"),
-    "AuthProvider": re.compile(r"\bAuthProvider\b"),
+    # NOTE: ``AuthProvider`` is intentionally NOT in this list anymore. The
+    # name now refers to the neutral ``adminfoundry.providers.base.AuthProvider``
+    # Protocol introduced by the v1-providers refactor, which is the
+    # opposite of the legacy concrete-class concept this guard used to
+    # forbid. Re-add only if a future iteration moves away from the name.
     "PolicyEngine": re.compile(r"\bPolicyEngine\b"),
     "policy_engine module": re.compile(r"\bpolicy_engine\b"),
     "ExtensionRegistry": re.compile(r"\bExtensionRegistry\b"),
@@ -82,6 +86,7 @@ def test_package_tree_only_contains_v1_subpackages():
         "extensions",
         "i18n",
         "models",
+        "providers",
         "registry",
         "root",
         "schemas",

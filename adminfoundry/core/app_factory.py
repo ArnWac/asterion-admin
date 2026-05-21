@@ -9,9 +9,21 @@ from adminfoundry.core.config import CoreAdminConfig
 from adminfoundry.core.errors import register_error_handlers
 from adminfoundry.core.installers import install_middleware, install_routes
 from adminfoundry.core.logging import configure_logging
-from adminfoundry.core.runtime import AdminRuntime
+from adminfoundry.core.runtime import AdminRuntime, ProviderSet
 from adminfoundry.db.session import DatabaseManager
 from adminfoundry.extensions import Extension
+from adminfoundry.providers import (
+    BuiltinJWTAuthProvider,
+    BuiltinPermissionProvider,
+    BuiltinSQLAlchemyUserProvider,
+    BuiltinTenantProvider,
+)
+from adminfoundry.providers.base import (
+    AuthProvider,
+    PermissionProvider,
+    TenantProvider,
+    UserProvider,
+)
 from adminfoundry.registry import AdminRegistry
 
 
@@ -20,6 +32,10 @@ def create_admin(
     *,
     register: Callable[[AdminRegistry], None] | None = None,
     extensions: Iterable[Extension] = (),
+    auth_provider: AuthProvider | None = None,
+    user_provider: UserProvider | None = None,
+    permission_provider: PermissionProvider | None = None,
+    tenant_provider: TenantProvider | None = None,
     **fastapi_kwargs,
 ) -> FastAPI:
     config = config or CoreAdminConfig.from_env()
@@ -33,6 +49,16 @@ def create_admin(
         **fastapi_kwargs,
     )
 
+    # Each provider defaults to the framework's built-in implementation,
+    # which preserves v1 behaviour exactly. Apps with external identity
+    # pass their own implementations here.
+    providers = ProviderSet(
+        auth=auth_provider or BuiltinJWTAuthProvider(),
+        users=user_provider or BuiltinSQLAlchemyUserProvider(),
+        permissions=permission_provider or BuiltinPermissionProvider(),
+        tenants=tenant_provider or BuiltinTenantProvider(),
+    )
+
     runtime = AdminRuntime(
         config=config,
         db=DatabaseManager(
@@ -42,6 +68,7 @@ def create_admin(
             max_overflow=config.db_max_overflow,
             pool_pre_ping=config.db_pool_pre_ping,
         ),
+        providers=providers,
     )
 
     app.state.adminfoundry = runtime
