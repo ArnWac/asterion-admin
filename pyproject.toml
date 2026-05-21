@@ -49,20 +49,27 @@ postgres = ["asyncpg>=0.29.0"]
 # Dev / test driver. Also good enough for local single-tenant demos.
 sqlite = ["aiosqlite>=0.20.0"]
 
+# Excel import/export via the import_export extension. CSV stays in core
+# (uses stdlib csv); XLSX is opt-in because openpyxl is a non-trivial dep
+# that only some apps need.
+xlsx = ["openpyxl>=3.1.0"]
+
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "httpx>=0.27.0",        # fastapi.testclient transitively needs it
     "aiosqlite>=0.20.0",
     "asyncpg>=0.29.0",
+    "openpyxl>=3.1.0",      # tests for the xlsx import_export branch
+    "python-multipart>=0.0.9",  # FastAPI file uploads (import endpoint)
     "ruff>=0.6.0",
     "build>=1.2.0",
 ]
 
-# Parked extras (Redis-backed rate limiter, S3 storage, xlsx import/export,
-# webhooks, yaml config) are intentionally NOT declared here. The roadmap
-# parks all of them as future extensions. Declaring them now would install
-# packages with no corresponding code paths.
+# Parked extras (Redis-backed rate limiter, S3 storage, webhooks, yaml
+# config) are intentionally NOT declared here. The roadmap parks them as
+# future extensions; declaring them now would install packages with no
+# corresponding code paths.
 
 [project.scripts]
 adminfoundry = "adminfoundry.cli:app"
