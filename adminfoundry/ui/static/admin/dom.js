@@ -39,6 +39,20 @@ export function mount(root, ...nodes) {
   root.removeAttribute("data-loading");
 }
 
+export function setBreadcrumb(parts) {
+  const bar = document.getElementById("breadcrumb");
+  if (!bar) return;
+  clear(bar);
+  parts.forEach((part, idx) => {
+    if (idx > 0) bar.appendChild(el("span", { class: "bc-sep" }, "›"));
+    if (part && part.href) {
+      bar.appendChild(el("a", { href: part.href }, part.label));
+    } else {
+      bar.appendChild(el("span", {}, part && part.label != null ? part.label : String(part)));
+    }
+  });
+}
+
 export function showToast(message, { type = "ok", timeout = 3500 } = {}) {
   const toast = document.getElementById("toast");
   if (!toast) return;

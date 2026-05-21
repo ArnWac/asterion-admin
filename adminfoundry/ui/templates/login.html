@@ -7,21 +7,27 @@
   <link rel="stylesheet" href="{{ admin_ui_path }}/static/admin.css">
 </head>
 <body data-view="login">
-  <main class="login">
-    <h1>{{ admin_title }}</h1>
-    <form id="login-form" novalidate autocomplete="on">
-      <p id="login-error" class="form-error" role="alert" aria-live="polite" hidden></p>
-      <label>
-        Email
-        <input type="email" name="email" required autofocus autocomplete="email">
-      </label>
-      <label>
-        Password
-        <input type="password" name="password" required autocomplete="current-password">
-      </label>
-      <button type="submit" class="btn btn-primary">Sign in</button>
-    </form>
-  </main>
+  <a href="#login-form" class="skip-link">Skip to login form</a>
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="app-logo">
+        <span class="app-name">{{ admin_title }}</span>
+        <span class="app-admin-label">Admin</span>
+      </div>
+      <form id="login-form" novalidate autocomplete="on" aria-label="Sign in">
+        <p id="login-error" class="form-error" role="alert" aria-live="polite" hidden></p>
+        <label>
+          Email
+          <input type="email" name="email" required autofocus autocomplete="email">
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" required autocomplete="current-password">
+        </label>
+        <button type="submit" class="btn btn-primary">Sign in</button>
+      </form>
+    </div>
+  </div>
 
   <script>
     window.ADMINFOUNDRY = {

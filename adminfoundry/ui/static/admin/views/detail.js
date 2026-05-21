@@ -2,19 +2,25 @@
 
 import { APIError, admin } from "../api.js";
 import { getResourceContract } from "../contract.js";
-import { el, mount, showToast } from "../dom.js";
+import { el, mount, setBreadcrumb } from "../dom.js";
 import { formatValue } from "../format.js";
 
 const cfg = window.ADMINFOUNDRY || {};
 
 export async function mountDetail(root, resource, recordId) {
   const contract = await getResourceContract(resource);
+  setBreadcrumb([
+    { label: "Home", href: `${cfg.uiPath}/dashboard` },
+    { label: contract.label_plural, href: `${cfg.uiPath}/${resource}` },
+    { label: prettify(recordId) },
+  ]);
+
   let record;
   try {
     record = await admin.read(resource, recordId);
   } catch (err) {
     const message = err instanceof APIError ? err.message : String(err);
-    mount(root, errorScreen(resource, message));
+    mount(root, errorScreen(message));
     return;
   }
 
@@ -29,12 +35,6 @@ export async function mountDetail(root, resource, recordId) {
 
   mount(
     root,
-    el("nav", { class: "crumbs" }, [
-      el("a", { href: `${cfg.uiPath}/dashboard` }, "Dashboard"),
-      " / ",
-      el("a", { href: `${cfg.uiPath}/${resource}` }, contract.label_plural),
-      ` / ${prettify(recordId)}`,
-    ]),
     el("div", { class: "page-header" }, [
       el("h1", {}, `${contract.label} detail`),
       el("div", { class: "page-actions" }, [
@@ -60,13 +60,8 @@ export async function mountDetail(root, resource, recordId) {
   );
 }
 
-function errorScreen(resource, message) {
-  return el("div", {}, [
-    el("nav", { class: "crumbs" }, [
-      el("a", { href: `${cfg.uiPath}/${resource}` }, "← back to list"),
-    ]),
-    el("div", { class: "card" }, el("p", { class: "form-error" }, message)),
-  ]);
+function errorScreen(message) {
+  return el("div", { class: "card" }, el("p", { class: "form-error" }, message));
 }
 
 function prettify(name) {

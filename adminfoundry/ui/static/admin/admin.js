@@ -6,8 +6,8 @@
 // server already put into window.ADMINFOUNDRY.
 //
 // We also wire up the shell-wide concerns: the sign-out button, the
-// topbar resource navigation, and an unauthenticated -> /login redirect
-// for app pages.
+// sidebar resource navigation, the bottom user line, and an
+// unauthenticated -> /login redirect for app pages.
 
 import { APIError, auth, tokenStore } from "./api.js";
 import { getFullContract } from "./contract.js";
@@ -44,9 +44,10 @@ async function main() {
   }
 
   wireSignout();
-  populateTopbarNav().catch(() => {
-    /* nav is non-essential; failure shouldn't break the view */
-  });
+  // Sidebar nav + user line are non-essential; failure shouldn't break the view.
+  populateSidebarNav().catch(() => {});
+  populateUserLine().catch(() => {});
+  highlightSettingsLink();
 
   const root = document.getElementById("app-root");
   if (!root) return;
@@ -87,25 +88,47 @@ function wireSignout() {
   });
 }
 
-async function populateTopbarNav() {
-  const nav = document.getElementById("topbar-nav");
+async function populateSidebarNav() {
+  const nav = document.getElementById("sidebar-nav");
   if (!nav) return;
   const contract = await getFullContract();
   const models = (contract.models || []).slice().sort((a, b) =>
     a.label_plural.localeCompare(b.label_plural)
   );
 
-  const links = models.map((m) => {
-    const a = el("a", { href: `${cfg.uiPath}/${m.resource}` }, m.label_plural);
-    if (cfg.resource === m.resource) a.setAttribute("aria-current", "page");
-    return a;
+  const items = models.map((m) => {
+    const link = el("a", { href: `${cfg.uiPath}/${m.resource}` }, m.label_plural);
+    if (cfg.resource === m.resource) {
+      link.setAttribute("aria-current", "page");
+      link.classList.add("active");
+    }
+    return el("li", {}, link);
   });
 
-  const settingsLink = el("a", { href: `${cfg.uiPath}/settings` }, "Settings");
-  if (cfg.view === "settings") settingsLink.setAttribute("aria-current", "page");
-  links.push(settingsLink);
+  if (items.length === 0) {
+    nav.replaceChildren(el("li", {}, el("span", { class: "placeholder" }, "No models")));
+    return;
+  }
+  nav.replaceChildren(...items);
+}
 
-  nav.replaceChildren(...links);
+async function populateUserLine() {
+  const slot = document.getElementById("user-ctx");
+  if (!slot) return;
+  try {
+    const me = await auth.me();
+    if (me) slot.textContent = me.email || me.full_name || "Signed in";
+  } catch {
+    // Best-effort only; leave the slot empty so layout doesn't shift.
+  }
+}
+
+function highlightSettingsLink() {
+  if (cfg.view !== "settings") return;
+  const link = document.getElementById("settings-link");
+  if (!link) return;
+  link.setAttribute("aria-current", "page");
+  link.classList.add("active");
 }
 
 main().catch((err) => {

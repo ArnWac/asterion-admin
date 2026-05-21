@@ -5,7 +5,7 @@
 
 import { APIError, admin } from "../api.js";
 import { getResourceContract } from "../contract.js";
-import { clear, el, mount, showToast } from "../dom.js";
+import { el, mount, setBreadcrumb, showToast } from "../dom.js";
 
 const cfg = window.ADMINFOUNDRY || {};
 
@@ -13,13 +13,22 @@ export async function mountForm(root, resource, mode, recordId) {
   const isEdit = mode === "edit";
   const contract = await getResourceContract(resource);
 
+  setBreadcrumb([
+    { label: "Home", href: `${cfg.uiPath}/dashboard` },
+    { label: contract.label_plural, href: `${cfg.uiPath}/${resource}` },
+    isEdit
+      ? { label: prettify(recordId), href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}` }
+      : { label: "New" },
+    isEdit ? { label: "Edit" } : null,
+  ].filter(Boolean));
+
   let existing = null;
   if (isEdit) {
     try {
       existing = await admin.read(resource, recordId);
     } catch (err) {
       const message = err instanceof APIError ? err.message : String(err);
-      mount(root, errorScreen(resource, message));
+      mount(root, errorScreen(message));
       return;
     }
   }
@@ -104,12 +113,6 @@ export async function mountForm(root, resource, mode, recordId) {
 
   mount(
     root,
-    el("nav", { class: "crumbs" }, [
-      el("a", { href: `${cfg.uiPath}/dashboard` }, "Dashboard"),
-      " / ",
-      el("a", { href: `${cfg.uiPath}/${resource}` }, contract.label_plural),
-      ` / ${isEdit ? "Edit" : "New"}`,
-    ]),
     el("div", { class: "page-header" }, [
       el("h1", {}, `${isEdit ? "Edit" : "New"} ${contract.label.toLowerCase()}`),
     ]),
@@ -223,13 +226,8 @@ function toDatetimeLocal(iso) {
   );
 }
 
-function errorScreen(resource, message) {
-  return el("div", {}, [
-    el("nav", { class: "crumbs" }, [
-      el("a", { href: `${cfg.uiPath}/${resource}` }, "← back to list"),
-    ]),
-    el("div", { class: "card" }, el("p", { class: "form-error" }, message)),
-  ]);
+function errorScreen(message) {
+  return el("div", { class: "card" }, el("p", { class: "form-error" }, message));
 }
 
 function prettify(name) {

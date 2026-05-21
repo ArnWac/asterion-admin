@@ -3,7 +3,7 @@
 
 import { APIError, admin } from "../api.js";
 import { getResourceContract } from "../contract.js";
-import { clear, el, mount, showToast } from "../dom.js";
+import { clear, el, mount, setBreadcrumb, showToast } from "../dom.js";
 import { formatValue } from "../format.js";
 
 const cfg = window.ADMINFOUNDRY || {};
@@ -11,6 +11,10 @@ const PAGE_SIZE = 25;
 
 export async function mountList(root, resource) {
   const contract = await getResourceContract(resource);
+  setBreadcrumb([
+    { label: "Home", href: `${cfg.uiPath}/dashboard` },
+    { label: contract.label_plural },
+  ]);
   const pkField = contract.fields.find((f) => f.primary_key) || { name: "id" };
   const columns = (contract.list_display && contract.list_display.length
     ? contract.list_display

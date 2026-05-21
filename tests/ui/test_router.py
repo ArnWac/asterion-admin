@@ -55,12 +55,29 @@ def test_login_page_renders(client):
     assert 'id="login-form"' in body
     assert "/api/v1/auth/login" not in body  # login URL is built in JS from cfg
     assert 'data-view="login"' in body
+    # Login page uses the boxed standalone shell (no sidebar).
+    assert 'class="login-wrap"' in body
+    assert 'class="login-box"' in body
+    assert 'class="sidebar"' not in body
 
 
 def test_dashboard_renders_shell(client):
     resp = client.get("/admin/dashboard")
     assert resp.status_code == 200
-    assert 'data-view="dashboard"' in resp.text
+    body = resp.text
+    assert 'data-view="dashboard"' in body
+    # The sidebar shell is the central UX of this refactor — assert its
+    # structural anchors are present on every app page.
+    assert 'class="skip-link"' in body
+    assert 'class="layout"' in body
+    assert 'class="sidebar"' in body
+    assert 'id="sidebar-nav"' in body
+    assert 'id="user-ctx"' in body
+    assert 'id="signout"' in body
+    assert 'id="breadcrumb"' in body
+    assert 'id="main-content"' in body
+    # The old topbar must not return.
+    assert 'class="topbar"' not in body
 
 
 def test_settings_renders_shell(client):

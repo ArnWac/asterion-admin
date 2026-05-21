@@ -11,15 +11,34 @@
   {% if resource %}data-resource="{{ resource }}"{% endif %}
   {% if record_id %}data-record-id="{{ record_id }}"{% endif %}
 >
-  <header class="topbar">
-    <a class="brand" href="{{ admin_ui_path }}/dashboard">{{ admin_title }}</a>
-    <nav class="topbar-nav" id="topbar-nav" aria-label="Resources"></nav>
-    <button id="signout" type="button" class="btn btn-link">Sign out</button>
-  </header>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
 
-  <main id="app-root" data-loading="true">
-    <p class="placeholder">Loading…</p>
-  </main>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Admin navigation">
+      <a href="{{ admin_ui_path }}/dashboard" class="app-logo app-logo--sidebar">
+        <span class="app-name">{{ admin_title }}</span>
+        <span class="app-admin-label">Admin</span>
+      </a>
+
+      <ul id="sidebar-nav" class="sidebar-nav" aria-label="Models">
+        <li><span class="placeholder">Loading…</span></li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <span id="user-ctx" class="user-line" aria-label="Signed in user"></span>
+        <a id="settings-link" href="{{ admin_ui_path }}/settings">Settings</a>
+        <button id="signout" type="button" class="btn-signout">Sign out</button>
+      </div>
+    </aside>
+
+    <main id="main-content" class="main" tabindex="-1">
+      <nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb"></nav>
+
+      <div id="app-root" data-loading="true">
+        <p class="placeholder">Loading…</p>
+      </div>
+    </main>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
