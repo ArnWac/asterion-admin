@@ -54,6 +54,50 @@ Open <http://127.0.0.1:8000/admin> and sign in with the credentials
 printed to the console. The first boot seeds two tenants + sample
 projects + tickets; subsequent boots are no-ops.
 
+## Smoke checklist
+
+After a fresh boot, the following should all hold. Each line is a single
+manual check — if any fails, the seed or tenant bootstrap is broken.
+
+```bash
+BASE=http://127.0.0.1:8000
+
+# 1. /admin renders the sidebar shell (HTML).
+curl -sf $BASE/admin/dashboard | grep -q 'id="sidebar-nav"' && echo "ok: shell"
+
+# 2. Superadmin can log in.
+SU=$(curl -sf -X POST $BASE/api/v1/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"superadmin@example.com","password":"superadmin123"}' \
+    | jq -r .access_token)
+test -n "$SU" && echo "ok: superadmin login"
+
+# 3. Public-schema /root/tenants lists both demo tenants.
+curl -sf -H "Authorization: Bearer $SU" $BASE/api/v1/root/tenants \
+    | jq -e '.items | length == 2' >/dev/null && echo "ok: 2 tenants"
+
+# 4. Owner can log in and see projects in their tenant only.
+OWNER=$(curl -sf -X POST $BASE/api/v1/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"owner@acme.test","password":"owner123"}' \
+    | jq -r .access_token)
+curl -sf -H "Authorization: Bearer $OWNER" -H "X-Tenant-Slug: acme" \
+    $BASE/api/v1/admin/projects | jq -e '.items | length == 2' >/dev/null \
+    && echo "ok: acme owner sees acme projects (WEB+API)"
+
+# 5. Owner has zero access in public schema (no tenant header).
+curl -s -o /dev/null -w "%{http_code}\n" \
+    -H "Authorization: Bearer $OWNER" $BASE/api/v1/admin/projects \
+    | grep -q 403 && echo "ok: owner blocked in public schema"
+
+# 6. AuditLog is queryable by superadmin in public schema.
+curl -sf -H "Authorization: Bearer $SU" $BASE/api/v1/admin/audit_logs \
+    | jq -e '.total >= 0' >/dev/null && echo "ok: audit log readable"
+```
+
+Expected output: six `ok:` lines. If any are missing, copy the failing
+line and re-run with `-v` to see the response body.
+
 ## Trying it from the API
 
 Every admin/auth endpoint can be scoped to a tenant via the
