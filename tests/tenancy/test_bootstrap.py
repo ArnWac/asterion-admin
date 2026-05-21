@@ -57,8 +57,8 @@ async def _seed_catalog(session) -> None:
             PermissionCatalog(key="admin.users.list"),
             PermissionCatalog(key="admin.users.read"),
             PermissionCatalog(key="admin.users.delete"),
-            PermissionCatalog(key="admin.audit.list"),
-            PermissionCatalog(key="admin.audit.delete"),
+            PermissionCatalog(key="admin.audit_logs.list"),
+            PermissionCatalog(key="admin.audit_logs.delete"),
             PermissionCatalog(key="admin.projects.list"),
             PermissionCatalog(key="admin.projects.create"),
         ]
@@ -175,8 +175,10 @@ async def test_seed_admin_excludes_deny_list(session):
         ).mappings()
     }
     assert "admin.users.list" in admin_perms
-    assert "admin.audit.list" in admin_perms
-    assert "admin.audit.delete" not in admin_perms
+    assert "admin.audit_logs.list" in admin_perms
+    # Deny-list invariants: admin role must never receive these two delete keys.
+    # If renamed, update _ADMIN_PERMISSIONS_DENY in tenancy/bootstrap.py.
+    assert "admin.audit_logs.delete" not in admin_perms
     assert "admin.users.delete" not in admin_perms
 
 

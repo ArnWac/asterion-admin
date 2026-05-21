@@ -29,11 +29,9 @@ with the corresponding ``admin.<resource>.{list,read,create,update,
 delete}`` keys (via the registry → catalog sync in
 ``tenancy.bootstrap``). For this example that is harmless: the
 resources are all public-schema so only superadmins can reach them at
-the HTTP layer. Note that the existing framework deny-list
-(``_ADMIN_PERMISSIONS_DENY`` in ``tenancy.bootstrap``) uses
-``admin.audit.delete``, which does NOT match this admin's resource name
-``audit_logs``; the discrepancy is pre-existing and left to a future
-framework change.
+the HTTP layer. The deny-list in ``tenancy.bootstrap`` correctly
+excludes ``admin.audit_logs.delete`` and ``admin.users.delete`` from
+the default ``admin`` tenant role.
 """
 
 from __future__ import annotations

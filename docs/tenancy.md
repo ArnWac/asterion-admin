@@ -90,7 +90,7 @@ The bootstrap step:
 3. Run `alembic_tenant.ini` against the schema.
 4. Inside `tenant_acme`, create three default roles:
    - `owner`  → always granted `admin.*` (plus everything in the catalog).
-   - `admin`  → all catalog keys minus `admin.audit.delete` and `admin.users.delete`.
+   - `admin`  → all catalog keys minus `admin.audit_logs.delete` and `admin.users.delete`.
    - `viewer` → catalog keys ending in `.list`.
 5. Assign the owner role to the optional owner membership.
 6. Write an audit row.

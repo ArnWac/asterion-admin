@@ -45,7 +45,9 @@ _DEFAULT_ROLE_DEFS: tuple[dict, ...] = (
 )
 
 _OWNER_FALLBACK_PERMISSIONS: frozenset[str] = frozenset({"admin.*"})
-_ADMIN_PERMISSIONS_DENY: frozenset[str] = frozenset({"admin.audit.delete", "admin.users.delete"})
+_ADMIN_PERMISSIONS_DENY: frozenset[str] = frozenset(
+    {"admin.audit_logs.delete", "admin.users.delete"}
+)
 
 
 # ---------------------------------------------------------------------------
