@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from fastapi import Request
+from fastapi import HTTPException, Request, status
 
 from adminfoundry.providers.base import AdminTenant, AdminUser
 
@@ -101,10 +101,34 @@ async def build_admin_context(request: Request) -> AdminContext:
             user, tenant, request=request
         )
 
-    return AdminContext(
+    ctx = AdminContext(
         request=request,
         user=user,
         tenant=tenant,
         permissions=permissions,
         source=_detect_source(request),
     )
+
+    # AccessLogMiddleware (core/middleware.py) reads ``request.state.current_user``
+    # for the per-request ``actor_user_id`` log field. Keep that working without
+    # forcing routes to depend on the legacy ``get_current_user`` dependency.
+    if user is not None:
+        request.state.current_user = user
+    return ctx
+
+
+async def require_admin_context(request: Request) -> AdminContext:
+    """Authenticated variant of :func:`build_admin_context`.
+
+    Returns the context if a user is present; raises 401 otherwise. Use
+    this on routes that require an authenticated principal — every CRUD,
+    contract, action, and import/export route in v1 does.
+    """
+    ctx = await build_admin_context(request)
+    if ctx.user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return ctx
