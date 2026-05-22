@@ -3,18 +3,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-GLOBALLY_PROTECTED: frozenset[str] = frozenset(
-    {
-        "hashed_password",
-        "password",
-        "password_hash",
-        "pin_hash",
-        "shared_secret",
-        "tenant_salt",
-        "setup_code",
-        "qr_bootstrap_token",
-    }
+from adminfoundry.security.protected_fields import (
+    DEFAULT_PROTECTED_FIELDS,
+    get_registry,
 )
+
+#: Backward-compatible alias for the default seed. New code should call
+#: :func:`adminfoundry.security.protected_fields.get_registry` directly
+#: (the registry may have extension-contributed fields beyond this set).
+GLOBALLY_PROTECTED: frozenset[str] = DEFAULT_PROTECTED_FIELDS
 
 AUTO_FIELDS: frozenset[str] = frozenset({"id", "created_at", "updated_at"})
 
@@ -66,7 +63,13 @@ class ModelAdmin:
 
     @property
     def all_protected(self) -> frozenset[str]:
-        return GLOBALLY_PROTECTED | frozenset(self.protected_fields)
+        """Combined set of protected field names for this admin.
+
+        Reads from the live :class:`ProtectedFieldRegistry` (so any
+        extension-contributed fields are included) merged with this
+        admin's own ``protected_fields``.
+        """
+        return get_registry().as_frozenset() | frozenset(self.protected_fields)
 
     @property
     def model_name(self) -> str:

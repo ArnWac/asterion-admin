@@ -11,6 +11,12 @@ from adminfoundry.providers.base import (
     UserProvider,
 )
 from adminfoundry.registry import AdminRegistry
+from adminfoundry.security.protected_fields import (
+    ProtectedFieldRegistry,
+)
+from adminfoundry.security.protected_fields import (
+    get_registry as get_protected_field_registry,
+)
 
 
 @dataclass(slots=True)
@@ -52,6 +58,12 @@ class AdminRuntime:
     db: DatabaseManager
     registry: AdminRegistry = field(default_factory=AdminRegistry)
     providers: ProviderSet = field(default_factory=_default_providers)
+    #: Module-level singleton — every runtime references the same registry.
+    #: Phase 5 extensions register via ``runtime.protected_fields.register(...)``;
+    #: ``create_admin`` freezes the registry after extension setup.
+    protected_fields: ProtectedFieldRegistry = field(
+        default_factory=get_protected_field_registry
+    )
 
 
 def get_runtime(app) -> AdminRuntime:
