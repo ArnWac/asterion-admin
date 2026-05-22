@@ -36,6 +36,11 @@ async def get_full_contract(
     return {
         "contract_version": CONTRACT_VERSION,
         "models": [build_model_contract(admin).model_dump() for admin in runtime.registry.all()],
+        # Extension contributions land under a namespaced top-level key.
+        # Each extension owns its namespace (typically the extension name);
+        # the UI / API clients iterate over this dict to discover features
+        # the framework itself doesn't know about (OAuth providers, etc.).
+        "extensions": runtime.contract_contributions.all(),
     }
 
 

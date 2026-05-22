@@ -750,8 +750,8 @@ async def _tenant_set_active(slug: str, *, active: bool) -> None:
 APP_SPEC_ENV = "ADMINFOUNDRY_APP"
 
 
-def _load_registry_from_app_spec(app_spec: str):
-    """Import ``module:attribute`` and return the registry behind the FastAPI app.
+def _load_runtime_from_app_spec(app_spec: str):
+    """Import ``module:attribute`` and return the ``AdminRuntime`` behind it.
 
     ``attribute`` may be either the FastAPI ``app`` instance or a zero-arg
     factory callable that returns one. A FastAPI instance is itself callable
@@ -795,7 +795,12 @@ def _load_registry_from_app_spec(app_spec: str):
             err=True,
         )
         raise typer.Exit(code=2)
-    return runtime.registry
+    return runtime
+
+
+def _load_registry_from_app_spec(app_spec: str):
+    """Convenience wrapper — returns just the AdminRegistry."""
+    return _load_runtime_from_app_spec(app_spec).registry
 
 
 @permissions_app.command("sync")
@@ -823,14 +828,16 @@ def permissions_sync(
             err=True,
         )
         raise typer.Exit(code=2)
-    registry = _load_registry_from_app_spec(app_spec)
-    asyncio.run(_permissions_sync(registry, prune=prune))
+    runtime = _load_runtime_from_app_spec(app_spec)
+    asyncio.run(
+        _permissions_sync(runtime.registry, runtime.permission_registry, prune=prune)
+    )
 
 
-async def _permissions_sync(registry, *, prune: bool) -> None:
+async def _permissions_sync(registry, permission_registry, *, prune: bool) -> None:
     from adminfoundry.authz import generate_permission_keys, sync_permission_catalog
 
-    keys = generate_permission_keys(registry)
+    keys = generate_permission_keys(registry, permission_registry)
     if not keys:
         typer.echo("Registry is empty — nothing to sync.")
         return

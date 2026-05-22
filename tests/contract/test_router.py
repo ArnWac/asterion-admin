@@ -138,6 +138,101 @@ def test_full_contract_requires_authentication(app):
     assert resp.status_code == 401
 
 
+def test_full_contract_includes_empty_extensions_dict_by_default(client):
+    """No extension contributions registered → ``extensions`` is an empty
+    dict, not absent. Clients can iterate without a key check."""
+    body = client.get("/api/v1/admin/_contract").json()
+    assert body["extensions"] == {}
+
+
+def test_full_contract_exposes_extension_contributions(tmp_path):
+    """End-to-end proof of Phase 6b: an AdminExtension that adds a
+    namespaced fragment via ``register_contract_contributions`` appears
+    under the contract's ``extensions`` top-level key."""
+    from adminfoundry import CoreAdminConfig, create_admin
+    from adminfoundry.extensions import AdminExtension
+    from tests._helpers import make_admin_principal, override_admin_context
+
+    class _OAuthFake(AdminExtension):
+        name = "auth_oauth"
+
+        def register_contract_contributions(self, registry):
+            registry.add(
+                "auth_oauth",
+                {
+                    "providers": [
+                        {
+                            "id": "google",
+                            "label": "Google",
+                            "login_url": "/api/v1/oauth/google/login",
+                        }
+                    ]
+                },
+            )
+
+    db_url = f"sqlite+aiosqlite:///{tmp_path / 'contrib.db'}"
+    app = create_admin(
+        config=CoreAdminConfig(
+            database_url=db_url,
+            secret_key="test-contrib",
+            enable_multi_tenant=False,
+            enable_builtin_ui=False,
+            enable_builtin_admins=False,
+        ),
+        extensions=[_OAuthFake()],
+    )
+    override_admin_context(app, principal=make_admin_principal())
+
+    with TestClient(app, raise_server_exceptions=False) as c:
+        body = c.get("/api/v1/admin/_contract").json()
+
+    assert "auth_oauth" in body["extensions"]
+    fragment = body["extensions"]["auth_oauth"]
+    assert fragment["providers"][0]["id"] == "google"
+    assert fragment["providers"][0]["login_url"] == "/api/v1/oauth/google/login"
+
+
+def test_full_contract_extensions_are_namespaced_per_extension(tmp_path):
+    """Two extensions, two namespaces — both fragments appear, neither
+    overwrites the other."""
+    from adminfoundry import CoreAdminConfig, create_admin
+    from adminfoundry.extensions import AdminExtension
+    from tests._helpers import make_admin_principal, override_admin_context
+
+    class _One(AdminExtension):
+        name = "one"
+
+        def register_contract_contributions(self, registry):
+            registry.add("one", {"hello": "from one"})
+
+    class _Two(AdminExtension):
+        name = "two"
+
+        def register_contract_contributions(self, registry):
+            registry.add("two", {"hello": "from two"})
+
+    db_url = f"sqlite+aiosqlite:///{tmp_path / 'ns.db'}"
+    app = create_admin(
+        config=CoreAdminConfig(
+            database_url=db_url,
+            secret_key="test-ns",
+            enable_multi_tenant=False,
+            enable_builtin_ui=False,
+            enable_builtin_admins=False,
+        ),
+        extensions=[_One(), _Two()],
+    )
+    override_admin_context(app, principal=make_admin_principal())
+
+    with TestClient(app, raise_server_exceptions=False) as c:
+        body = c.get("/api/v1/admin/_contract").json()
+
+    assert body["extensions"] == {
+        "one": {"hello": "from one"},
+        "two": {"hello": "from two"},
+    }
+
+
 # --- /_contract/{resource} ---
 
 

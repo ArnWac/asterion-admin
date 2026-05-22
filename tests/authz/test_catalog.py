@@ -121,6 +121,50 @@ def test_generate_does_not_yield_wildcards():
     assert "admin.projects.*" not in keys
 
 
+# --- generate_permission_keys with PermissionRegistry (Phase 6a) ---
+
+
+def test_generate_merges_extension_permission_registry():
+    """Keys contributed by extensions via PermissionRegistry must show
+    up in the catalog alongside the admin CRUD keys."""
+    from adminfoundry.authz.registry import PermissionRegistry
+
+    admin_reg = AdminRegistry()
+    admin_reg.register(ProjectAdmin)
+
+    perm_reg = PermissionRegistry()
+    perm_reg.register("oauth.identities.list", "oauth.identities.unlink")
+
+    keys = generate_permission_keys(admin_reg, perm_reg)
+    # admin CRUD keys still present
+    assert "admin.projects.list" in keys
+    assert "admin.projects.delete" in keys
+    # extension keys merged in
+    assert "oauth.identities.list" in keys
+    assert "oauth.identities.unlink" in keys
+
+
+def test_generate_works_with_only_permission_registry():
+    """Empty AdminRegistry + non-empty PermissionRegistry = only extension keys."""
+    from adminfoundry.authz.registry import PermissionRegistry
+
+    perm_reg = PermissionRegistry()
+    perm_reg.register("oauth.identities.list")
+
+    keys = generate_permission_keys(AdminRegistry(), perm_reg)
+    assert keys == {"oauth.identities.list"}
+
+
+def test_generate_unchanged_when_permission_registry_omitted():
+    """Backward-compat: callers that don't pass permission_registry get
+    exactly the legacy admin-derived keys."""
+    registry = AdminRegistry()
+    registry.register(ProjectAdmin)
+    keys = generate_permission_keys(registry)
+    keys_explicit = generate_permission_keys(registry, None)
+    assert keys == keys_explicit
+
+
 # --- sync_permission_catalog ---
 
 

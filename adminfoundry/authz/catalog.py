@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adminfoundry.authz.registry import PermissionRegistry
 from adminfoundry.models.permission_catalog import PermissionCatalog
 from adminfoundry.registry import AdminRegistry, ModelAdmin
 from adminfoundry.security.validation import (
@@ -57,16 +58,26 @@ def _action_keys(resource: str, admin: ModelAdmin) -> list[str]:
     return keys
 
 
-def generate_permission_keys(registry: AdminRegistry) -> set[str]:
-    """Return every permission key that ``registry`` should expose.
+def generate_permission_keys(
+    registry: AdminRegistry,
+    permission_registry: PermissionRegistry | None = None,
+) -> set[str]:
+    """Return every permission key the catalog should expose.
 
-    For each registered resource, yield the five CRUD keys
-    (``admin.<resource>.{list,read,create,update,delete}``) plus one
-    ``admin.<resource>.<action>`` per declared admin action.
+    Combines two sources:
+
+    * **Auto-derived CRUD keys** — for each registered ``ModelAdmin``,
+      five keys (``admin.<resource>.{list,read,create,update,delete}``)
+      plus one ``admin.<resource>.<action>`` per declared admin action.
+    * **Extension-contributed keys** — if ``permission_registry`` is
+      passed, every key that any extension registered via
+      ``register_permissions(...)`` is also merged in. This is how
+      e.g. ``oauth.identities.list`` from an OAuth extension lands in
+      the catalog and becomes assignable to tenant roles.
 
     Wildcards are NOT emitted into the catalog. Wildcards are only valid
-    as *granted* permission patterns (``admin.*`` on the owner role); the
-    catalog is the list of concrete permissions a UI might display.
+    as *granted* permission patterns (``admin.*`` on the owner role);
+    the catalog is the list of concrete permissions a UI might display.
     """
     keys: set[str] = set()
     for admin in registry.all():
@@ -75,6 +86,9 @@ def generate_permission_keys(registry: AdminRegistry) -> set[str]:
             keys.add(validate_permission_key(key))
         for key in _action_keys(resource, admin):
             keys.add(validate_permission_key(key))
+    if permission_registry is not None:
+        # PermissionRegistry already validated each key on register().
+        keys.update(permission_registry.all())
     return keys
 
 

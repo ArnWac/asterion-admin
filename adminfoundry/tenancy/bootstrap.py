@@ -18,6 +18,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
+    from adminfoundry.authz.registry import PermissionRegistry
     from adminfoundry.registry import AdminRegistry
 
 from adminfoundry.db.session import DatabaseManager
@@ -237,13 +238,16 @@ async def bootstrap_tenant(
     owner_membership_id: uuid.UUID | None = None,
     database_url: str,
     registry: AdminRegistry | None = None,
+    permission_registry: PermissionRegistry | None = None,
 ) -> None:
     """Provision and seed a tenant. PostgreSQL only — no-op otherwise.
 
     Steps (idempotent):
-      1. (Optional) Sync ``PermissionCatalog`` from ``registry`` so the seed
-         step finds the keys the apps registered. Without it, admin/viewer
-         roles end up empty and owner gets only the ``admin.*`` fallback.
+      1. (Optional) Sync ``PermissionCatalog`` from ``registry`` (admin
+         CRUD/action keys) and ``permission_registry`` (extension-
+         contributed keys) so the seed step finds every permission the
+         app exposes. Without it, admin/viewer roles end up empty and
+         owner gets only the ``admin.*`` fallback.
       2. Create the tenant schema (CREATE SCHEMA IF NOT EXISTS).
       3. Run tenant Alembic migrations against the schema.
       4. Open a new session scoped to the tenant schema.
@@ -257,14 +261,21 @@ async def bootstrap_tenant(
     slug = validate_tenant_slug(slug)
     schema_name = make_tenant_schema_name(slug)
 
-    if registry is not None:
+    if registry is not None or permission_registry is not None:
         # Local import to avoid circular import at module load.
         from adminfoundry.authz.catalog import (
             generate_permission_keys,
             sync_permission_catalog,
         )
 
-        keys = generate_permission_keys(registry)
+        # ``generate_permission_keys`` derives CRUD/action keys from the
+        # AdminRegistry and merges the extension PermissionRegistry. Use
+        # an empty AdminRegistry when only the permission_registry is
+        # given (extension keys only, no auto-derived CRUD).
+        from adminfoundry.registry import AdminRegistry as _Registry
+
+        admin_reg = registry if registry is not None else _Registry()
+        keys = generate_permission_keys(admin_reg, permission_registry)
         if keys:
             await sync_permission_catalog(public_db, keys)
             await public_db.flush()
