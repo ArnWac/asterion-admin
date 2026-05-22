@@ -20,7 +20,6 @@ S5 checklist (verbatim from the roadmap):
 from __future__ import annotations
 
 import asyncio
-import uuid
 
 import pytest
 from fastapi import HTTPException
@@ -30,7 +29,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.password import hash_password
 from adminfoundry.auth.tokens import (
     create_access_token,
@@ -46,8 +44,7 @@ from adminfoundry.models.base import GlobalModel
 from adminfoundry.models.user import User
 from adminfoundry.schemas.builder import build_model_schema
 from adminfoundry.schemas.serialization.serializer import serialize_record
-from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
-from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+from tests._helpers import make_admin_tenant, make_admin_user, override_admin_context
 
 SECRET = "test-s5-invariant-secret"
 ALG = "HS256"
@@ -81,24 +78,6 @@ class _StubAccount:
     def __init__(self, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
-
-
-def _make_tenant_context() -> TenantContext:
-    return TenantContext(
-        id=uuid.uuid4(),
-        slug="acme",
-        name="Acme",
-        is_active=True,
-        schema_name="tenant_acme",
-    )
-
-
-class _StubMembership:
-    def __init__(self) -> None:
-        self.id = uuid.uuid4()
-        self.user_id = uuid.uuid4()
-        self.tenant_id = uuid.uuid4()
-        self.is_active = True
 
 
 @pytest.fixture
@@ -140,28 +119,13 @@ def app_with_user(tmp_path):
     asyncio.run(runtime.db.dispose())
 
 
-def _grant(app, keys: set[str]) -> None:
-    async def _override():
-        return TenantAuthContext(
-            tenant=_make_tenant_context(),
-            membership=_StubMembership(),
-            roles=[],
-            permission_keys=set(keys),
-        )
-
-    app.dependency_overrides[require_tenant_auth_context] = _override
-
-
-def _override_current_user(app, runtime, email: str) -> None:
-    from sqlalchemy import select
-
-    async def _override():
-        factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
-        async with factory() as session:
-            row = await session.execute(select(User).where(User.email == email))
-            return row.scalar_one()
-
-    app.dependency_overrides[get_current_user] = _override
+def _grant(app, email: str, keys: set[str]) -> None:
+    override_admin_context(
+        app,
+        user=make_admin_user(email=email),
+        tenant=make_admin_tenant("acme"),
+        permissions=frozenset(keys),
+    )
 
 
 # --- S5.1: hidden fields never serialized ---
@@ -312,9 +276,8 @@ def test_s5_wildcard_permission_grants_required():
 def test_s5_unknown_permission_denied_at_crud_layer(app_with_user):
     """Roundtrip via the real CRUD router — proves the gate is wired, not
     just that the utility function works in isolation."""
-    app, runtime, user = app_with_user
-    _override_current_user(app, runtime, "alice@example.com")
-    _grant(app, {"admin.s5_accounts.list"})  # has list, NOT create
+    app, _runtime, _user = app_with_user
+    _grant(app, "alice@example.com", {"admin.s5_accounts.list"})  # list ok, create not
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.post("/api/v1/admin/s5_accounts", json={"email": "x@y.com"})
     assert resp.status_code == 403

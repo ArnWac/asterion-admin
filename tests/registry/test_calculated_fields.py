@@ -13,7 +13,6 @@ Verifies the canonical ``calculated_fields`` API end-to-end:
 from __future__ import annotations
 
 import asyncio
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,7 +21,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.password import hash_password
 from adminfoundry.contract.service import (
     build_field_metadata,
@@ -36,8 +34,7 @@ from adminfoundry.schemas.serialization.serializer import (
     serialize_record,
     serialize_records,
 )
-from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
-from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+from tests._helpers import make_admin_tenant, make_admin_user, override_admin_context
 
 
 class _AppBase(DeclarativeBase):
@@ -180,21 +177,6 @@ def test_writable_payload_unaffected_by_calculated_fields():
 # --- HTTP integration ---
 
 
-def _make_tenant_context() -> TenantContext:
-    return TenantContext(
-        id=uuid.uuid4(),
-        slug="acme",
-        name="Acme",
-        is_active=True,
-        schema_name="tenant_acme",
-    )
-
-
-class _StubMembership:
-    def __init__(self) -> None:
-        self.id = uuid.uuid4()
-
-
 @pytest.fixture
 def app(tmp_path):
     db_url = f"sqlite+aiosqlite:///{tmp_path / 'calc.db'}"
@@ -230,24 +212,12 @@ def app(tmp_path):
 
     asyncio.run(_setup())
 
-    async def _current_user_override():
-        factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
-        from sqlalchemy import select
-
-        async with factory() as session:
-            result = await session.execute(select(User).where(User.email == "user@example.com"))
-            return result.scalar_one()
-
-    async def _auth_override():
-        return TenantAuthContext(
-            tenant=_make_tenant_context(),
-            membership=_StubMembership(),
-            roles=[],
-            permission_keys={"admin.*"},
-        )
-
-    application.dependency_overrides[get_current_user] = _current_user_override
-    application.dependency_overrides[require_tenant_auth_context] = _auth_override
+    override_admin_context(
+        application,
+        user=make_admin_user(email="user@example.com"),
+        tenant=make_admin_tenant("acme"),
+        permissions=frozenset({"admin.*"}),
+    )
 
     yield application
 

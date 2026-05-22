@@ -6,7 +6,6 @@ Endpoint: ``POST /api/v1/admin/{resource}/_actions/{action}``.
 from __future__ import annotations
 
 import asyncio
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,12 +15,10 @@ from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
 from adminfoundry.actions import AdminAction, BulkDeleteAction
-from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.password import hash_password
 from adminfoundry.models.base import GlobalModel
 from adminfoundry.models.user import User
-from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
-from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+from tests._helpers import make_admin_tenant, make_admin_user, override_admin_context
 
 
 class _AppBase(DeclarativeBase):
@@ -79,21 +76,6 @@ class WidgetAdmin(ModelAdmin):
     ]
 
 
-def _make_tenant_context() -> TenantContext:
-    return TenantContext(
-        id=uuid.uuid4(),
-        slug="acme",
-        name="Acme",
-        is_active=True,
-        schema_name="tenant_acme",
-    )
-
-
-class _StubMembership:
-    def __init__(self) -> None:
-        self.id = uuid.uuid4()
-
-
 @pytest.fixture
 def app(tmp_path):
     db_url = f"sqlite+aiosqlite:///{tmp_path / 'actions.db'}"
@@ -127,15 +109,10 @@ def app(tmp_path):
 
     asyncio.run(_setup())
 
-    async def _current_user_override():
-        factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
-        from sqlalchemy import select
-
-        async with factory() as session:
-            result = await session.execute(select(User).where(User.email == "user@example.com"))
-            return result.scalar_one()
-
-    application.dependency_overrides[get_current_user] = _current_user_override
+    # Default: an authenticated user, no tenant, no permissions. Auth-only
+    # endpoints (contract) pass; permission-gated endpoints (CRUD/actions)
+    # 403 unless a test overrides with _grant().
+    override_admin_context(app=application, user=make_admin_user(email="user@example.com"))
 
     yield application
 
@@ -143,15 +120,12 @@ def app(tmp_path):
 
 
 def _grant(app, keys: set[str]) -> None:
-    async def _override():
-        return TenantAuthContext(
-            tenant=_make_tenant_context(),
-            membership=_StubMembership(),
-            roles=[],
-            permission_keys=set(keys),
-        )
-
-    app.dependency_overrides[require_tenant_auth_context] = _override
+    override_admin_context(
+        app,
+        user=make_admin_user(email="user@example.com"),
+        tenant=make_admin_tenant("acme"),
+        permissions=frozenset(keys),
+    )
 
 
 def _client(app) -> TestClient:

@@ -17,11 +17,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.password import hash_password
 from adminfoundry.contract.service import CONTRACT_VERSION
 from adminfoundry.models.base import GlobalModel
 from adminfoundry.models.user import User
+from tests._helpers import make_admin_user, override_admin_context
 
 
 class _AppBase(DeclarativeBase):
@@ -82,15 +82,7 @@ def app(tmp_path):
 
     asyncio.run(_setup())
 
-    async def _override_user():
-        factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
-        async with factory() as session:
-            from sqlalchemy import select
-
-            result = await session.execute(select(User).where(User.email == "user@example.com"))
-            return result.scalar_one()
-
-    app.dependency_overrides[get_current_user] = _override_user
+    override_admin_context(app, user=make_admin_user(email="user@example.com"))
 
     yield app
 

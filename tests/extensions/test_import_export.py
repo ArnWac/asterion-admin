@@ -17,7 +17,6 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,7 +25,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.password import hash_password
 from adminfoundry.extensions.import_export import (
     EXPORT_AUDIT_ACTION,
@@ -40,8 +38,7 @@ from adminfoundry.extensions.import_export import (
 from adminfoundry.models.audit_log import AuditLog
 from adminfoundry.models.base import GlobalModel
 from adminfoundry.models.user import User
-from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
-from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+from tests._helpers import make_admin_tenant, make_admin_user, override_admin_context
 
 
 class _Base(DeclarativeBase):
@@ -64,31 +61,13 @@ class WidgetAdmin(ModelAdmin):
     protected_fields = ["api_secret"]
 
 
-def _tenant_ctx() -> TenantContext:
-    return TenantContext(
-        id=uuid.uuid4(), slug="acme", name="Acme",
-        is_active=True, schema_name="tenant_acme",
-    )
-
-
-class _StubMembership:
-    def __init__(self) -> None:
-        self.id = uuid.uuid4()
-        self.user_id = uuid.uuid4()
-        self.tenant_id = uuid.uuid4()
-        self.is_active = True
-
-
 def _grant(app, keys: set[str]) -> None:
-    async def _override():
-        return TenantAuthContext(
-            tenant=_tenant_ctx(),
-            membership=_StubMembership(),
-            roles=[],
-            permission_keys=set(keys),
-        )
-
-    app.dependency_overrides[require_tenant_auth_context] = _override
+    override_admin_context(
+        app,
+        user=make_admin_user(email="alice@example.com"),
+        tenant=make_admin_tenant("acme"),
+        permissions=frozenset(keys),
+    )
 
 
 @pytest.fixture
@@ -124,13 +103,8 @@ def app(tmp_path):
 
     asyncio.run(_setup())
 
-    async def _current_user_override():
-        factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
-        async with factory() as session:
-            row = await session.execute(select(User).where(User.email == "alice@example.com"))
-            return row.scalar_one()
-
-    application.dependency_overrides[get_current_user] = _current_user_override
+    # Default authenticated context; tests that need permissions call _grant().
+    override_admin_context(application, user=make_admin_user(email="alice@example.com"))
 
     yield application
     asyncio.run(runtime.db.dispose())

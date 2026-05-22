@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.password import hash_password
 from adminfoundry.core.errors import (
     AUTHENTICATION_REQUIRED,
@@ -267,31 +264,16 @@ def test_crud_unknown_resource_uses_envelope(tmp_path):
 
     import asyncio
 
-    user = asyncio.run(_user_stub())
+    asyncio.run(_user_stub())
 
-    async def _override():
-        return user
+    from tests._helpers import make_admin_tenant, make_admin_user, override_admin_context
 
-    app.dependency_overrides[get_current_user] = _override
-
-    from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
-    from adminfoundry.tenancy.dependencies import require_tenant_auth_context
-
-    async def _override_auth():
-        return TenantAuthContext(
-            tenant=TenantContext(
-                id=uuid.uuid4(),
-                slug="x",
-                name="X",
-                is_active=True,
-                schema_name="tenant_x",
-            ),
-            membership=type("M", (), {"id": uuid.uuid4()})(),
-            roles=[],
-            permission_keys={"admin.*"},
-        )
-
-    app.dependency_overrides[require_tenant_auth_context] = _override_auth
+    override_admin_context(
+        app,
+        user=make_admin_user(email="x@y.com"),
+        tenant=make_admin_tenant("x"),
+        permissions=frozenset({"admin.*"}),
+    )
 
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.get("/api/v1/admin/no_such_resource")

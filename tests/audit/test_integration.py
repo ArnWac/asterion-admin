@@ -6,7 +6,6 @@ Also asserts that an audit-write failure does not break the response path.
 from __future__ import annotations
 
 import asyncio
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,13 +23,11 @@ from adminfoundry.audit import (
     LOGIN_FAILURE,
     LOGIN_SUCCESS,
 )
-from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.password import hash_password
 from adminfoundry.models.audit_log import AuditLog
 from adminfoundry.models.base import GlobalModel
 from adminfoundry.models.user import User
-from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
-from adminfoundry.tenancy.dependencies import require_tenant_auth_context
+from tests._helpers import make_admin_tenant, make_admin_user, override_admin_context
 
 
 class _AppBase(DeclarativeBase):
@@ -56,21 +53,6 @@ class WidgetAdmin(ModelAdmin):
     list_display = ["id", "name"]
     readonly_fields = ["id"]
     actions = [PingAction()]
-
-
-def _make_tenant_context() -> TenantContext:
-    return TenantContext(
-        id=uuid.uuid4(),
-        slug="acme",
-        name="Acme",
-        is_active=True,
-        schema_name="tenant_acme",
-    )
-
-
-class _StubMembership:
-    def __init__(self):
-        self.id = uuid.uuid4()
 
 
 @pytest.fixture
@@ -106,22 +88,12 @@ def app(tmp_path):
 
     asyncio.run(_setup())
 
-    async def _current_user_override():
-        factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
-        async with factory() as session:
-            result = await session.execute(select(User).where(User.email == "alice@example.com"))
-            return result.scalar_one()
-
-    async def _auth_override():
-        return TenantAuthContext(
-            tenant=_make_tenant_context(),
-            membership=_StubMembership(),
-            roles=[],
-            permission_keys={"admin.*"},
-        )
-
-    application.dependency_overrides[get_current_user] = _current_user_override
-    application.dependency_overrides[require_tenant_auth_context] = _auth_override
+    override_admin_context(
+        application,
+        user=make_admin_user(email="alice@example.com"),
+        tenant=make_admin_tenant("acme"),
+        permissions=frozenset({"admin.*"}),
+    )
 
     yield application
 
@@ -151,8 +123,6 @@ def _audits(app, action: str | None = None) -> list[AuditLog]:
 
 
 def test_login_success_writes_audit(app):
-    # Drop the user override so the real login flow runs.
-    app.dependency_overrides.pop(get_current_user, None)
     resp = _client(app).post(
         "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "hunter2-strong"},
@@ -167,7 +137,6 @@ def test_login_success_writes_audit(app):
 
 
 def test_login_failure_invalid_credentials_writes_audit(app):
-    app.dependency_overrides.pop(get_current_user, None)
     resp = _client(app).post(
         "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "wrong"},
@@ -182,7 +151,6 @@ def test_login_failure_invalid_credentials_writes_audit(app):
 
 
 def test_login_failure_unknown_user_writes_audit(app):
-    app.dependency_overrides.pop(get_current_user, None)
     resp = _client(app).post(
         "/api/v1/auth/login",
         json={"email": "ghost@example.com", "password": "irrelevant"},
