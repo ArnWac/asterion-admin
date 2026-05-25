@@ -115,7 +115,9 @@ named `tenant_<slug>`. Each tenant schema holds `tenant_roles`,
 `tenant_role_permissions`, `tenant_membership_roles`. Incoming requests
 carry the tenant slug via the `X-Tenant-Slug` header (default; configurable).
 `TenantMiddleware` resolves the slug → `TenantContext`; the
-`require_tenant_auth_context` dependency `SET LOCAL search_path` on the
+`require_admin_context` dependency walks the four neutral providers
+(auth → user → tenant → permissions), and the built-in
+`PermissionProvider` issues `SET LOCAL search_path` on the
 request-scoped session and loads the user's tenant-local roles +
 permission keys. CRUD reads/writes happen on the same session, so tenant
 data isolation comes from PostgreSQL, not from filters in Python.

@@ -33,11 +33,15 @@ Depends(get_async_session)
   └─► opens an AsyncSession, BEGIN
             │
             ▼
-Depends(require_tenant_auth_context)
-  └─► verifies TenantMembership(user_id, tenant_id, is_active=True) in public schema
-  └─► SET LOCAL search_path TO "tenant_acme", public        — scoped to the txn
-  └─► SELECT TenantRole + TenantRolePermission for the membership
-  └─► returns TenantAuthContext(tenant, membership, roles, permission_keys)
+Depends(require_admin_context)
+  └─► AuthProvider.authenticate_request(request)            → AuthIdentity
+  └─► UserProvider.get_by_id(identity.user_id)              → AdminPrincipal
+  └─► TenantProvider.resolve_tenant(request)                → AdminTenant
+  └─► PermissionProvider.get_permissions(principal, tenant) → frozenset[str]
+        (BuiltinPermissionProvider issues SET LOCAL search_path
+         TO "tenant_acme", public — scoped to the txn — and loads
+         TenantRole + TenantRolePermission for the membership.)
+  └─► returns AdminContext(principal, tenant, permissions, …)
             │
             ▼
 Handler reads/writes via the SAME session
@@ -54,9 +58,9 @@ The plan's central architectural claim — *tenant isolation comes from
 PostgreSQL, not from filters in Python* — rests on three invariants:
 
 1. `SET LOCAL search_path` lives **only** for the current transaction.
-2. The CRUD session and the TenantAuthContext session are the **same
-   object** (so the search_path it sets applies to subsequent CRUD
-   queries).
+2. The CRUD session and the `BuiltinPermissionProvider` session are the
+   **same object** (so the search_path it sets applies to subsequent
+   CRUD queries).
 3. Tenant-local tables don't carry a `tenant_id` column. If they did,
    they could leak across schemas via cross-schema joins; without it,
    PostgreSQL's schema resolution is the only routing mechanism.

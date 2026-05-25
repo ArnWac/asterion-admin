@@ -5,10 +5,6 @@ from adminfoundry.authz.catalog import (
     load_permission_keys,
     sync_permission_catalog,
 )
-from adminfoundry.authz.dependencies import (
-    require_permission,
-    require_permission_key,
-)
 from adminfoundry.authz.permissions import (
     assert_permission,
     has_permission,
@@ -23,7 +19,5 @@ __all__ = [
     "has_permission",
     "load_permission_keys",
     "permission_key",
-    "require_permission",
-    "require_permission_key",
     "sync_permission_catalog",
 ]

@@ -28,20 +28,39 @@ adminfoundry/
     permission_catalog.py, audit_log.py, impersonation_log.py
 
   auth/
-    router.py                # POST /login, GET /me
-    dependencies.py          # get_current_user, require_superadmin
+    router.py                # POST /login, GET /me, POST /logout-all
+    dependencies.py          # get_current_user, require_superadmin (JWT primitives — kept for auth/root routers)
     tokens.py                # JWT encode/decode, access + impersonation token types
     password.py              # bcrypt
     rate_limiter.py          # InMemoryLoginRateLimiter
 
   authz/
     permissions.py           # permission_key() + wildcard matcher
-    dependencies.py          # require_permission
     catalog.py               # generate_permission_keys(registry) + sync_permission_catalog
+    registry.py              # PermissionRegistry — in-memory bag extensions write into
+
+  admin/
+    context.py               # AdminContext + build_admin_context + require_admin_context
+    providers.py             # AdminContextProvider Protocol (doc-spec)
+    navigation_router.py     # GET /_navigation — per-user, permission-filtered extension nav
+
+  providers/
+    base.py                  # AuthProvider / UserProvider / PermissionProvider / TenantProvider Protocols + DTOs
+    auth.py, users.py, permissions.py, tenants.py     # Builtin* defaults
+
+  extensions/
+    base.py                  # AdminExtension base class (lifecycle hooks)
+    registry.py              # ExtensionRegistry
+    context.py               # ExtensionContext (registries handed to hooks)
+    lifecycle.py             # run_setup_phase, compose_lifespan
+    errors.py                # ExtensionError, DuplicateExtensionError, RegistryFrozenError
+    import_export/           # CSV/XLSX import-export extension
+    auth_oauth/              # OAuth/OIDC extension (Phase 8a skeleton + GoogleOIDCProvider)
 
   security/
     validation.py            # validate_{resource_name, action_name, tenant_slug, schema_name, permission_key, limit_offset}
     sanitize.py              # sanitize_payload(...) — secret redaction for logs/audit
+    protected_fields.py      # ProtectedFieldRegistry singleton + DEFAULT_PROTECTED_FIELDS
 
   registry/
     registry.py              # AdminRegistry
@@ -70,8 +89,7 @@ adminfoundry/
     schema_strategy.py       # SET LOCAL search_path
     schema_names.py          # make_tenant_schema_name, validators
     bootstrap.py             # create_tenant_record, seed_default_tenant_roles, bootstrap_tenant
-    context.py               # TenantContext, TenantAuthContext
-    dependencies.py          # require_tenant_auth_context
+    context.py               # TenantContext (request.state shape)
 
   audit/
     service.py               # record_audit, record_audit_in_session, audit_payload, request_audit_kwargs
@@ -89,8 +107,9 @@ adminfoundry/
 
   ui/
     router.py                # /admin shell routes
+    navigation.py            # NavigationRegistry (extension-contributed nav items)
     templates/{app,login}.html
-    static/admin/{admin.css, admin.js}
+    static/admin/{admin.css, admin.js, api.js, contract.js, dom.js, format.js, views/}
 ```
 
 ## Wiring (create_admin)
@@ -100,16 +119,28 @@ CoreAdminConfig.from_env()
      │  validate()
      │  configure_logging()
      ▼
-FastAPI()
-     │  app.state.adminfoundry = AdminRuntime(config, db, registry)
-     │  register_error_handlers(app)                # consistent envelope
-     │  install_middleware(app, config)             # request_id ▸ security_headers ▸ cors ▸ tenant
-     │  install_builtin_admins(registry)            # tenant_roles, tenant_role_permissions, tenant_membership_roles
-     │  register(registry)                          # user-supplied
-     │  install_routes(app, config)                 # /healthz ▸ /auth ▸ /admin/_contract ▸ /root ▸ /admin (UI+static) ▸ /admin/_actions ▸ /admin/{resource}
+ProviderSet(auth=…, users=…, permissions=…, tenants=…)   # Builtin* defaults unless overridden
+AdminRuntime(config, db, providers, extensions, permission_registry,
+             contract_contributions, navigation, protected_fields)
+     │  runtime.extensions.register_all(extensions)
+     │  compose_lifespan(extensions, user_lifespan)        # ext.startup/shutdown wraps user lifespan
+     ▼
+FastAPI(lifespan=composed)
+     │  app.state.adminfoundry = runtime
+     │  register_error_handlers(app)                       # consistent envelope
+     │  install_middleware(app, config)                    # request_id ▸ access_log ▸ security_headers ▸ cors ▸ tenant
+     │  install_builtin_admins(registry)                   # tenant_roles, tenant_role_permissions, tenant_membership_roles
+     │  register(registry)                                 # user-supplied
+     │  run_setup_phase(extensions, ExtensionContext, app) # configure → register_{permissions,protected_fields,contract_contributions,navigation,routes}
+     │     └─► freezes every registry afterwards
+     │  install_routes(app, config)                        # /healthz ▸ /auth ▸ /admin/_contract ▸ /admin/_navigation ▸ /root ▸ /admin (UI+static) ▸ /admin/_actions ▸ /admin/{resource}
      ▼
 app
 ```
+
+Extension routes mount BEFORE the dynamic `/{resource}` catch-all, so a
+static-path extension route (`/{resource}/_export`) wins over the
+parameterized CRUD route.
 
 ## Request lifecycle
 
@@ -117,13 +148,18 @@ app
 Request
   │
   ▼  RequestIDMiddleware       request.state.request_id
+  ▼  AccessLogMiddleware       request/response log records with request_id
   ▼  SecurityHeadersMiddleware adds X-Content-Type-Options, Referrer-Policy, X-Frame-Options
   ▼  CORSMiddleware            only if cors_origins configured
   ▼  TenantMiddleware          extracts slug → request.state.tenant: TenantContext
   ▼  Route handler             Depends(get_async_session) opens a txn-scoped session
-  │                            Depends(require_tenant_auth_context) issues SET LOCAL search_path
-  │                                and loads tenant-local roles + permission_keys
-  │                            Permission check via TenantAuthContext.has_permission()
+  │                            Depends(require_admin_context) walks the four providers:
+  │                              · AuthProvider.authenticate_request → AuthIdentity
+  │                              · UserProvider.get_by_id            → AdminPrincipal
+  │                              · TenantProvider.resolve_tenant      → AdminTenant
+  │                              · PermissionProvider.get_permissions → frozenset[str]
+  │                                (BuiltinPermissionProvider issues SET LOCAL search_path)
+  │                            Permission check via AdminContext.has_permission()
   │                            Body validation via Pydantic + clean_write_payload
   │                            Audit via record_audit_in_session (savepoint-isolated)
   ▼  Response                  envelope on errors; X-Request-ID echoed
@@ -138,6 +174,12 @@ runtime = request.app.state.adminfoundry          # AdminRuntime
 runtime.config                                    # CoreAdminConfig
 runtime.db                                        # DatabaseManager
 runtime.registry                                  # AdminRegistry
+runtime.providers                                 # ProviderSet(auth, users, permissions, tenants)
+runtime.extensions                                # ExtensionRegistry
+runtime.permission_registry                       # PermissionRegistry (extension-contributed perm keys)
+runtime.contract_contributions                    # ContractContributionRegistry (extension contract fragments)
+runtime.navigation                                # NavigationRegistry (extension-contributed nav items)
+runtime.protected_fields                          # ProtectedFieldRegistry
 ```
 
 No module-level engine, no module-level settings singleton, no module-level

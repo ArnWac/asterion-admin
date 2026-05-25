@@ -55,7 +55,7 @@ trailing segment.
 | `admin.*.list` | anything | **rejected on parse** — middle wildcards are illegal |
 
 The CRUD router computes the required key per endpoint and calls
-`TenantAuthContext.has_permission(required)` which delegates to the
+`AdminContext.has_permission(required)` which delegates to the
 wildcard-aware helper.
 
 ## Input validation
@@ -88,9 +88,11 @@ class WidgetAdmin(ModelAdmin):
     protected_fields = ["internal_token"]                   # never serialized, never accepted
 ```
 
-Plus the framework-wide `GLOBALLY_PROTECTED` frozenset which always
-masks `hashed_password`, `password`, `secret`, `token` columns no
-matter what the per-admin config says. These rules apply to:
+Plus the framework-wide `ProtectedFieldRegistry` (seeded from
+`DEFAULT_PROTECTED_FIELDS`; extensions add more via
+`register_protected_fields`) which always masks `hashed_password`,
+`password`, `secret`, OAuth tokens, etc. no matter what the per-admin
+config says. These rules apply to:
 
 - contract `/api/v1/admin/_contract/{resource}` (hidden + globally protected dropped)
 - serializer output (list + detail responses omit them)

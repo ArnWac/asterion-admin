@@ -5,7 +5,7 @@ from adminfoundry.tenancy.bootstrap import (
     provision_tenant_schema,
     seed_default_tenant_roles,
 )
-from adminfoundry.tenancy.context import TenantAuthContext, TenantContext
+from adminfoundry.tenancy.context import TenantContext
 from adminfoundry.tenancy.schema_names import (
     InvalidSchemaNameError,
     make_tenant_schema_name,
@@ -14,7 +14,6 @@ from adminfoundry.tenancy.schema_names import (
 
 __all__ = [
     "InvalidSchemaNameError",
-    "TenantAuthContext",
     "TenantContext",
     "assign_owner_membership",
     "bootstrap_tenant",

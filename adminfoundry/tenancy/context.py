@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from adminfoundry.models.tenant import Tenant
-    from adminfoundry.models.tenant_membership import TenantMembership
-    from adminfoundry.models.tenant_rbac import TenantRole
 
 
 @dataclass
@@ -73,29 +71,3 @@ class TenantContext:
             "date_pattern": self.date_pattern,
             "allowed_cidrs": self.allowed_cidrs,
         }
-
-
-@dataclass(slots=True)
-class TenantAuthContext:
-    """Per-request tenant authorization context built after membership is verified.
-
-    Holds the resolved tenant, the public-schema membership record, and the
-    tenant-local roles/permission_keys loaded from the active tenant schema.
-    None of the role data touches public.roles or User.roles.
-    """
-
-    tenant: TenantContext
-    membership: TenantMembership
-    roles: list[TenantRole]
-    permission_keys: set[str]
-
-    def has_permission(self, key: str) -> bool:
-        from adminfoundry.authz.permissions import has_permission as _matches
-
-        return _matches(self.permission_keys, key)
-
-    def has_role(self, name: str) -> bool:
-        return any(r.name == name for r in self.roles)
-
-    def role_names(self) -> frozenset[str]:
-        return frozenset(r.name for r in self.roles)
