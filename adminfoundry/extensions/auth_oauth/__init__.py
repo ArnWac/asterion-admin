@@ -78,6 +78,7 @@ from adminfoundry.extensions.auth_oauth.dto import (
     OAuthProviderConfig,
 )
 from adminfoundry.extensions.auth_oauth.mappers import GoogleOIDCClaimMapper
+from adminfoundry.extensions.auth_oauth.models import ExternalIdentity
 from adminfoundry.extensions.auth_oauth.providers import GoogleOIDCProvider
 from adminfoundry.extensions.auth_oauth.router import build_oauth_router
 from adminfoundry.extensions.base import AdminExtension
@@ -146,6 +147,14 @@ class OAuthExtension(AdminExtension):
     def register_protected_fields(self, registry) -> None:
         registry.register(*_PROTECTED_FIELDS)
 
+    def register_models(self):
+        # Importing models attaches the ExternalIdentity Table to
+        # GlobalBase.metadata at class-definition time. Returning the
+        # class lets the runtime track ownership for tooling.
+        from adminfoundry.extensions.auth_oauth import models
+
+        return (models.ExternalIdentity,)
+
     def register_contract_contributions(self, registry) -> None:
         # The UI iterates over this fragment to render login buttons.
         # We emit absolute paths here so consumers don't have to know
@@ -188,6 +197,7 @@ class OAuthExtension(AdminExtension):
 
 
 __all__ = [
+    "ExternalIdentity",
     "ExternalIdentityData",
     "GoogleOIDCClaimMapper",
     "GoogleOIDCProvider",
