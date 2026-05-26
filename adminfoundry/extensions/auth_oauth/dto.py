@@ -1,15 +1,19 @@
 """DTOs for the OAuth/OIDC extension.
 
 Pure value objects — no SQLAlchemy, no FastAPI, no provider SDK
-imports. The skeleton ships only what's needed for the claim-mapping
-contract test. A future iteration adds:
+imports. Two shapes:
 
-* ``ExternalIdentity`` (persisted row backed by SQLAlchemy)
-* ``OAuthCredential`` (optional, for apps that need API access tokens)
+* :class:`ExternalIdentityData` — neutral identity carrier the claim
+  mapper produces; the router feeds it into
+  :class:`OAuthCapableUserProvider.find_or_create_by_external_identity`.
+* :class:`OAuthProviderConfig` — public, log-safe configuration the
+  framework reads off every provider instance.
 
-The persisted model is deliberately deferred — see the extension's
-module docstring for why DB-model registration for extensions is its
-own architectural question.
+The corresponding persisted row lives in
+:mod:`adminfoundry.extensions.auth_oauth.models` as
+:class:`ExternalIdentity`. This file stays free of ORM imports so
+mappers + tests can construct identity data without dragging the
+SQLAlchemy stack in.
 """
 
 from __future__ import annotations
@@ -23,10 +27,11 @@ from typing import Any
 class ExternalIdentityData:
     """Provider-agnostic representation of one external identity.
 
-    Built by an ``OIDCClaimMapper`` from verified token claims. The
-    persisted ``ExternalIdentity`` table (Phase 8b) materializes this
-    into rows; for the skeleton we only need the DTO so the claim-
-    mapping contract is testable in isolation.
+    Built by an ``OIDCClaimMapper`` from verified token claims and
+    handed to the user provider's
+    :meth:`find_or_create_by_external_identity`. The persisted
+    :class:`~adminfoundry.extensions.auth_oauth.models.ExternalIdentity`
+    table materializes a subset of these fields into rows.
 
     Field naming follows OIDC where possible but stays neutral —
     Google's ``picture`` becomes ``picture_url``, ``hd`` becomes
@@ -47,9 +52,10 @@ class ExternalIdentityData:
     locale: str | None = None
     hosted_domain: str | None = None  #: Google ``hd``; org domain in workspace tenancy
 
-    #: Any claims the mapper kept but doesn't have a typed slot for. The
-    #: ``ExternalIdentity`` model (Phase 8b) MUST NOT persist this dict
-    #: as-is — it's for transient use only (debugging, custom hooks).
+    #: Any claims the mapper kept but doesn't have a typed slot for.
+    #: The :class:`ExternalIdentity` row stores only the typed columns
+    #: above; ``raw_extra`` is for transient use only (debugging,
+    #: custom hooks the host app may run).
     raw_extra: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -58,8 +64,9 @@ class OAuthProviderConfig:
     """Public, log-safe configuration for one provider adapter.
 
     Used in the contract contribution (so the UI knows what login
-    buttons to render) and in the placeholder route URLs. Secrets
-    (``client_secret``, signing keys) belong on the concrete
+    buttons to render) and as the URL segment in the route paths
+    (``/api/v1/oauth/{id}/login``). Secrets (``client_secret``,
+    signing keys) belong on the concrete
     :class:`~adminfoundry.extensions.auth_oauth.base.OAuthProvider`
     instance, not here.
     """

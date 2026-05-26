@@ -40,8 +40,9 @@ table, AND mounted routes that complete a real OIDC redirect flow.
 
 * Token refresh / API access to Google services (Drive/Gmail). Login
   only — the access_token is discarded after the ID-token verifies.
-* OAuth credential storage (``OAuthCredential`` table). Add only when
-  an extension actually needs offline access tokens.
+* Persistent token storage. No table holds ``access_token`` /
+  ``refresh_token`` / ``id_token``; an extension that needs offline
+  IdP API access would add its own model + flow.
 * SAML / SCIM. Different protocols, different extension.
 
 Usage::
@@ -103,25 +104,13 @@ from adminfoundry.extensions.auth_oauth.user_provider import (
 from adminfoundry.extensions.base import AdminExtension
 from adminfoundry.extensions.context import ExtensionContext
 
-#: Permission keys this extension claims as its own. Phase 8b's
+#: Permission keys this extension claims as its own. A future
 #: ``ExternalIdentity`` admin would gate on ``oauth.identities.list``;
 #: an "unlink my Google account" UI button would require
 #: ``oauth.identities.unlink``. Tenant roles can grant either.
 _PERMISSION_KEYS: tuple[str, ...] = (
     "oauth.identities.list",
     "oauth.identities.unlink",
-)
-
-#: Fields the extension's future ``ExternalIdentity`` / ``OAuthCredential``
-#: models would expose if they were persisted today. Registering them
-#: NOW means the protected-field registry already knows about them when
-#: those models land — no risk of a token slipping through a serializer
-#: written before the registration.
-_PROTECTED_FIELDS: tuple[str, ...] = (
-    "access_token",
-    "refresh_token",
-    "id_token",
-    "client_secret",
 )
 
 
@@ -140,7 +129,7 @@ def _api_base_from_auth_prefix(auth_api_prefix: str) -> str:
 
 
 class OAuthExtension(AdminExtension):
-    """The OAuth/OIDC extension — multi-provider, skeleton routes."""
+    """The OAuth/OIDC extension — multi-provider redirect-flow integration."""
 
     name = "auth_oauth"
 
@@ -182,9 +171,6 @@ class OAuthExtension(AdminExtension):
 
     def register_permissions(self, registry) -> None:
         registry.register(*_PERMISSION_KEYS)
-
-    def register_protected_fields(self, registry) -> None:
-        registry.register(*_PROTECTED_FIELDS)
 
     def register_models(self):
         # Importing models attaches the ExternalIdentity Table to

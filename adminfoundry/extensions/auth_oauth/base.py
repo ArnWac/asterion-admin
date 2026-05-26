@@ -5,15 +5,19 @@ The OAuth extension is built around two collaborator interfaces:
 * :class:`OIDCClaimMapper` — pure function (well, callable) that turns
   IdP-side claims (an opaque ``dict``) into a provider-agnostic
   :class:`~adminfoundry.extensions.auth_oauth.dto.ExternalIdentityData`.
-  This is what the skeleton ships — Google's specific claim names
-  (``sub``, ``hd``, ``picture``) get translated to neutral fields, and
-  the rest of the framework never sees provider-specific JSON.
+  Provider-specific claim names (Google's ``sub`` / ``hd`` / ``picture``)
+  get translated to neutral fields here so the rest of the framework
+  never sees provider-specific JSON.
 * :class:`OAuthProvider` — bundles a provider's :class:`OIDCClaimMapper`
-  with its configuration (id, label) and, in the full Phase 8b
-  implementation, the OAuth/OIDC flow methods (authorize URL,
-  code/token exchange, JWKS verification). The skeleton defines only
-  the slots the routes need; the flow methods are added when the
-  redirect-flow lands.
+  with its public configuration (id, label). The concrete subclasses
+  (:class:`~adminfoundry.extensions.auth_oauth.GoogleOIDCProvider`)
+  add the OAuth/OIDC flow methods on top — :meth:`build_authorize_url`,
+  :meth:`exchange_code` — which the router invokes per request.
+
+The Protocol here is intentionally minimal: it only declares the slots
+the framework reads (``config``, ``claim_mapper``). The flow methods
+live on the concrete subclasses because their shape differs per provider
+(form-encoded for Google's token endpoint, JSON for GitHub's, etc.).
 
 Both protocols are ``runtime_checkable`` so ``isinstance(obj, Protocol)``
 works in tests and assertions.
@@ -50,12 +54,12 @@ class OIDCClaimMapper(Protocol):
 class OAuthProvider(Protocol):
     """One OAuth/OIDC provider adapter wired into ``OAuthExtension``.
 
-    Skeleton surface — the redirect-flow methods (``authorize_url``,
-    ``exchange_code``, ``verify_id_token``) land in Phase 8b. Apps
-    constructing providers today should subclass
+    Apps constructing providers should subclass
     :class:`~adminfoundry.extensions.auth_oauth.GoogleOIDCProvider`
-    rather than implement this Protocol from scratch — the protocol is
-    the type-level spec, not the recommended building block.
+    (or write their own concrete subclass for another IdP) rather than
+    implement this Protocol from scratch — the protocol is the
+    type-level spec for what the framework reads off the instance, not
+    the recommended building block.
     """
 
     #: Public configuration (id + display label). Used by the contract

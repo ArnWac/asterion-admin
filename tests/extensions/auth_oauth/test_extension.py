@@ -65,7 +65,13 @@ def test_extension_registers_permission_keys(tmp_path):
     assert "oauth.identities.unlink" in keys
 
 
-def test_extension_registers_protected_fields(tmp_path):
+def test_extension_does_not_register_speculative_protected_fields(tmp_path):
+    """ExternalIdentity stores no tokens (login-only flow). client_secret
+    lives on a Python instance attribute, not a model column. So the
+    extension intentionally registers NO protected-field names — there's
+    nothing for the ProtectedFieldRegistry to mask in serialized output.
+    If a future extension grows OAuthCredential or surfaces secrets via
+    an admin, it adds register_protected_fields then."""
     _build_app(
         tmp_path,
         providers=[GoogleOIDCProvider(client_id="x", client_secret="y")],
@@ -73,10 +79,10 @@ def test_extension_registers_protected_fields(tmp_path):
     from adminfoundry.security.protected_fields import get_registry
 
     pfr = get_registry().as_frozenset()
-    assert "access_token" in pfr
-    assert "refresh_token" in pfr
-    assert "id_token" in pfr
-    assert "client_secret" in pfr
+    assert "access_token" not in pfr
+    assert "refresh_token" not in pfr
+    assert "id_token" not in pfr
+    assert "client_secret" not in pfr
 
 
 def test_extension_contributes_to_contract(tmp_path):

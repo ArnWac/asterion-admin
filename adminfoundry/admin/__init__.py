@@ -3,13 +3,11 @@ from adminfoundry.admin.context import (
     build_admin_context,
     require_admin_context,
 )
-from adminfoundry.admin.providers import AdminContextProvider
 from adminfoundry.providers.base import AdminPrincipal, AdminTenant
 from adminfoundry.registry import AdminRegistry, ModelAdmin
 
 __all__ = [
     "AdminContext",
-    "AdminContextProvider",
     "AdminPrincipal",
     "AdminRegistry",
     "AdminTenant",

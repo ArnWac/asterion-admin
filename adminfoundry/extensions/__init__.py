@@ -23,7 +23,7 @@ Public surface:
 * :class:`ExtensionContext` — handle passed to every ``register_*`` hook.
 * :class:`ExtensionRegistry` — collection on ``AdminRuntime.extensions``.
 * Errors: :class:`ExtensionError`, :class:`DuplicateExtensionError`,
-  :class:`RegistryFrozenError`, :class:`ExtensionDependencyError`.
+  :class:`RegistryFrozenError`.
 
 Internal (used by ``create_admin`` only): :mod:`.lifecycle`.
 """
@@ -34,7 +34,6 @@ from adminfoundry.extensions.base import AdminExtension
 from adminfoundry.extensions.context import ExtensionContext
 from adminfoundry.extensions.errors import (
     DuplicateExtensionError,
-    ExtensionDependencyError,
     ExtensionError,
     RegistryFrozenError,
 )
@@ -44,7 +43,6 @@ __all__ = [
     "AdminExtension",
     "DuplicateExtensionError",
     "ExtensionContext",
-    "ExtensionDependencyError",
     "ExtensionError",
     "ExtensionRegistry",
     "RegistryFrozenError",

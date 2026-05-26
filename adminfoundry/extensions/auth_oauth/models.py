@@ -12,10 +12,10 @@ identity (``provider`` + ``provider_subject``) to a framework
 What's intentionally NOT here:
 
 * No ``access_token`` / ``refresh_token`` / ``id_token`` columns.
-  Phase 8b is login-only — we don't proxy API calls to the IdP, so we
-  have no reason to retain tokens. A future "OAuthCredential" model
-  (separate table, separate extension) can add them when there's a
-  real use case.
+  This is login-only — we don't proxy API calls to the IdP, so
+  there's no reason to retain tokens. An extension that needs offline
+  access would add its own table for that — keep the surface small
+  here so leaks have less to steal.
 * No "last login" timestamp on this row. Use the existing ``AuditLog``
   for that — duplicating it here would be a second source of truth.
 * No soft delete. Unlinking deletes the row; the audit log records who

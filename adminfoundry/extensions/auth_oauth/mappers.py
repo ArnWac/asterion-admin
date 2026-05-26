@@ -1,18 +1,20 @@
 """Concrete :class:`OIDCClaimMapper` implementations.
 
-The skeleton ships only the Google mapper because Google's OIDC claim
-shape is the most commonly-asked use case. Adding GitHub / Microsoft
-later is the same pattern: a small class that pulls the IdP-specific
-field names into the neutral :class:`ExternalIdentityData` slots.
+Ships the Google mapper because Google's OIDC claim shape is the most
+commonly-asked use case. Adding GitHub / Microsoft / Authentik later
+is the same pattern: a small class that pulls the IdP-specific field
+names into the neutral :class:`ExternalIdentityData` slots.
 
-What stays OUT of the mappers (in the framework or never):
+What stays OUT of the mappers (in :mod:`verifier` or never):
 
-* Token signature verification — that's the OAuthProvider's job
-  (Phase 8b will use the IdP's JWKS endpoint).
+* Token signature verification — that's the verifier's job, against
+  the JWKS document the :class:`JWKSClient` fetches.
 * User provisioning (find-or-create the local user) — that's the
-  UserProvider's job, called by the framework after the mapper runs.
-* Raw token storage — the mapper sees claims, not tokens. Tokens never
-  reach the framework's protected-field-stripped layers.
+  :class:`OAuthCapableUserProvider`'s job, called by the router after
+  the mapper runs.
+* Raw token storage — the mapper sees claims, not tokens. Tokens are
+  discarded after the ID-token is verified (login-only flow, no
+  refresh_token retention).
 """
 
 from __future__ import annotations

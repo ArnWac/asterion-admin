@@ -25,9 +25,3 @@ class RegistryFrozenError(ExtensionError):
     all registries are frozen — extensions must contribute during their
     declared lifecycle hooks, not at request time.
     """
-
-
-class ExtensionDependencyError(ExtensionError):
-    """An extension declared a dependency on another extension that isn't
-    registered. Reserved for a future ``depends_on`` declaration; not
-    raised in v1 (no extension uses dependencies yet)."""
