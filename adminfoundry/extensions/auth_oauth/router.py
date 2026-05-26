@@ -1,71 +1,331 @@
-"""OAuth/OIDC placeholder routes — Phase 8a skeleton.
+"""OAuth/OIDC redirect-flow handlers — Phase 8b.7.
 
-Mounts ``GET /api/v1/oauth/{provider_id}/login`` and
-``GET /api/v1/oauth/{provider_id}/callback`` for every configured
-provider. Both endpoints return 501 with a clear "skeleton — no flow
-implemented" message.
+Two endpoints per provider:
 
-Phase 8b will replace these handlers with the real redirect flow
-(authorize URL, callback handler, state/PKCE/cookie storage,
-ID-token verification via JWKS, find-or-create user, JWT minting,
-fragment-redirect to the UI).
+* ``GET /api/v1/oauth/{provider_id}/login``
+   1. Generate fresh state + nonce + PKCE verifier.
+   2. Seal them into the cookie (10-minute TTL, HMAC-SHA256).
+   3. Build the IdP authorize URL with the matching ``state`` /
+      ``nonce`` / ``code_challenge``.
+   4. 302 redirect to the IdP.
 
-Why a placeholder lands in v1 anyway: the contract contribution
-already advertises ``login_url: /api/v1/oauth/{id}/login`` to clients.
-A UI button that clicks through to a 501 with a useful body is
-strictly better than a 404 — operators see exactly which extension
-needs to be upgraded.
+* ``GET /api/v1/oauth/{provider_id}/callback``
+   1. Read + verify the sealed cookie. Clear it immediately
+      (single-use).
+   2. Check the ``state`` query param matches the cookie.
+   3. POST the authorization code to the token endpoint with the PKCE
+      verifier. Reject on any error.
+   4. Verify the ID-token end-to-end (sig + iss + aud + exp + nonce).
+   5. Find-or-create the user via the extension's
+      :class:`OAuthCapableUserProvider`.
+   6. Mint a framework access token.
+   7. 302 redirect to ``return_to``#token=<jwt> — fragment, not query,
+      so the token doesn't leak via referer headers or server logs.
+
+Failures: every error path logs the specific reason via the
+extension's logger and redirects to ``<login_path>?oauth_error=<code>``
+with a small set of generic codes. The user never sees the underlying
+exception; operators correlate via request_id + logs.
+
+The callback handler runs in a single HTTP request, but the work is
+sequential by design — each step depends on the previous one
+succeeding. No parallelism to chase here.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+import logging
+import time
+from urllib.parse import quote, urlencode
 
-from adminfoundry.extensions.auth_oauth.base import OAuthProvider
+from fastapi import APIRouter, Request
+from fastapi.responses import RedirectResponse
 
-#: Body shape returned by placeholder endpoints.
-_PLACEHOLDER_DETAIL: str = (
-    "OAuth flow is not yet implemented — this is the Phase 8a skeleton "
-    "of OAuthExtension. Phase 8b will replace this endpoint with the "
-    "real redirect handler. Track via the v1-providers roadmap."
+from adminfoundry.auth.tokens import create_access_token
+from adminfoundry.extensions.auth_oauth.base import InvalidClaimsError
+from adminfoundry.extensions.auth_oauth.providers import (
+    GoogleOIDCProvider,
+    TokenExchangeError,
+)
+from adminfoundry.extensions.auth_oauth.state import (
+    OAuthFlowState,
+    OAuthStateError,
+    clear_state_cookie,
+    code_challenge_from_verifier,
+    cookie_name_for_request,
+    generate_code_verifier,
+    generate_nonce,
+    generate_state,
+    seal_state,
+    set_state_cookie,
+    unseal_state,
+)
+from adminfoundry.extensions.auth_oauth.user_provider import (
+    OAuthCapabilityError,
+)
+from adminfoundry.extensions.auth_oauth.verifier import (
+    IDTokenError,
+    verify_id_token,
 )
 
+logger = logging.getLogger("adminfoundry.extensions.auth_oauth")
 
-def build_oauth_router(providers: list[OAuthProvider]) -> APIRouter:
+#: Default landing page on success when no ``return_to`` was given.
+_DEFAULT_RETURN_TO: str = "/admin/dashboard"
+
+#: Page the UI eventually loads with the JWT in the URL fragment.
+#: Phase 8b.8 ships the JS that reads ``#token=…`` and stores it.
+_LOGIN_COMPLETE_PATH: str = "/admin/login-complete"
+
+#: Where to send the user on any error — relative path, no host.
+_LOGIN_ERROR_PATH: str = "/admin/login"
+
+#: How long the issued framework JWT is valid for. Re-use the
+#: framework's existing access-token expiry semantics rather than
+#: inventing OAuth-specific tokens.
+
+
+def _attach_login_handler(
+    router: APIRouter,
+    provider: GoogleOIDCProvider,
+) -> None:
+    """Mount the ``/login`` handler for a single provider.
+
+    Defined as a helper (not inline in the factory) so the closure
+    over ``provider`` is explicit and the loop variable can't leak —
+    the previous bug where ``_provider_id: str = provider_id`` was
+    needed in the function signature is avoided.
+    """
+    provider_id = provider.config.id
+
+    @router.get(f"/{provider_id}/login", name=f"oauth_{provider_id}_login")
+    async def _login(request: Request) -> RedirectResponse:
+        # ---- generate fresh per-flow secrets ----
+        state = generate_state()
+        nonce = generate_nonce()
+        code_verifier = generate_code_verifier()
+        return_to = (
+            request.query_params.get("return_to") or _DEFAULT_RETURN_TO
+        )
+        # Refuse open-redirects: only same-site relative paths allowed
+        # in return_to. An absolute URL or anything starting with //
+        # would let an attacker bounce the user to an arbitrary host
+        # after a successful login.
+        if not return_to.startswith("/") or return_to.startswith("//"):
+            return_to = _DEFAULT_RETURN_TO
+
+        # ---- seal cookie + build authorize URL ----
+        payload = OAuthFlowState(
+            state=state,
+            code_verifier=code_verifier,
+            nonce=nonce,
+            provider_id=provider_id,
+            return_to=return_to,
+            created_at=int(time.time()),
+        )
+        config = request.app.state.adminfoundry.config
+        sealed = seal_state(payload, config.secret_key)
+        redirect_uri = _callback_url(request, provider_id)
+        authorize_url = provider.build_authorize_url(
+            state=state,
+            nonce=nonce,
+            code_challenge=code_challenge_from_verifier(code_verifier),
+            redirect_uri=redirect_uri,
+        )
+
+        # 302 (not 307) — semantically a GET → GET redirect. 307 would
+        # be wrong for a navigation triggered by a click on a login
+        # button.
+        response = RedirectResponse(url=authorize_url, status_code=302)
+        set_state_cookie(response, sealed, request=request)
+        return response
+
+
+def _attach_callback_handler(
+    router: APIRouter,
+    provider: GoogleOIDCProvider,
+) -> None:
+    """Mount the ``/callback`` handler for a single provider."""
+    provider_id = provider.config.id
+
+    @router.get(f"/{provider_id}/callback", name=f"oauth_{provider_id}_callback")
+    async def _callback(request: Request) -> RedirectResponse:
+        runtime = request.app.state.adminfoundry
+        ext = _extension_from(request)
+        cookie_name = cookie_name_for_request(request)
+        raw_cookie = request.cookies.get(cookie_name, "")
+
+        # Every error path goes through this helper so the cookie is
+        # ALWAYS cleared and the user gets a consistent redirect with
+        # a generic error code. Real diagnostics land in the logs.
+        def _fail(code: str, reason: str) -> RedirectResponse:
+            logger.warning(
+                "oauth callback failed: provider=%s code=%s reason=%s",
+                provider_id, code, reason,
+            )
+            resp = RedirectResponse(
+                url=f"{_LOGIN_ERROR_PATH}?{urlencode({'oauth_error': code})}",
+                status_code=302,
+            )
+            clear_state_cookie(resp, request=request)
+            return resp
+
+        # ---- 1. unseal cookie ----
+        try:
+            flow = unseal_state(raw_cookie, runtime.config.secret_key)
+        except OAuthStateError as exc:
+            return _fail("state_invalid", str(exc))
+        if flow.provider_id != provider_id:
+            # Cookie's provider doesn't match this callback URL — could
+            # be an attempt to swap callbacks across providers.
+            return _fail(
+                "state_invalid",
+                f"cookie for {flow.provider_id!r} arrived at {provider_id!r}",
+            )
+
+        # ---- 2. check state parameter ----
+        echoed_state = request.query_params.get("state", "")
+        if echoed_state != flow.state:
+            return _fail("state_mismatch", "state query param != cookie")
+
+        # ---- 3. catch IdP-reported errors ----
+        idp_error = request.query_params.get("error")
+        if idp_error:
+            return _fail("idp_error", f"IdP returned error={idp_error!r}")
+
+        code = request.query_params.get("code", "")
+        if not code:
+            return _fail("missing_code", "callback URL missing 'code'")
+
+        # ---- 4. exchange the code for tokens ----
+        try:
+            token_response = await provider.exchange_code(
+                code=code,
+                code_verifier=flow.code_verifier,
+                redirect_uri=_callback_url(request, provider_id),
+                http_client=ext._http_client,
+            )
+        except TokenExchangeError as exc:
+            return _fail("token_exchange_failed", str(exc))
+
+        # ---- 5. verify the ID-token ----
+        jwks = ext._jwks_clients.get(provider_id)
+        if jwks is None:
+            return _fail(
+                "internal",
+                f"no JWKS client for provider {provider_id!r}",
+            )
+        try:
+            claims = await verify_id_token(
+                token_response["id_token"],
+                jwks_client=jwks,
+                issuer=provider.ISSUER,
+                audience=provider.client_id,
+                nonce=flow.nonce,
+            )
+        except IDTokenError as exc:
+            return _fail("id_token_invalid", str(exc))
+
+        # ---- 6. map claims + find-or-create user ----
+        try:
+            identity = provider.claim_mapper(claims)
+        except InvalidClaimsError as exc:
+            return _fail("claims_invalid", str(exc))
+
+        try:
+            principal = await ext._user_provider.find_or_create_by_external_identity(
+                provider=identity.provider,
+                provider_subject=identity.provider_subject,
+                claims=identity,
+                allow_create=ext._auto_create_users,
+                request=request,
+            )
+        except OAuthCapabilityError as exc:
+            # AutoCreateDisabled / EmailNotVerified / EmailCollision /
+            # UserInactive all collapse into one generic code at the
+            # wire — the logger has the detail.
+            return _fail("user_resolve_failed", str(exc))
+
+        # ---- 7. mint framework JWT + redirect with fragment ----
+        config = runtime.config
+        jwt_token = create_access_token(
+            principal.id,
+            secret_key=config.secret_key,
+            algorithm=config.jwt_algorithm,
+            expires_minutes=config.access_token_expire_minutes,
+            # We don't have a User row in scope here — the user
+            # provider returned an AdminPrincipal DTO. The Builtin
+            # version's token_version defaults to 0 anyway for a fresh
+            # user; existing users get their stored version on next
+            # session.me load. This is consistent with the password
+            # login flow which doesn't read token_version at issue
+            # time either (auth/router.py).
+            token_version=0,
+        )
+
+        # Fragment-redirect so the token never appears in:
+        # * server access logs (request URLs)
+        # * referer headers (the next page the JS navigates to)
+        # * Sentry / APM URL captures
+        # The JS on _LOGIN_COMPLETE_PATH reads location.hash, stores
+        # the token, then replaces the URL.
+        fragment_target = (
+            f"{_LOGIN_COMPLETE_PATH}"
+            f"#token={quote(jwt_token, safe='')}"
+            f"&return_to={quote(flow.return_to, safe='/')}"
+        )
+        response = RedirectResponse(url=fragment_target, status_code=302)
+        clear_state_cookie(response, request=request)
+        return response
+
+
+def _callback_url(request: Request, provider_id: str) -> str:
+    """Build the absolute callback URL the IdP redirects back to.
+
+    Must match exactly what's registered with the IdP — Google rejects
+    redirect_uri mismatches at the authorize step. We derive the base
+    URL from the inbound request so deployments behind proxies pick
+    up the public host without configuration.
+    """
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/v1/oauth/{provider_id}/callback"
+
+
+def _extension_from(request: Request):
+    """Pull the live :class:`OAuthExtension` instance off the runtime.
+
+    The router needs access to the extension's per-provider JWKS
+    clients + the user_provider + the auto_create flag. Walking the
+    extension registry is cheap (a tuple scan over typically 1-5
+    extensions) and avoids stashing the extension globally.
+    """
+    runtime = request.app.state.adminfoundry
+    # Lazy import — adminfoundry.extensions.auth_oauth.__init__ pulls
+    # this module in via build_oauth_router, and top-level importing
+    # OAuthExtension would re-enter __init__ during the import.
+    from adminfoundry.extensions.auth_oauth import OAuthExtension
+
+    for ext in runtime.extensions:
+        if isinstance(ext, OAuthExtension):
+            return ext
+    raise RuntimeError(
+        "build_oauth_router called without a live OAuthExtension on the runtime"
+    )
+
+
+def build_oauth_router(providers: list[GoogleOIDCProvider]) -> APIRouter:
     """Build a sub-router that exposes /login + /callback per provider.
 
     Called from :meth:`OAuthExtension.register_routes` with the
-    extension's configured provider list. The provider's
-    :attr:`OAuthProviderConfig.id` becomes the URL segment, so
-    ``GoogleOIDCProvider`` with ``id="google"`` lands at
-    ``/api/v1/oauth/google/login`` once the framework mounts the
-    extension under its admin-api prefix.
+    extension's configured provider list.
     """
     router = APIRouter(prefix="/oauth", tags=["auth-oauth"])
-
     for provider in providers:
-        provider_id = provider.config.id
-        # Bind ``provider_id`` into the closure via default argument so
-        # the loop variable doesn't leak. Each provider gets its own
-        # pair of (login, callback) handlers — same body for the skeleton,
-        # but Phase 8b will dispatch on the provider's flow methods here.
-
-        @router.get(f"/{provider_id}/login", name=f"oauth_{provider_id}_login")
-        async def _login(_provider_id: str = provider_id) -> None:
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail=(
-                    f"[provider={_provider_id} phase=8a-skeleton] {_PLACEHOLDER_DETAIL}"
-                ),
-            )
-
-        @router.get(f"/{provider_id}/callback", name=f"oauth_{provider_id}_callback")
-        async def _callback(_provider_id: str = provider_id) -> None:
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail=(
-                    f"[provider={_provider_id} phase=8a-skeleton] {_PLACEHOLDER_DETAIL}"
-                ),
-            )
-
+        _attach_login_handler(router, provider)
+        _attach_callback_handler(router, provider)
     return router
+
+
+__all__ = [
+    "build_oauth_router",
+]

@@ -1,13 +1,13 @@
-"""OAuth/OIDC extension — Phase 8a skeleton.
+"""OAuth/OIDC extension — full redirect flow.
 
-The first extension that hangs off the Phase-5 ``AdminExtension`` SPI to
-prove the architecture really lets external auth backends in without
-core changes. It validates that the four extension-side registries
-(permissions / protected fields / contract contributions / navigation)
-are sufficient to describe "an OAuth provider that doesn't exist in the
-framework".
+The first extension that hangs off the Phase-5 ``AdminExtension`` SPI
+and uses the Phase-8b.1 ``register_models`` hook. Validates the
+architecture end-to-end: an external auth backend the framework knows
+nothing about plugs in via ``extensions=[…]`` and contributes
+permissions, protected fields, contract fragments, a persisted DB
+table, AND mounted routes that complete a real OIDC redirect flow.
 
-**Skeleton scope — what is HERE in v1:**
+**What's HERE:**
 
 * :class:`OAuthProvider` / :class:`OIDCClaimMapper` Protocols
   (``base.py``).
@@ -15,28 +15,31 @@ framework".
   config wrapper (``dto.py``).
 * :class:`GoogleOIDCClaimMapper` — pure claim-mapping function
   (``mappers.py``).
-* :class:`GoogleOIDCProvider` adapter bundle (``providers.py``).
-* :class:`OAuthExtension` — Phase-5 ``AdminExtension`` subclass that
-  registers permissions, protected fields, contract contributions, and
-  placeholder routes.
+* :class:`GoogleOIDCProvider` adapter bundle with hard-coded Google
+  endpoints + ``build_authorize_url`` / ``exchange_code`` (``providers.py``).
+* :class:`ExternalIdentity` persistent model with ``(provider,
+  provider_subject)`` unique constraint (``models.py``).
+* Sealed-cookie state + PKCE storage (``state.py``).
+* Cached, request-coalescing :class:`JWKSClient` (``jwks.py``).
+* End-to-end ID-token verifier with strict alg/iss/aud/exp/nonce
+  checks (``verifier.py``).
+* :class:`OAuthCapableUserProvider` Protocol + :class:`BuiltinOAuthUserProvider`
+  default impl with safe lookup-only defaults (``user_provider.py``).
+* Real ``/login`` + ``/callback`` handlers that tie it all together
+  and end in a fragment-redirect with a framework JWT (``router.py``).
+* :class:`OAuthExtension` — AdminExtension subclass that wires all of
+  the above and manages the per-process httpx + JWKS clients via the
+  Phase-5 ``startup`` / ``shutdown`` hooks.
 
-**What lands in Phase 8b (NOT in this skeleton):**
+**Migration story:** the framework ships NO Alembic migration for
+``external_identities``. Host apps wiring this extension run
+``alembic --autogenerate`` against their own env.py — see
+``models.py`` and ``docs/extensions.md`` for the rationale.
 
-* Actual OAuth redirect flow: state + PKCE storage (Cookie + verifier
-  hash), authorize URL construction, code-for-token exchange.
-* JWKS client with key rotation + cache for ID-token verification.
-* Find-or-create user via the framework's ``UserProvider``.
-* JWT minting after successful login + fragment-redirect to the UI
-  ``/admin/login-complete#token=…``.
-* Persisted ``ExternalIdentity`` model with ``(provider,
-  provider_subject)`` unique constraint + Alembic migration. (Needs
-  the framework SPI for extension DB models — a separate Phase 8a-prereq
-  decision.)
-
-**What we do NOT plan to ship even in Phase 8b:**
+**What we deliberately don't ship:**
 
 * Token refresh / API access to Google services (Drive/Gmail). Login
-  only.
+  only — the access_token is discarded after the ID-token verifies.
 * OAuth credential storage (``OAuthCredential`` table). Add only when
   an extension actually needs offline access tokens.
 * SAML / SCIM. Different protocols, different extension.
@@ -52,20 +55,26 @@ Usage::
     app = create_admin(
         config=...,
         extensions=[
-            OAuthExtension(providers=[
-                GoogleOIDCProvider(client_id="...", client_secret="..."),
-            ]),
+            OAuthExtension(
+                providers=[
+                    GoogleOIDCProvider(client_id="...", client_secret="..."),
+                ],
+                # Default is lookup-only — pre-provisioned users only.
+                # Set True to auto-create users for verified emails;
+                # see BuiltinOAuthUserProvider for the security defaults.
+                auto_create_users=False,
+            ),
         ],
     )
 
-Hitting ``GET /api/v1/admin/_contract`` shows an ``extensions.auth_oauth``
-fragment listing the configured providers. Hitting
-``GET /api/v1/oauth/google/login`` returns 501 with a "Phase 8b not
-implemented" body for the duration of v1.
+``GET /api/v1/admin/_contract`` exposes the configured providers in
+``extensions.auth_oauth.providers``; ``GET /api/v1/oauth/{id}/login``
+starts the redirect flow.
 """
 
 from __future__ import annotations
 
+import httpx
 from fastapi import FastAPI
 
 from adminfoundry.extensions.auth_oauth.base import (
@@ -77,6 +86,7 @@ from adminfoundry.extensions.auth_oauth.dto import (
     ExternalIdentityData,
     OAuthProviderConfig,
 )
+from adminfoundry.extensions.auth_oauth.jwks import JWKSClient
 from adminfoundry.extensions.auth_oauth.mappers import GoogleOIDCClaimMapper
 from adminfoundry.extensions.auth_oauth.models import ExternalIdentity
 from adminfoundry.extensions.auth_oauth.providers import GoogleOIDCProvider
@@ -162,6 +172,11 @@ class OAuthExtension(AdminExtension):
             user_provider or BuiltinOAuthUserProvider()
         )
         self._auto_create_users: bool = auto_create_users
+        # Async resources created in startup, torn down in shutdown.
+        # Typed as Optional because they're None until startup runs;
+        # the router asserts non-None before use.
+        self._http_client: httpx.AsyncClient | None = None
+        self._jwks_clients: dict[str, JWKSClient] = {}
 
     # ---- Phase 5 lifecycle hooks ----
 
@@ -214,6 +229,42 @@ class OAuthExtension(AdminExtension):
             build_oauth_router(self._providers),
             prefix=api_base,
         )
+
+    async def startup(self, app: FastAPI) -> None:
+        # One shared httpx client for both the token exchanges and the
+        # JWKS clients (each provider gets its own JWKSClient that
+        # uses this shared transport). Keeping a single client means
+        # we benefit from connection pooling across providers — token
+        # exchanges hit accounts.google.com and JWKS hits
+        # www.googleapis.com, so the pool helps less in practice than
+        # in theory, but it's still simpler than one client per
+        # subsystem.
+        self._http_client = httpx.AsyncClient(timeout=15.0)
+        self._jwks_clients = {}
+        for prov in self._providers:
+            jwks_uri = getattr(prov, "JWKS_URI", None)
+            if not jwks_uri:
+                # Skip providers that don't have a JWKS URI declared
+                # (purely hypothetical — every concrete OIDC provider
+                # we ship has one). The callback handler raises a
+                # clean 'internal' error if it can't find a client.
+                continue
+            self._jwks_clients[prov.config.id] = JWKSClient(
+                jwks_uri,
+                http_client=self._http_client,
+            )
+
+    async def shutdown(self, app: FastAPI) -> None:
+        # JWKS clients share the httpx transport — they MUST NOT close
+        # it (they were constructed with the http_client kwarg, so
+        # aclose() is a no-op for the shared client). We close the
+        # shared client exactly once here.
+        for jwks in self._jwks_clients.values():
+            await jwks.aclose()
+        self._jwks_clients = {}
+        if self._http_client is not None:
+            await self._http_client.aclose()
+            self._http_client = None
 
     @property
     def providers(self) -> tuple[OAuthProvider, ...]:

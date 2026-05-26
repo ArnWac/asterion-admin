@@ -124,34 +124,51 @@ def test_extension_contract_supports_multiple_providers(tmp_path):
     assert ids == ["google_workspace", "google_personal"]
 
 
-# --- placeholder routes ---
+# --- real flow routes (Phase 8b.7 smoke tests; deep flow tests live
+# in test_router_flow.py) ---
 
 
-def test_placeholder_login_returns_501_with_useful_body(tmp_path):
+def test_login_redirects_to_idp_authorize_endpoint(tmp_path):
+    """Phase 8b: /login generates state + PKCE, sets sealed cookie, 302s
+    to Google's authorize endpoint with all the right parameters."""
     app = _build_app(
         tmp_path,
         providers=[GoogleOIDCProvider(client_id="x", client_secret="y")],
     )
     with TestClient(app, raise_server_exceptions=False) as c:
-        resp = c.get("/api/v1/oauth/google/login")
-    assert resp.status_code == 501
-    body = resp.json()
-    # The error envelope wraps {"detail": {...}} into the framework's
-    # standard error response shape. Either form is acceptable as long
-    # as the provider id + phase hint are surfaced.
-    text = str(body)
-    assert "google" in text
-    assert "8a-skeleton" in text or "skeleton" in text
+        resp = c.get("/api/v1/oauth/google/login", follow_redirects=False)
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert location.startswith(GoogleOIDCProvider.AUTHORIZE_ENDPOINT)
+    # The security-critical params must appear unencrypted in the
+    # query string for the IdP to read them.
+    assert "client_id=x" in location
+    assert "response_type=code" in location
+    assert "code_challenge_method=S256" in location
+    assert "state=" in location
+    assert "nonce=" in location
+    # Sealed-cookie state was set.
+    assert "set-cookie" in {h.lower() for h in resp.headers.keys()}
 
 
-def test_placeholder_callback_returns_501(tmp_path):
+def test_callback_without_cookie_redirects_to_login_with_error(tmp_path):
+    """Phase 8b: the callback handler never throws — every failure path
+    redirects to /admin/login?oauth_error=<code> after clearing the
+    cookie. Hitting /callback fresh (no cookie) is the simplest failure
+    to assert against."""
     app = _build_app(
         tmp_path,
         providers=[GoogleOIDCProvider(client_id="x", client_secret="y")],
     )
     with TestClient(app, raise_server_exceptions=False) as c:
-        resp = c.get("/api/v1/oauth/google/callback")
-    assert resp.status_code == 501
+        resp = c.get(
+            "/api/v1/oauth/google/callback?state=anything&code=any",
+            follow_redirects=False,
+        )
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert location.startswith("/admin/login")
+    assert "oauth_error=state_invalid" in location
 
 
 def test_no_routes_mounted_when_no_providers(tmp_path):
