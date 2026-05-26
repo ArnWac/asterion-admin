@@ -51,14 +51,15 @@ order. Each hook has a no-op default — override only what you need.
 |---|---|---|---|
 | 1 | `configure(config)` | Validate the framework config; raise to abort startup | once per app boot |
 | 2 | `register_permissions(registry)` | Add namespaced permission keys (`"oauth.identities.list"`) | once |
-| 3 | `register_protected_fields(registry)` | Add field names that must never serialize / log (`"access_token"`) | once |
+| 3 | `register_protected_fields(registry)` | Add field names that must never serialize / log (`"hashed_password"`) | once |
 | 4 | `register_contract_contributions(registry)` | Add a namespaced fragment to `GET /_contract` for the UI to consume | once |
 | 5 | `register_navigation(registry)` | Add permission-gated sidebar nav items | once |
-| 6 | `register_routes(app, ctx)` | Mount routers on the FastAPI app | once |
+| 6 | `register_models()` | Return ORM classes whose tables this extension owns | once |
+| 7 | `register_routes(app, ctx)` | Mount routers on the FastAPI app | once |
 | — | **All registries freeze here.** Any later attempt to register raises `RegistryFrozenError`. | | |
-| 7 | `startup(app)` | Async resource setup (DB pools, JWKS clients, background jobs) | once per process |
-| 8 | _(requests served)_ | | |
-| 9 | `shutdown(app)` | Async resource teardown — called in **reverse** registration order; failures logged but never raised | once per process |
+| 8 | `startup(app)` | Async resource setup (DB pools, JWKS clients, background jobs) | once per process |
+| 9 | _(requests served)_ | | |
+| 10 | `shutdown(app)` | Async resource teardown — called in **reverse** registration order; failures logged but never raised | once per process |
 
 Only `register_routes` receives the `app` directly. Extension routes
 are mounted **before** the framework's dynamic `/{resource}` catch-all,
@@ -132,6 +133,61 @@ Superadmins bypass the permission filter — see [auth-architecture.md](auth-arc
 
 ---
 
+## ORM models — `register_models()`
+
+Extensions that ship database tables (the OAuth extension's
+`ExternalIdentity`, for example) declare them via `register_models()`.
+The hook returns an iterable of model classes; the framework stashes
+them on `runtime.extension_models` so tooling can answer "which
+extension owns table X".
+
+```python
+from adminfoundry.models.base import GlobalBase
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String
+
+
+class MyExtensionThing(GlobalBase):
+    __tablename__ = "my_extension_things"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+
+
+class MyExtension(AdminExtension):
+    name = "my_extension"
+
+    def register_models(self):
+        # Importing the model module attaches the Table to
+        # GlobalBase.metadata at class-definition time. Returning the
+        # class records ownership on runtime.extension_models.
+        from my_extension import models
+        return (models.MyExtensionThing,)
+```
+
+The model class **must** subclass `adminfoundry.models.base.GlobalBase`
+(or `TenantBase` for tenant-local data) so it lands on the shared
+metadata. Defining it under your own `DeclarativeBase` would put it in
+its own private namespace and `create_all` / autogenerate wouldn't see it.
+
+### Migration story
+
+The framework ships **no** migrations for extension-owned tables.
+Apps that wire an extension are responsible for generating their own
+revisions:
+
+1. Import the extension at the top of `migrations/shared/env.py` so
+   `GlobalBase.metadata` sees the table.
+2. Run `alembic --autogenerate` against the env. The new revision
+   creates the extension's tables.
+3. Run `alembic upgrade head` in deployments.
+
+This is intentional: bundling migrations for extension tables would
+inflate every adminfoundry installation with tables the host might
+never use, and would couple framework releases to extension schema
+changes. Each host opts in by importing.
+
+---
+
 ## `ExtensionContext`
 
 The bundle handed to `register_*` hooks. Carries the four registries
@@ -188,14 +244,14 @@ All live in `adminfoundry.extensions.errors`.
 
 ## Ships-with extensions
 
-| Name | Module | Status |
+| Name | Module | What it does |
 |---|---|---|
-| `import_export` | `adminfoundry.extensions.import_export` | v1 — CSV + XLSX import/export, per-admin |
-| `auth_oauth` | `adminfoundry.extensions.auth_oauth` | Phase 8a skeleton — provider adapters + placeholder routes; real OAuth flow lands in Phase 8b |
+| `import_export` | `adminfoundry.extensions.import_export` | CSV + XLSX import/export, per-admin |
+| `auth_oauth` | `adminfoundry.extensions.auth_oauth` | OIDC sign-in (Google ships, GitHub/Microsoft/etc. via subclass) — see [auth-oauth.md](auth-oauth.md) |
 
 Both are reference implementations of "the right way" to do
-permissions / contract contributions / route mounting. Read them if
-you're writing your own.
+permissions / contract contributions / route mounting / model
+registration. Read them if you're writing your own.
 
 ---
 

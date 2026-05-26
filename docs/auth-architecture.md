@@ -235,6 +235,60 @@ table at all" scenario as a regression guard.
 
 ---
 
+## Optional capabilities: `OAuthCapableUserProvider`
+
+The four core Protocols above answer "who is this principal" (read
+path). Some extensions also need a *write* path — the OAuth extension,
+for example, may need to find or create a user from a verified
+external identity after the IdP redirect lands.
+
+Forcing every `UserProvider` implementation to grow an OAuth-shaped
+method they may never use would be wrong. So that capability is its
+own opt-in Protocol that lives in the auth_oauth extension:
+
+```python
+from adminfoundry.extensions.auth_oauth import OAuthCapableUserProvider
+
+
+class CompanyOAuthUserProvider:
+    async def find_or_create_by_external_identity(
+        self, *,
+        provider: str,
+        provider_subject: str,
+        claims,                # ExternalIdentityData
+        allow_create: bool,
+        request,
+    ):
+        # Look up the IdP identity in your IAM, return AdminPrincipal,
+        # or raise one of the OAuthCapabilityError subclasses to refuse.
+        ...
+
+
+# Wire it into the extension, not into create_admin():
+app = create_admin(
+    config=cfg,
+    extensions=[
+        OAuthExtension(
+            providers=[GoogleOIDCProvider(client_id=…, client_secret=…)],
+            user_provider=CompanyOAuthUserProvider(),  # opt-in
+            auto_create_users=False,                   # safe default
+        ),
+    ],
+)
+```
+
+The default `BuiltinOAuthUserProvider` operates on the framework's
+`User` table and applies four security defaults — see
+[auth-oauth.md](auth-oauth.md) for the full setup walkthrough.
+
+This pattern is the model for any future "extension X needs a write
+operation on the user store" Protocol: define it in the extension's
+own module, ship a `Builtin*` that wraps the framework's `User`,
+runtime-checkable so the extension can `isinstance(provider,
+ProtocolName)` before using it.
+
+---
+
 ## Why not just override `get_current_user`?
 
 The old shape (`get_current_user(request, credentials, session) → User`)
