@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from adminfoundry.db.session import DatabaseManager
 from adminfoundry.models.audit_log import AuditLog
-from adminfoundry.models.user import User
+from adminfoundry.providers.base import AdminPrincipal
 from adminfoundry.security.sanitize import sanitize_payload
 
 logger = logging.getLogger(__name__)
@@ -62,13 +62,36 @@ def request_audit_kwargs(
     }
 
 
+def _coerce_actor_id(actor: AdminPrincipal | None) -> uuid.UUID | None:
+    """Convert the principal's id to a UUID for ``actor_user_id``.
+
+    The builtin User model uses UUID primary keys, but external auth
+    providers may supply opaque string ids (Keycloak sub, OAuth subject).
+    UUID-shaped ids round-trip into the audit column; everything else
+    falls back to ``None`` and survives in ``actor_label`` instead — the
+    audit row still pins WHO did the action, just via the email/display
+    name instead of the FK column.
+    """
+    if actor is None:
+        return None
+    raw = getattr(actor, "id", None)
+    if raw is None:
+        return None
+    if isinstance(raw, uuid.UUID):
+        return raw
+    try:
+        return uuid.UUID(str(raw))
+    except (ValueError, AttributeError):
+        return None
+
+
 def audit_payload(
     *,
     action: str,
     method: str = "",
     path: str = "",
     status_code: int = 0,
-    actor: User | None = None,
+    actor: AdminPrincipal | None = None,
     tenant_id: uuid.UUID | None = None,
     resource: str | None = None,
     record_id: str | int | uuid.UUID | None = None,
@@ -87,7 +110,7 @@ def audit_payload(
         method=method,
         path=path,
         status_code=status_code,
-        actor_user_id=getattr(actor, "id", None),
+        actor_user_id=_coerce_actor_id(actor),
         tenant_id=tenant_id,
         resource=resource,
         record_id=None if record_id is None else str(record_id),

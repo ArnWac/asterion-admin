@@ -175,6 +175,46 @@ def test_audit_payload_omits_changes_when_none():
     assert row.changes is None
 
 
+def test_audit_payload_handles_external_string_actor_id():
+    """1.5 / Doc-2 §3: the audit service must accept an AdminPrincipal
+    with an arbitrary string id (external auth providers). UUID-shaped
+    ids round-trip to ``actor_user_id``; opaque ids fall back to
+    ``actor_label`` instead of raising."""
+    from adminfoundry.providers.base import AdminPrincipal
+
+    # UUID-shaped string id → keeps in actor_user_id.
+    pid = str(uuid.uuid4())
+    row = audit_payload(
+        action=LOGIN_SUCCESS,
+        actor=AdminPrincipal(id=pid, email="a@x"),
+    )
+    assert row.actor_user_id == uuid.UUID(pid)
+    assert row.actor_label == "a@x"
+
+    # Opaque external id (Keycloak sub, OAuth subject) → silent
+    # fallback, actor still identified via label.
+    row = audit_payload(
+        action=LOGIN_SUCCESS,
+        actor=AdminPrincipal(id="keycloak|user-12345", email="b@y"),
+    )
+    assert row.actor_user_id is None
+    assert row.actor_label == "b@y"
+
+
+def test_audit_payload_handles_uuid_actor_id_directly():
+    """Builtin path: ``AdminPrincipal.id`` can already carry a
+    ``uuid.UUID`` (when the BuiltinSQLAlchemyUserProvider hydrates a
+    principal). Must round-trip unchanged."""
+    from adminfoundry.providers.base import AdminPrincipal
+
+    pid = uuid.uuid4()
+    row = audit_payload(
+        action=LOGIN_SUCCESS,
+        actor=AdminPrincipal(id=pid, email="c@z"),  # type: ignore[arg-type]
+    )
+    assert row.actor_user_id == pid
+
+
 # --- record_audit_in_session (savepoint isolation) ---
 
 
