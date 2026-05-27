@@ -60,6 +60,13 @@ class FieldMeta(BaseModel):
     #: fields (``choices``, ``foreign_key``, future widget extras).
     #: Pre-A4 clients can still read everything through this dict.
     metadata: dict[str, Any] = {}
+    #: Per-caller field permission decided by the admin's
+    #: :class:`~adminfoundry.admin.policy.AdminPolicy.field_permission`.
+    #: ``"write"`` when no policy is attached (legacy / quickstart
+    #: default — the contract behaves as it always has). Clients can
+    #: branch on this to disable inputs for ``"read"`` fields and hide
+    #: them entirely for ``"hidden"``. Roadmap 2.4.
+    field_permission: str = "write"
 
 
 class AdminActionMeta(BaseModel):
@@ -251,6 +258,7 @@ def _field_meta_from_adapter(
     *,
     registry: FieldRegistry,
     readonly_set: set[str],
+    field_permission: str = "write",
 ) -> FieldMeta:
     """Run a column through the registry and turn the resulting
     :class:`FieldContract` into the wire-format :class:`FieldMeta`.
@@ -259,6 +267,10 @@ def _field_meta_from_adapter(
     constraints (primary keys). Admin-level overrides via
     ``ModelAdmin.readonly_fields`` are layered on top here, because
     only the caller knows about the admin.
+
+    ``field_permission`` is the per-caller decision from
+    :meth:`AdminPolicy.field_permission` (Roadmap 2.4). Defaults to
+    ``"write"`` for the legacy / no-policy path.
     """
     adapter = registry.find_adapter(col)
     if adapter is None:
@@ -271,7 +283,9 @@ def _field_meta_from_adapter(
             name=col.name,
             type="string",
             primary_key=bool(col.primary_key),
-            read_only=bool(col.primary_key) or col.name in readonly_set,
+            read_only=bool(col.primary_key)
+            or col.name in readonly_set
+            or field_permission == "read",
             hidden=False,
             nullable=bool(col.nullable),
             calculated=False,
@@ -280,6 +294,7 @@ def _field_meta_from_adapter(
             help_text=_column_help_text(col),
             validation={},
             metadata={},
+            field_permission=field_permission,
         )
 
     contract = adapter.build_contract(col)
@@ -289,7 +304,9 @@ def _field_meta_from_adapter(
         name=contract.name,
         type=contract.type,
         primary_key=contract.primary_key,
-        read_only=contract.read_only or contract.name in readonly_set,
+        read_only=contract.read_only
+        or contract.name in readonly_set
+        or field_permission == "read",
         hidden=contract.hidden,
         nullable=contract.nullable,
         calculated=contract.calculated,
@@ -298,6 +315,7 @@ def _field_meta_from_adapter(
         help_text=_column_help_text(col),
         validation=validation,
         metadata=leftover_metadata,
+        field_permission=field_permission,
     )
 
 
@@ -305,6 +323,7 @@ def build_field_metadata(
     model_admin: ModelAdmin,
     *,
     registry: FieldRegistry | None = None,
+    field_permissions: dict[str, str] | None = None,
 ) -> list[FieldMeta]:
     """Build the list of :class:`FieldMeta` for one admin.
 
@@ -313,9 +332,19 @@ def build_field_metadata(
     every column type used in core. Routers that have an
     extension-augmented registry on the runtime pass it in to expose
     extension-contributed adapters.
+
+    ``field_permissions`` (Roadmap 2.4) maps column name → ``"read" |
+    "write" | "hidden"`` (the string values of
+    :class:`adminfoundry.admin.policy.FieldPermission`). Columns mapped
+    to ``"hidden"`` are dropped from the output entirely — same shape
+    as a protected field. Other fields receive the value in
+    :attr:`FieldMeta.field_permission`; ``"read"`` also forces
+    ``read_only=True``. ``None`` means "no per-caller policy was run"
+    and every field falls through to the default ``"write"``.
     """
     if registry is None:
         registry = build_default_registry()
+    perms = field_permissions or {}
 
     mapper = sa_inspect(model_admin.model)
     protected = model_admin.all_protected
@@ -326,11 +355,22 @@ def build_field_metadata(
     for col in mapper.columns:
         if col.name in protected:
             continue
+        perm = perms.get(col.name, "write")
+        if perm == "hidden":
+            continue
         fields.append(
-            _field_meta_from_adapter(col, registry=registry, readonly_set=readonly_set)
+            _field_meta_from_adapter(
+                col,
+                registry=registry,
+                readonly_set=readonly_set,
+                field_permission=perm,
+            )
         )
 
     for fname in model_admin.calculated_fields:
+        perm = perms.get(fname, "write")
+        if perm == "hidden":
+            continue
         fields.append(
             FieldMeta(
                 name=fname,
@@ -345,10 +385,50 @@ def build_field_metadata(
                 help_text=None,
                 validation={},
                 metadata={},
+                field_permission="read",  # calculated fields are inherently read-only
             )
         )
 
     return fields
+
+
+async def compute_field_permissions(
+    model_admin: ModelAdmin,
+    ctx: Any | None,
+) -> dict[str, str]:
+    """Pre-compute the per-field permission map for one admin + caller.
+
+    Lives outside :func:`build_field_metadata` because
+    :meth:`AdminPolicy.field_permission` is async and the contract
+    builders are deliberately sync. Routers call this first, hand the
+    resulting dict to ``build_model_contract`` / ``build_field_metadata``,
+    and the builders apply the static string mapping per field.
+
+    Returns ``{}`` when there is no policy or no ctx — every field
+    falls back to the default ``"write"`` in the builder.
+    """
+    if ctx is None:
+        return {}
+    policy = getattr(model_admin, "policy", None)
+    if policy is None:
+        return {}
+    from adminfoundry.admin.policy import FieldPermission
+
+    mapper = sa_inspect(model_admin.model)
+    out: dict[str, str] = {}
+    for col in mapper.columns:
+        perm = await policy.field_permission(col.name, None, ctx)
+        if isinstance(perm, FieldPermission):
+            out[col.name] = perm.value
+        else:
+            out[col.name] = str(perm)
+    for fname in getattr(model_admin, "calculated_fields", {}) or {}:
+        perm = await policy.field_permission(fname, None, ctx)
+        if isinstance(perm, FieldPermission):
+            out[fname] = perm.value
+        else:
+            out[fname] = str(perm)
+    return out
 
 
 def _admin_action_meta(action) -> AdminActionMeta:
@@ -634,6 +714,7 @@ def build_model_contract(
     registry: FieldRegistry | None = None,
     permissions: Collection[str] | None = None,
     admin_registry: "AdminRegistry | None" = None,
+    field_permissions: dict[str, str] | None = None,
 ) -> ModelContractMeta:
     """Render the contract for one admin.
 
@@ -642,6 +723,13 @@ def build_model_contract(
     When supplied, the ``capabilities`` block reflects what THIS caller
     can do; when ``None``, all capabilities default to True so cache-
     friendly schema-only consumers still get a usable shape.
+
+    ``field_permissions`` (Roadmap 2.4) is a pre-computed map of
+    column name → ``"read" | "write" | "hidden"``. Routers compute it
+    once via :func:`compute_field_permissions` (async, calls the
+    admin's :class:`AdminPolicy`) before invoking this sync builder.
+    None means "no per-caller policy ran" — every field falls back to
+    the default ``"write"``.
     """
     return ModelContractMeta(
         contract_version=CONTRACT_VERSION,
@@ -649,7 +737,9 @@ def build_model_contract(
         label=model_admin.display_label,
         label_plural=model_admin.display_label_plural,
         description=model_admin.description,
-        fields=build_field_metadata(model_admin, registry=registry),
+        fields=build_field_metadata(
+            model_admin, registry=registry, field_permissions=field_permissions
+        ),
         crud_actions=list(CRUD_ACTIONS),
         admin_actions=[_admin_action_meta(a) for a in model_admin.actions],
         capabilities=_build_capabilities(model_admin, permissions=permissions),

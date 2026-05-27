@@ -226,10 +226,11 @@ def test_capabilities_respect_global_wildcard():
 # ---------------------------------------------------------------------------
 
 
-def test_validation_dict_empty_when_adapter_did_not_supply():
-    """Default scalar adapters don't (yet) emit validation hints, so
-    the field's ``validation`` dict is empty. A future adapter for
-    String might emit ``max_length`` — pinning the current shape so
-    that change becomes visible."""
+def test_validation_dict_populated_from_string_column_length():
+    """Roadmap 2.3 lifted the A4 "slot exists but adapters don't emit"
+    state — ``Column(String(200))`` now produces
+    ``validation = {"max_length": 200}``. Adapters that don't supply
+    hints still leave the dict empty (see test_validation_hints.py for
+    that branch)."""
     metas = build_field_metadata(_PostAdmin())
-    assert _meta_by_name(metas, "title").validation == {}
+    assert _meta_by_name(metas, "title").validation == {"max_length": 200}

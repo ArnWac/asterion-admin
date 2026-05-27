@@ -254,6 +254,12 @@ class TextAdapter:
 
     def build_contract(self, model_attr: Column, ctx: Any | None = None) -> FieldContract:
         contract = _base_contract(model_attr, "string", str)
+        metadata: dict[str, Any] = {"widget": "textarea"}
+        # Some dialects accept TEXT(N) — propagate the cap when present
+        # so the textarea can enforce it client-side.
+        length = getattr(model_attr.type, "length", None)
+        if isinstance(length, int) and length > 0:
+            metadata["max_length"] = length
         return FieldContract(
             name=contract.name,
             type=contract.type,
@@ -263,7 +269,7 @@ class TextAdapter:
             nullable=contract.nullable,
             calculated=contract.calculated,
             python_type=contract.python_type,
-            metadata={"widget": "textarea"},
+            metadata=metadata,
         )
 
     def serialize(self, value: Any, ctx: Any | None = None) -> Any:
@@ -281,6 +287,12 @@ class StringAdapter:
     never returns ``None`` for a real column. Non-column attributes
     (hybrid properties, calculated fields) are handled outside the
     registry by the caller.
+
+    Validation hints (Roadmap 2.3): when the column declares a length
+    (``Column(String(200))``), the adapter exposes ``max_length=200``
+    in metadata. The contract builder's ``_split_widget_and_validation``
+    promotes it into :data:`FieldMeta.validation` so the client form
+    can size + validate the input without re-introspecting the model.
     """
 
     name = "string"
@@ -289,7 +301,24 @@ class StringAdapter:
         return isinstance(model_attr, Column)
 
     def build_contract(self, model_attr: Column, ctx: Any | None = None) -> FieldContract:
-        return _base_contract(model_attr, "string", str)
+        contract = _base_contract(model_attr, "string", str)
+        metadata: dict[str, Any] = {}
+        length = getattr(model_attr.type, "length", None)
+        if isinstance(length, int) and length > 0:
+            metadata["max_length"] = length
+        if not metadata:
+            return contract
+        return FieldContract(
+            name=contract.name,
+            type=contract.type,
+            primary_key=contract.primary_key,
+            read_only=contract.read_only,
+            hidden=contract.hidden,
+            nullable=contract.nullable,
+            calculated=contract.calculated,
+            python_type=contract.python_type,
+            metadata=metadata,
+        )
 
     def serialize(self, value: Any, ctx: Any | None = None) -> Any:
         return value

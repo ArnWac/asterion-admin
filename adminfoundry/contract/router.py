@@ -17,6 +17,7 @@ from adminfoundry.contract.service import (
     CONTRACT_VERSION,
     ModelContractMeta,
     build_model_contract,
+    compute_field_permissions,
 )
 from adminfoundry.security.validation import (
     InvalidResourceNameError,
@@ -32,17 +33,24 @@ async def get_full_contract(
     ctx: AdminContext = Depends(require_admin_context),
 ) -> dict:
     runtime = request.app.state.adminfoundry
-    return {
-        "contract_version": CONTRACT_VERSION,
-        "models": [
+    models: list[dict] = []
+    for admin in runtime.registry.all():
+        # Field permissions are policy.field_permission() output for
+        # the calling principal — pre-computed here (async) so the
+        # sync builder below can stamp the result into FieldMeta.
+        field_permissions = await compute_field_permissions(admin, ctx)
+        models.append(
             build_model_contract(
                 admin,
                 registry=runtime.fields,
                 permissions=ctx.permissions,
                 admin_registry=runtime.registry,
+                field_permissions=field_permissions,
             ).model_dump()
-            for admin in runtime.registry.all()
-        ],
+        )
+    return {
+        "contract_version": CONTRACT_VERSION,
+        "models": models,
         # Extension contributions land under a namespaced top-level key.
         # Each extension owns its namespace (typically the extension name);
         # the UI / API clients iterate over this dict to discover features
@@ -71,9 +79,11 @@ async def get_model_contract(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Resource '{resource}' is not registered.",
         )
+    field_permissions = await compute_field_permissions(admin, ctx)
     return build_model_contract(
         admin,
         registry=runtime.fields,
         permissions=ctx.permissions,
         admin_registry=runtime.registry,
+        field_permissions=field_permissions,
     )
