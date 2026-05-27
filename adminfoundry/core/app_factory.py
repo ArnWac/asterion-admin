@@ -121,6 +121,13 @@ def create_admin(
     )
     runtime.extension_models = run_setup_phase(runtime.extensions, ctx, app)
 
+    # Freeze the admin registry now that every setup-time contributor
+    # (builtin admins, the user's ``register=`` callback, extensions)
+    # has had its turn. Anything that tries to mutate the registry from
+    # a request handler will surface a RegistryFrozenError instead of
+    # silently breaking cached contracts / route tables.
+    runtime.registry.freeze()
+
     install_routes(app, config)
 
     return app

@@ -42,9 +42,10 @@ class SchemaBuilder:
     """Pydantic schema factory driven by the field registry.
 
     A3 replaces the previous inline ``_TYPE_MAP`` with a registry lookup.
-    The module-level ``schema_builder`` singleton holds a fresh default
-    registry; callers with a custom or extension-augmented registry build
-    their own :class:`SchemaBuilder` instance.
+    Construct one ``SchemaBuilder`` per app — the cache is per-instance
+    and tied to the registry passed in at construction. ``runtime.fields``
+    is the registry the framework uses internally; callers with a custom
+    or extension-augmented registry build their own instance.
     """
 
     def __init__(self, registry: FieldRegistry | None = None) -> None:
@@ -133,9 +134,6 @@ class SchemaBuilder:
         if key not in self._cache:
             self._cache[key] = builder(model_admin)
         return self._cache[key]
-
-
-schema_builder = SchemaBuilder()
 
 
 def build_model_schema(model_admin: ModelAdmin) -> AdminModelSchema:
