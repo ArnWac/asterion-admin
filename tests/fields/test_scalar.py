@@ -168,11 +168,10 @@ def test_default_registry_picks_float_for_numeric_money_columns():
     assert adapter.name == "float"
 
 
-def test_serialize_and_parse_are_identity_by_default():
-    """A1 keeps serialize/parse as no-op identity functions. Later
-    phases will customize per-adapter (Enum coercion, JSON parse,
-    Secret redaction). This test pins the A1 baseline so a regression
-    can be detected if someone changes a default."""
+def test_parse_is_identity_for_default_scalars():
+    """parse() remains identity for every default scalar adapter —
+    SQLAlchemy already coerces input on bind, so per-adapter parsing
+    is reserved for future custom types (Enum/JSON validators)."""
     for adapter in (
         UUIDAdapter(),
         BooleanAdapter(),
@@ -181,5 +180,45 @@ def test_serialize_and_parse_are_identity_by_default():
         IntegerAdapter(),
         StringAdapter(),
     ):
-        assert adapter.serialize("x") == "x"
         assert adapter.parse(42) == 42
+
+
+def test_serialize_is_identity_for_non_typed_scalars():
+    """Bool / Float / Integer / String stay identity on serialize —
+    these are JSON-native primitives. UUID/DateTime have their own
+    tests below pinning the coercion behaviour."""
+    for adapter in (
+        BooleanAdapter(),
+        FloatAdapter(),
+        IntegerAdapter(),
+        StringAdapter(),
+    ):
+        assert adapter.serialize("x") == "x"
+        assert adapter.serialize(7) == 7
+
+
+def test_uuid_adapter_serialize_coerces_uuid_to_str():
+    """1.3 (Robustness): UUID-to-string coercion moves into the
+    adapter so the serializer can stay column-type-agnostic. Non-UUID
+    values pass through unchanged for defensive cases."""
+    import uuid as _uuid
+
+    adapter = UUIDAdapter()
+    sample = _uuid.UUID("12345678-1234-5678-1234-567812345678")
+    assert adapter.serialize(sample) == "12345678-1234-5678-1234-567812345678"
+    # Already a string? leave it alone.
+    assert adapter.serialize("not-a-uuid") == "not-a-uuid"
+    # None passes through (nullable columns).
+    assert adapter.serialize(None) is None
+
+
+def test_datetime_adapter_serialize_coerces_datetime_to_isoformat():
+    """1.3 (Robustness): datetime-to-isoformat coercion moves into the
+    adapter. Non-datetime values pass through."""
+    from datetime import datetime as _dt
+
+    adapter = DateTimeAdapter()
+    sample = _dt(2026, 5, 27, 14, 30, 0)
+    assert adapter.serialize(sample) == "2026-05-27T14:30:00"
+    assert adapter.serialize("already-a-string") == "already-a-string"
+    assert adapter.serialize(None) is None

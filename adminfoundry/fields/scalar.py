@@ -52,6 +52,11 @@ class UUIDAdapter:
     because the UUID type lives in different namespaces across SA
     versions and dialects, and exists as a real ``Uuid`` class only in
     SA 2.0+. Substring lookup is robust to both.
+
+    ``serialize`` converts :class:`uuid.UUID` values to their canonical
+    string form for the wire — pre-1.3 this lived in
+    ``serializer._serialize_value``; consolidated here so column-type
+    coercion has one source of truth.
     """
 
     name = "uuid"
@@ -66,6 +71,8 @@ class UUIDAdapter:
         return _base_contract(model_attr, "uuid", uuid.UUID)
 
     def serialize(self, value: Any, ctx: Any | None = None) -> Any:
+        if isinstance(value, uuid.UUID):
+            return str(value)
         return value
 
     def parse(self, value: Any, ctx: Any | None = None) -> Any:
@@ -89,6 +96,13 @@ class BooleanAdapter:
 
 
 class DateTimeAdapter:
+    """SQLAlchemy ``DateTime`` columns.
+
+    ``serialize`` returns ISO-8601 strings (``.isoformat()``) for the
+    wire — pre-1.3 this lived in ``serializer._serialize_value``;
+    consolidated here so column-type coercion has one source of truth.
+    """
+
     name = "datetime"
 
     def supports(self, model_attr: Any) -> bool:
@@ -98,6 +112,8 @@ class DateTimeAdapter:
         return _base_contract(model_attr, "datetime", datetime)
 
     def serialize(self, value: Any, ctx: Any | None = None) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
         return value
 
     def parse(self, value: Any, ctx: Any | None = None) -> Any:
