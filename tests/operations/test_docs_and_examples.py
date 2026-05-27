@@ -130,3 +130,54 @@ def test_basic_single_example_registers_against_real_registry():
     assert registry.all(), "register() left the registry empty"
     names = [a.model_name for a in registry.all()]
     assert "posts" in names
+
+
+# --- multi_tenant example (Roadmap 1.8) ---
+
+
+def test_multi_tenant_example_admin_config_imports():
+    """Smoke-test the multi_tenant example's admin_config module —
+    catches stale attrs the same way the basic_single tests do.
+    Without this, a typo in the second example only surfaces when an
+    operator actually runs it."""
+    mod = importlib.import_module("examples.multi_tenant.admin_config")
+    assert hasattr(mod, "register")
+
+
+def test_multi_tenant_example_uses_only_supported_admin_attrs():
+    """Any ModelAdmin subclass in the multi_tenant example must only
+    set attrs ModelAdmin supports. Parity with the basic_single
+    guard."""
+    from adminfoundry import ModelAdmin
+    from examples.multi_tenant import admin_config as mod
+
+    supported = set(vars(ModelAdmin).keys())
+    for name, obj in vars(mod).items():
+        if not isinstance(obj, type) or not issubclass(obj, ModelAdmin):
+            continue
+        if obj is ModelAdmin:
+            continue
+        declared = {n for n in vars(obj).keys() if not n.startswith("_")}
+        extras = declared - supported
+        extras.discard("model")
+        assert not extras, (
+            f"{name} sets attrs not present on ModelAdmin: {sorted(extras)}."
+        )
+
+
+def test_multi_tenant_example_registers_against_real_registry():
+    """Round-trip the multi_tenant ``register`` callback through a
+    real AdminRegistry. Pinning this catches the same class of
+    breakage that ``test_basic_single_example_registers...`` catches
+    for the simpler example."""
+    from adminfoundry import AdminRegistry
+    from examples.multi_tenant.admin_config import register
+
+    registry = AdminRegistry()
+    register(registry)
+    assert registry.all(), "multi_tenant register() left the registry empty"
+    names = [a.model_name for a in registry.all()]
+    # Multi-tenant example registers tenant-local RBAC admins + the
+    # business resources from its sample app.
+    assert "projects" in names
+    assert "tickets" in names
