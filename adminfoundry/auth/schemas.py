@@ -11,6 +11,14 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    #: Present when the auth provider issues refresh tokens (Roadmap
+    #: 3.1). Clients store it and POST it to ``/auth/refresh`` to get a
+    #: new access+refresh pair without re-entering credentials.
+    refresh_token: str | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class MeResponse(BaseModel):

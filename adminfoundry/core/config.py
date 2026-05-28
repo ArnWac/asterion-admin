@@ -106,6 +106,11 @@ class CoreAdminConfig:
 
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    #: Refresh-token lifetime (Roadmap 3.1). Default 7 days. The
+    #: refresh token is long-lived and exchanged at ``/auth/refresh``
+    #: for a fresh access+refresh pair (rotation); the old refresh
+    #: token is revoked on each exchange.
+    refresh_token_expire_minutes: int = 60 * 24 * 7
     password_min_length: int = 8
 
     enable_builtin_ui: bool = True
@@ -188,6 +193,10 @@ class CoreAdminConfig:
             access_token_expire_minutes=_env_int(
                 "ADMINFOUNDRY_ACCESS_TOKEN_EXPIRE_MINUTES",
                 60,
+            ),
+            refresh_token_expire_minutes=_env_int(
+                "ADMINFOUNDRY_REFRESH_TOKEN_EXPIRE_MINUTES",
+                60 * 24 * 7,
             ),
             password_min_length=_env_int(
                 "ADMINFOUNDRY_PASSWORD_MIN_LENGTH",
@@ -283,6 +292,9 @@ class CoreAdminConfig:
 
         if self.access_token_expire_minutes <= 0:
             raise ValueError("access_token_expire_minutes must be greater than 0")
+
+        if self.refresh_token_expire_minutes <= 0:
+            raise ValueError("refresh_token_expire_minutes must be greater than 0")
 
         if self.password_min_length < 8:
             raise ValueError("password_min_length must be at least 8")
@@ -381,6 +393,7 @@ class CoreAdminConfig:
             "admin_ui_path": self.admin_ui_path,
             "jwt_algorithm": self.jwt_algorithm,
             "access_token_expire_minutes": self.access_token_expire_minutes,
+            "refresh_token_expire_minutes": self.refresh_token_expire_minutes,
             "password_min_length": self.password_min_length,
             "enable_builtin_ui": self.enable_builtin_ui,
             "enable_builtin_admins": self.enable_builtin_admins,

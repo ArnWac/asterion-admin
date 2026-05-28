@@ -14,6 +14,7 @@ class TokenError(Exception):
 
 ACCESS_TOKEN_TYPE = "access"
 IMPERSONATION_TOKEN_TYPE = "impersonation"
+REFRESH_TOKEN_TYPE = "refresh"
 
 
 def _now_utc() -> datetime:
@@ -76,6 +77,52 @@ def create_access_token(
         expires_delta=timedelta(minutes=expires_minutes),
         token_type=ACCESS_TOKEN_TYPE,
     )
+
+
+def create_refresh_token(
+    user_id: str | UUID,
+    *,
+    secret_key: str,
+    algorithm: str,
+    expires_minutes: int,
+    token_version: int = 0,
+) -> str:
+    """Create a long-lived refresh token (Roadmap 3.1).
+
+    Same ``sub`` / ``tkv`` / ``jti`` shape as an access token but
+    ``type="refresh"`` and a longer expiry. Exchanged at
+    ``/auth/refresh`` for a fresh access+refresh pair (the old refresh
+    token's jti is revoked on each exchange — rotation).
+    """
+    return _create_token(
+        {
+            "sub": str(user_id),
+            "tkv": token_version,
+        },
+        secret_key=secret_key,
+        algorithm=algorithm,
+        expires_delta=timedelta(minutes=expires_minutes),
+        token_type=REFRESH_TOKEN_TYPE,
+    )
+
+
+def decode_refresh_token(
+    token: str,
+    *,
+    secret_key: str,
+    algorithm: str,
+) -> dict[str, Any]:
+    """Decode + type-check a refresh token. Raises :class:`TokenError`
+    for any non-refresh token so an access token can't be replayed at
+    the refresh endpoint."""
+    payload = decode_token(token, secret_key=secret_key, algorithm=algorithm)
+    if payload.get("type") != REFRESH_TOKEN_TYPE:
+        raise TokenError("Invalid token type")
+    return payload
+
+
+def is_refresh_token(payload: dict[str, Any]) -> bool:
+    return payload.get("type") == REFRESH_TOKEN_TYPE
 
 
 def create_impersonation_token(

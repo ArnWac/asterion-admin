@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adminfoundry.audit import (
@@ -14,9 +15,25 @@ from adminfoundry.audit import (
 )
 from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.rate_limiter import InMemoryLoginRateLimiter
-from adminfoundry.auth.revocation import revoke_token, token_exp_as_datetime
-from adminfoundry.auth.schemas import LoginRequest, MeResponse, TokenResponse
-from adminfoundry.auth.tokens import get_token_jti
+from adminfoundry.auth.revocation import (
+    is_token_revoked,
+    revoke_token,
+    token_exp_as_datetime,
+)
+from adminfoundry.auth.schemas import (
+    LoginRequest,
+    MeResponse,
+    RefreshRequest,
+    TokenResponse,
+)
+from adminfoundry.auth.tokens import (
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    get_subject_user_id,
+    get_token_jti,
+    get_token_version,
+)
 from adminfoundry.db.dependencies import get_async_session
 from adminfoundry.models.user import User
 from adminfoundry.providers.base import (
@@ -24,6 +41,7 @@ from adminfoundry.providers.base import (
     LoginCredentials,
     LoginError,
 )
+from adminfoundry.auth.tokens import TokenError
 
 router = APIRouter()
 
@@ -141,7 +159,89 @@ async def login(
     return TokenResponse(
         access_token=session_result.access_token,
         token_type=session_result.token_type,
+        refresh_token=session_result.refresh_token,
     )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh(
+    payload: RefreshRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+) -> TokenResponse:
+    """Exchange a refresh token for a fresh access+refresh pair (Roadmap 3.1).
+
+    Rotation: the presented refresh token's ``jti`` is revoked and a new
+    refresh token is issued, so a refresh token is single-use. A replayed
+    (already-rotated) refresh token is rejected because its jti is now in
+    ``revoked_tokens``.
+
+    Validates signature, ``type=refresh``, the ``tkv`` invariant (a
+    ``/logout-all`` since issuance invalidates it), the per-jti
+    revocation store, and that the user still exists + is active.
+    """
+    config = request.app.state.adminfoundry.config
+
+    try:
+        token_payload = decode_refresh_token(
+            payload.refresh_token,
+            secret_key=config.secret_key,
+            algorithm=config.jwt_algorithm,
+        )
+        user_id = get_subject_user_id(token_payload)
+        token_version = get_token_version(token_payload)
+        jti = get_token_jti(token_payload)
+    except TokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    if await is_token_revoked(session, jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked.",
+        )
+
+    user = (
+        await session.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+        )
+    if user.token_version != token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked.",
+        )
+
+    # Rotation: revoke the presented refresh token so it can't be reused.
+    await revoke_token(
+        session,
+        jti=jti,
+        user_id=user.id,
+        expires_at=token_exp_as_datetime(token_payload),
+        reason="refresh_rotation",
+    )
+
+    new_access = create_access_token(
+        user.id,
+        secret_key=config.secret_key,
+        algorithm=config.jwt_algorithm,
+        expires_minutes=config.access_token_expire_minutes,
+        token_version=user.token_version,
+    )
+    new_refresh = create_refresh_token(
+        user.id,
+        secret_key=config.secret_key,
+        algorithm=config.jwt_algorithm,
+        expires_minutes=config.refresh_token_expire_minutes,
+        token_version=user.token_version,
+    )
+    return TokenResponse(access_token=new_access, refresh_token=new_refresh)
 
 
 @router.get("/me", response_model=MeResponse)

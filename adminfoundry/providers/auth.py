@@ -26,6 +26,7 @@ from adminfoundry.auth.revocation import is_token_revoked
 from adminfoundry.auth.tokens import (
     TokenError,
     create_access_token,
+    create_refresh_token,
     decode_access_token,
     get_subject_user_id,
     get_token_jti,
@@ -145,9 +146,17 @@ class BuiltinJWTAuthProvider:
             expires_minutes=config.access_token_expire_minutes,
             token_version=user.token_version,
         )
+        refresh = create_refresh_token(
+            user.id,
+            secret_key=config.secret_key,
+            algorithm=config.jwt_algorithm,
+            expires_minutes=config.refresh_token_expire_minutes,
+            token_version=user.token_version,
+        )
         return AuthSession(
             access_token=token,
             token_type="bearer",
             expires_in=config.access_token_expire_minutes * 60,
             subject=str(user.id),
+            refresh_token=refresh,
         )
