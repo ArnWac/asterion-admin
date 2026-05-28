@@ -55,6 +55,32 @@ class AdminPrincipal:
 
 
 @dataclass(frozen=True, slots=True)
+class UserQuery:
+    """Filter + pagination for :meth:`UserProvider.list_users`.
+
+    Neutral request object so the provider doesn't have to know about
+    HTTP query params. ``search`` is a free-text needle the provider
+    matches however it likes (email / display name for the builtin).
+    """
+
+    search: str | None = None
+    limit: int = 100
+    offset: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class Page:
+    """One page of :class:`AdminPrincipal` results from
+    :meth:`UserProvider.list_users`. ``total`` is the unpaginated count
+    so the UI can render pagination controls."""
+
+    items: list["AdminPrincipal"]
+    total: int
+    limit: int
+    offset: int
+
+
+@dataclass(frozen=True, slots=True)
 class AdminTenant:
     """Neutral representation of an active tenant.
 
@@ -108,6 +134,31 @@ class UserProvider(Protocol):
         *,
         request: Request | None = None,
     ) -> AdminPrincipal | None: ...
+
+
+@runtime_checkable
+class UserListingProvider(Protocol):
+    """Optional extension of :class:`UserProvider` for the root panel.
+
+    Kept separate from ``UserProvider`` on purpose: ``UserProvider`` is
+    ``runtime_checkable`` and required everywhere auth runs, so adding
+    ``list_users`` to it would force every external auth-only provider
+    to implement listing just to pass ``isinstance(x, UserProvider)``.
+    A provider opts into root-panel listing by implementing this second
+    protocol; the root endpoint detects it via ``hasattr`` and returns
+    501 when it's absent.
+
+    Unlike ``UserProvider.get_by_id`` (which filters out inactive users
+    for the auth path), ``list_users`` returns every user including
+    inactive ones — the root panel needs to see and re-activate them.
+    """
+
+    async def list_users(
+        self,
+        query: "UserQuery",
+        *,
+        request: Request | None = None,
+    ) -> "Page": ...
 
 
 @runtime_checkable

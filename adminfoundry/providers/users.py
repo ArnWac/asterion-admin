@@ -13,11 +13,12 @@ where ``is_active`` is False, matching the behaviour of the legacy
 from __future__ import annotations
 
 from fastapi import Request
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from adminfoundry.models.user import User
-from adminfoundry.providers.base import AdminPrincipal
+from adminfoundry.providers.base import AdminPrincipal, Page, UserQuery
+from adminfoundry.security.validation import validate_limit_offset
 
 
 def _to_admin_principal(row: User) -> AdminPrincipal:
@@ -61,3 +62,51 @@ class BuiltinSQLAlchemyUserProvider:
         if row is None or not row.is_active:
             return None
         return _to_admin_principal(row)
+
+    async def list_users(
+        self,
+        query: UserQuery,
+        *,
+        request: Request | None = None,
+    ) -> Page:
+        """List users for the root admin panel.
+
+        Returns ALL users including inactive ones (unlike ``get_by_id``,
+        which filters inactive for the auth path) — the root panel needs
+        to see and re-activate disabled accounts. ``search`` matches
+        email + full_name case-insensitively.
+        """
+        if request is None:
+            raise RuntimeError(
+                "BuiltinSQLAlchemyUserProvider needs the request to reach the DB; "
+                "external use should pass a UserProvider that does not require it."
+            )
+        limit, offset = validate_limit_offset(limit=query.limit, offset=query.offset)
+
+        base = select(User)
+        if query.search:
+            needle = f"%{query.search.strip()}%"
+            base = base.where(or_(User.email.ilike(needle), User.full_name.ilike(needle)))
+
+        runtime = request.app.state.adminfoundry
+        factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
+        async with factory() as session:
+            total = (
+                await session.execute(select(func.count()).select_from(base.subquery()))
+            ).scalar_one()
+            rows = (
+                (
+                    await session.execute(
+                        base.order_by(User.email).limit(limit).offset(offset)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+        return Page(
+            items=[_to_admin_principal(r) for r in rows],
+            total=int(total),
+            limit=limit,
+            offset=offset,
+        )

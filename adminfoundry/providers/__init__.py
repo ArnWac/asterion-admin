@@ -30,9 +30,12 @@ from adminfoundry.providers.base import (
     AdminTenant,
     AuthIdentity,
     AuthProvider,
+    Page,
     PermissionProvider,
     TenantProvider,
+    UserListingProvider,
     UserProvider,
+    UserQuery,
 )
 from adminfoundry.providers.permissions import BuiltinPermissionProvider
 from adminfoundry.providers.tenants import BuiltinTenantProvider
@@ -47,7 +50,10 @@ __all__ = [
     "BuiltinPermissionProvider",
     "BuiltinSQLAlchemyUserProvider",
     "BuiltinTenantProvider",
+    "Page",
     "PermissionProvider",
     "TenantProvider",
+    "UserListingProvider",
     "UserProvider",
+    "UserQuery",
 ]

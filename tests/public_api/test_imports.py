@@ -98,9 +98,12 @@ PROVIDERS_PUBLIC: set[str] = {
     "BuiltinPermissionProvider",
     "BuiltinSQLAlchemyUserProvider",
     "BuiltinTenantProvider",
+    "Page",
     "PermissionProvider",
     "TenantProvider",
+    "UserListingProvider",
     "UserProvider",
+    "UserQuery",
 }
 
 
