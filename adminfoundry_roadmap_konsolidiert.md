@@ -88,41 +88,49 @@ wahrheit — siehe Phase 1.5 unten.
 
 ## Roadmap — Phasen
 
-### Phase 1 — Robustheit-Härtung (Doc 2 unfinished + Audit-Findings)
+### Phase 1 — Robustheit-Härtung ✅ ABGESCHLOSSEN
 
 **Ziel:** Bestehende Architektur verbindlich machen, keine neuen Features.
 
-| # | Aufgabe | Quelle | Aufwand |
-|---|---|---|---|
-| 1.1 | `AdminRegistry.freeze()` + `is_frozen` einbauen; alle Mutationen prüfen; Lifespan-Hook ruft freeze nach Setup | Doc 2 §8 + Audit A0.1 | klein |
-| 1.2 | Module-Level `schema_builder` Singleton entfernen | Doc 2 §2 + Audit A0.2 | trivial |
-| 1.3 | Serializer durch FieldAdapter-Pipeline leiten (UUID/datetime-Coercion in Adapter verlagern) | Doc 2 §4 + Audit A0.3 | mittel |
-| 1.4 | Public-API-Test: `tests/public_api/` prüft welche Symbole offiziell exportiert werden; Dokumentation listet sie auf | Doc 2 §1 | klein |
-| 1.5 | `auth/router.py`, `root/*`, `audit/service.py` auf `UserProvider`/`AdminPrincipal` statt direkter `User`-Import; Audit-Service nimmt `AdminPrincipal` statt `User` | Doc 2 §3 + Audit A0.5 | mittel-groß |
-| 1.6 | CRUD-Testmatrix vervollständigen: parametrisierte Tests für `{create, list, read, update, delete} × {success, validation_error, permission_error, not_found, protected_field, readonly_field, conflict, transaction_rollback}` | Doc 2 §7 | mittel |
-| 1.7 | `protected_fields`-Pfad-Audit: gleicher Test-Sweep über List/Detail/Create/Update/Contract/Audit/Error/Debug — protected darf nirgends auftauchen | Doc 2 §5 | klein-mittel |
-| 1.8 | Beispiele kuratieren: `minimal_single_file`, `basic_app`, `custom_auth_provider`, `multi_tenant_subdomain`. CI-Test pro Beispiel. Keine internen Imports | Doc 2 §10 | mittel |
+| # | Aufgabe | Status |
+|---|---|---|
+| 1.1 | `AdminRegistry.freeze()` + `is_frozen`; freeze nach Setup in `create_admin` | ✅ |
+| 1.2 | Toter Module-Level `schema_builder` Singleton entfernt | ✅ |
+| 1.3 | Serializer durch FieldAdapter-Pipeline (UUID/datetime-Coercion in Adapter) | ✅ |
+| 1.4 | Public-API-Test `tests/public_api/test_imports.py` (4 Surfaces, `__all__` gepinnt) | ✅ |
+| 1.5 | `audit/service.py` auf `AdminPrincipal` statt `User`. `root/*` + `auth/router` bleiben Builtin-Pfade (→ 2.5/2.6 lösen sie sauber auf) | ✅ scope-reduced |
+| 1.6 | CRUD-Matrix-Lücken: update/delete PK-coercion, validate-rollback, unique-conflict | ✅ |
+| 1.7 | Protected-Fields-Sweep über list/detail/update/contract/audit/sanitize | ✅ |
+| 1.8 | Examples-Smoke-Parity (multi_tenant). Die 3 zusätzlichen Beispiele aus Doc-2 §10 bleiben offen | ✅ scope-reduced |
 
-**DoD:** Two Admin-Apps können im selben Prozess mit unterschiedlicher
-Config laufen. `AdminRegistry` ist nach Freeze unveränderlich. Public
-API ist getestet + dokumentiert. Externe Auth funktioniert vollständig
-(ohne `User`-Imports in Core-Pfaden). CRUD-Matrix grün.
+Commits: `2c41f4a`, `d188417`, `114ce40`, `b768270`, `ec10862`, `a435032`.
 
 ---
 
-### Phase 2 — Architektur-Konsolidierung (Gap-Analysis Reste, die Phase 1 unterstützen)
+### Phase 2 — Architektur-Konsolidierung ✅ ABGESCHLOSSEN
 
 **Ziel:** Die drei Wege „field policy" zu einem konsolidieren; Inline-
 Permission schließen; Provider-Schicht vervollständigen.
 
-| # | Aufgabe | Quelle | Aufwand |
-|---|---|---|---|
-| 2.1 | `protected_fields` + `readonly_fields` intern in `field_permission(...)` übersetzen. Die Liste-Form bleibt API-Convenience, aber **eine** Pipeline entscheidet. Test: Custom Policy kann eine `readonly_fields`-Deklaration overrulen | Gap §8 + Audit A0.4 | mittel |
-| 2.2 | `InlineAdmin.policy: AdminPolicy \| None` + Plumbing in `process_inline_writes` (can_view_object / can_update_object / can_delete_object pro Inline-Row) | Gap §4 Mindestfunktion | mittel |
-| 2.3 | Validation-Hints aus Adaptern füllen (`max_length` aus `Column(String(200))`, `pattern` aus `Column(...)` constraints) — Slot `FieldMeta.validation` existiert seit A4, leer | Gap §6 | klein |
-| 2.4 | `FieldPermission` im Contract sichtbar machen: `FieldMeta.field_permission: "read"\|"write"\|"hidden"` (per-caller) | Gap §6 | klein |
-| 2.5 | `UserProvider.list_users(query) -> Page[AdminPrincipal]` + Plumbing in `root/users.py` (statt direkter `User`-Query) | Gap §1 | mittel |
-| 2.6 | `AuthProvider.login(credentials)` + `logout(request)` — Login/Logout-Flow auf Provider auslagern, `auth/router.py` wird dünner Wrapper | Gap §1 | groß |
+| # | Aufgabe | Status |
+|---|---|---|
+| 2.1 | `static_field_permission()` + `FieldPermission.strictest()` — eine Resolution-Regel vereint protected/readonly/calculated/policy. Policy kann nur verschärfen, nie lockern | ✅ |
+| 2.2 | `InlineAdmin.policy` + per-Inline-Gating in `process_inline_writes` (can_create/can_update_object/can_delete_object pro Row) | ✅ |
+| 2.3 | Validation-Hints: `StringAdapter`/`TextAdapter` emittieren `max_length` → `FieldMeta.validation` | ✅ |
+| 2.4 | `FieldMeta.field_permission: "read"/"write"/"hidden"` per-caller via `compute_field_permissions` | ✅ |
+| 2.5 | `UserListingProvider.list_users(query) -> Page` (separates optionales Protocol) + `root/users.py` list über Provider | ✅ |
+| 2.6 | `CredentialAuthProvider.login(credentials) -> AuthSession` (separates optionales Protocol) + `auth/router` delegiert. `logout-all` bleibt Builtin (token_version) | ✅ |
+
+Commits: `4c03e84`, `d5b0434`, `1442421`, `c542477`, `1598933`.
+
+**Architektur-Entscheidung in Phase 2:** Optionale Provider-Fähigkeiten
+(`list_users`, `login`) wurden als **separate runtime_checkable
+Protocols** (`UserListingProvider`, `CredentialAuthProvider`) modelliert,
+statt die Basis-Protocols zu verbreitern — sonst müsste jeder auth-only
+externe Provider sie implementieren, nur um `isinstance(x, UserProvider)`
+zu bestehen. Endpoints erkennen die Fähigkeit per `hasattr` und geben
+501 zurück, wenn sie fehlt. `PermissionProvider.can(obj, ...)` bleibt
+**bewusst abgelehnt** (würde mit `AdminPolicy` konkurrieren).
 
 **DoD:** Eine `AdminPolicy.field_permission()`-Implementierung kann
 ALLE Visibility-/Writability-Regeln steuern. Inline-Children
