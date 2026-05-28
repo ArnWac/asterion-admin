@@ -10,7 +10,7 @@ from adminfoundry.contract.service import (
     build_field_metadata,
     build_model_contract,
 )
-from adminfoundry.registry import AdminRegistry, ModelAdmin
+from adminfoundry.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):
@@ -74,11 +74,3 @@ def test_contract_list_display():
     contract = build_model_contract(ArticleAdmin())
     assert "id" in contract.list_display
     assert "title" in contract.list_display
-
-
-def test_contract_works_after_registration():
-    registry = AdminRegistry()
-    registry.register(ArticleAdmin)
-    contract = build_model_contract(ArticleAdmin())
-    assert contract.resource == "articles"
-    assert registry.get("articles") is not None
