@@ -49,6 +49,32 @@ class FieldPermission(str, Enum):
     READ = "read"
     HIDDEN = "hidden"
 
+    @property
+    def _rank(self) -> int:
+        """Strictness rank: WRITE(0) < READ(1) < HIDDEN(2)."""
+        return {"write": 0, "read": 1, "hidden": 2}[self.value]
+
+    @classmethod
+    def strictest(cls, *perms: "FieldPermission") -> "FieldPermission":
+        """Combine several field-permission decisions, keeping the most
+        restrictive (Roadmap 2.1).
+
+        This is the single rule that unifies the three field-visibility
+        mechanisms: a field's effective permission is the strictest of
+        its static class (protected → HIDDEN, readonly → READ) and the
+        per-caller :meth:`AdminPolicy.field_permission` decision. A
+        policy can therefore only ever tighten access, never loosen
+        what ``protected_fields`` / ``readonly_fields`` already locked
+        down.
+
+        Empty input defaults to WRITE (the permissive base).
+        """
+        result = cls.WRITE
+        for perm in perms:
+            if perm._rank > result._rank:
+                result = perm
+        return result
+
 
 class AdminPolicy:
     """Default-allow policy. Subclass and override only the methods you
@@ -107,3 +133,56 @@ class AdminPolicy:
         rejected and the field is missing from the form.
         """
         return FieldPermission.WRITE
+
+
+# ---------------------------------------------------------------------------
+# Field-visibility consolidation (Roadmap 2.1)
+# ---------------------------------------------------------------------------
+
+#: Columns the framework never lets a client write, regardless of admin
+#: config — server-generated identity + timestamps. Mirrors
+#: ``crud/payload.DEFAULT_READONLY_FIELD_NAMES`` but kept here so the
+#: static resolver doesn't import the CRUD layer.
+_AUTO_READONLY: frozenset[str] = frozenset(
+    {"id", "created_at", "updated_at", "created_by", "updated_by", "deleted_at"}
+)
+
+
+def static_field_permission(model_admin: Any, field: str) -> FieldPermission:
+    """Translate the *static* field-visibility config into a single
+    :class:`FieldPermission` (Roadmap 2.1 / Audit A0.4).
+
+    Resolution order (strictest first):
+
+    1. ``field in model_admin.all_protected`` → ``HIDDEN`` — protected
+       fields (global registry + per-admin ``protected_fields``) are
+       invisible everywhere.
+    2. ``field in model_admin.calculated_fields`` → ``READ`` —
+       calculated fields have no underlying column to write back to.
+    3. ``field in model_admin.readonly_fields`` or an auto-managed
+       column (PK / timestamps) → ``READ`` — visible but not writable.
+    4. otherwise → ``WRITE``.
+
+    This is the one place that interprets ``protected_fields``,
+    ``calculated_fields`` and ``readonly_fields`` as field permissions.
+    The per-caller :meth:`AdminPolicy.field_permission` decision is
+    layered on top via :meth:`FieldPermission.strictest` — a policy can
+    tighten but never loosen what this static resolver returns.
+
+    Synchronous on purpose: it reads only static admin attributes, so
+    the contract / schema builders (also sync) can call it directly;
+    the async policy hop stays separate.
+    """
+    protected = getattr(model_admin, "all_protected", frozenset())
+    if field in protected:
+        return FieldPermission.HIDDEN
+
+    calculated = getattr(model_admin, "calculated_fields", {}) or {}
+    if field in calculated:
+        return FieldPermission.READ
+
+    readonly = set(getattr(model_admin, "readonly_fields", []) or [])
+    if field in readonly or field in _AUTO_READONLY:
+        return FieldPermission.READ
+
+    return FieldPermission.WRITE

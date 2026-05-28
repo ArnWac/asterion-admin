@@ -73,13 +73,18 @@ def test_no_policy_defaults_to_write():
         assert m.field_permission == "write"
 
 
-def test_no_policy_means_empty_permission_map():
-    """``compute_field_permissions`` short-circuits when no policy is
-    attached — saves a per-column await on the cheap path."""
+def test_no_policy_returns_static_classification():
+    """Roadmap 2.1: ``compute_field_permissions`` now always returns a
+    populated map reflecting the static field class, even with no
+    policy attached. The PK ``id`` resolves to ``"read"`` (auto-managed
+    column); plain writable columns to ``"write"``."""
     import asyncio
 
     perms = asyncio.run(compute_field_permissions(_BareAdmin(), _ctx()))
-    assert perms == {}
+    assert perms["id"] == "read"  # primary key → read-only static class
+    assert perms["title"] == "write"
+    assert perms["salary"] == "write"
+    assert perms["private_note"] == "write"
 
 
 # ---------------------------------------------------------------------------
@@ -212,10 +217,33 @@ def test_compute_field_permissions_runs_policy_for_each_column():
     assert perms["title"] == "write"
 
 
-def test_compute_field_permissions_skips_when_ctx_none():
-    """Defensive: callers that haven't built a ctx (test paths,
-    background jobs) get an empty map without an async policy hop."""
+def test_compute_field_permissions_ctx_none_skips_policy_keeps_static():
+    """Roadmap 2.1: with no ctx the async policy hop is skipped, but
+    the static classification still applies — so ``salary`` is NOT
+    hidden (that was a policy decision) yet the PK ``id`` is still
+    ``"read"`` (static class). A policy can only tighten on top of
+    the static base; without a ctx there's no tightening."""
     import asyncio
 
     perms = asyncio.run(compute_field_permissions(_HideSalaryAdmin(), None))
-    assert perms == {}
+    assert perms["salary"] == "write"  # policy not run → static WRITE
+    assert perms["id"] == "read"  # static PK class still applies
+
+
+def test_policy_cannot_loosen_static_readonly():
+    """Roadmap 2.1 strictest contract: a policy returning WRITE for a
+    statically read-only field (PK) must NOT loosen it — the combined
+    result stays ``read``."""
+    import asyncio
+
+    class _LoosenPolicy(AdminPolicy):
+        async def field_permission(self, field, obj, ctx):
+            return FieldPermission.WRITE  # tries to grant write to everything
+
+    class _Admin(ModelAdmin):
+        model = _Doc
+        policy = _LoosenPolicy()
+
+    perms = asyncio.run(compute_field_permissions(_Admin(), _ctx()))
+    # id is a PK → static READ; policy WRITE cannot loosen it.
+    assert perms["id"] == "read"

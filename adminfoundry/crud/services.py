@@ -49,6 +49,17 @@ async def _apply_field_policy_to_schema(
 
     Returns the original schema when there's no ctx or no policy —
     the cheap path for legacy callers / public APIs.
+
+    Roadmap 2.1 note: this is the ``strictest`` combination applied to
+    the write path. The incoming ``schema`` already carries the *static*
+    field class — ``build_model_schema`` dropped ``protected_fields``
+    and flagged ``readonly_fields`` / auto columns as ``read_only``.
+    Policy can only tighten from there: the WRITE branch leaves the
+    existing FieldInfo untouched (so a field already ``read_only`` by
+    static class stays read-only even if the policy says WRITE), READ
+    forces read-only, HIDDEN drops the field. A policy therefore never
+    loosens what the static config locked down — matching
+    :meth:`FieldPermission.strictest`.
     """
     if ctx is None:
         return schema

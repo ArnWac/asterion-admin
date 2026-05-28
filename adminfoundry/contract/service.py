@@ -398,36 +398,46 @@ async def compute_field_permissions(
 ) -> dict[str, str]:
     """Pre-compute the per-field permission map for one admin + caller.
 
-    Lives outside :func:`build_field_metadata` because
-    :meth:`AdminPolicy.field_permission` is async and the contract
-    builders are deliberately sync. Routers call this first, hand the
-    resulting dict to ``build_model_contract`` / ``build_field_metadata``,
-    and the builders apply the static string mapping per field.
+    This is the single place (Roadmap 2.1) that unifies the three
+    field-visibility mechanisms into one decision per field:
 
-    Returns ``{}`` when there is no policy or no ctx — every field
-    falls back to the default ``"write"`` in the builder.
+    1. :func:`adminfoundry.admin.policy.static_field_permission`
+       interprets ``protected_fields`` (→ HIDDEN) and
+       ``readonly_fields`` / auto columns (→ READ).
+    2. when an :class:`AdminPolicy` is attached and a ctx is supplied,
+       its async :meth:`field_permission` runs per field.
+    3. the two are combined with :meth:`FieldPermission.strictest` — a
+       policy can tighten but never loosen the static class.
+
+    Lives outside :func:`build_field_metadata` because the policy hop
+    is async and the contract builders are deliberately sync. Routers
+    call this first, then hand the resulting string map to
+    ``build_model_contract`` / ``build_field_metadata``.
+
+    Always returns a populated map (one entry per column + calculated
+    field) so the contract's ``field_permission`` reflects readonly
+    columns as ``"read"`` even with no policy attached.
     """
-    if ctx is None:
-        return {}
+    from adminfoundry.admin.policy import FieldPermission, static_field_permission
+
     policy = getattr(model_admin, "policy", None)
-    if policy is None:
-        return {}
-    from adminfoundry.admin.policy import FieldPermission
+    run_policy = policy is not None and ctx is not None
+
+    async def _resolve(field_name: str) -> str:
+        static = static_field_permission(model_admin, field_name)
+        if not run_policy:
+            return static.value
+        dynamic = await policy.field_permission(field_name, None, ctx)
+        if not isinstance(dynamic, FieldPermission):
+            dynamic = FieldPermission(str(dynamic))
+        return FieldPermission.strictest(static, dynamic).value
 
     mapper = sa_inspect(model_admin.model)
     out: dict[str, str] = {}
     for col in mapper.columns:
-        perm = await policy.field_permission(col.name, None, ctx)
-        if isinstance(perm, FieldPermission):
-            out[col.name] = perm.value
-        else:
-            out[col.name] = str(perm)
+        out[col.name] = await _resolve(col.name)
     for fname in getattr(model_admin, "calculated_fields", {}) or {}:
-        perm = await policy.field_permission(fname, None, ctx)
-        if isinstance(perm, FieldPermission):
-            out[fname] = perm.value
-        else:
-            out[fname] = str(perm)
+        out[fname] = await _resolve(fname)
     return out
 
 
