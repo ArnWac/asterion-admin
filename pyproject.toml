@@ -32,6 +32,7 @@ dependencies = [
     "pydantic[email]>=2.7.0",
     "python-jose[cryptography]>=3.3.0",  # JWT encode/decode (auth/tokens.py)
     "bcrypt>=4.0.0",                     # password hashing (auth/password.py)
+    "pyotp>=2.9.0",                      # TOTP 2FA (auth/totp.py)
     "typer>=0.12.0",                     # CLI (cli/main.py)
     "jinja2>=3.1.0",                     # UI templates (ui/templates/*.html)
 ]

@@ -30,6 +30,23 @@ class PasswordResetConfirmBody(BaseModel):
     new_password: str
 
 
+class TwoFactorSetupResponse(BaseModel):
+    secret: str
+    provisioning_uri: str
+
+
+class TwoFactorEnableBody(BaseModel):
+    code: str
+
+
+class TwoFactorEnableResponse(BaseModel):
+    backup_codes: list[str]
+
+
+class TwoFactorDisableBody(BaseModel):
+    code: str
+
+
 class MeResponse(BaseModel):
     id: str
     email: EmailStr

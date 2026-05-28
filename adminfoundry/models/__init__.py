@@ -11,6 +11,7 @@ from adminfoundry.models.tenant_rbac import (
     TenantRole,
     TenantRolePermission,
 )
+from adminfoundry.models.two_factor_backup_code import TwoFactorBackupCode
 from adminfoundry.models.user import User
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "TenantMembershipRole",
     "TenantRole",
     "TenantRolePermission",
+    "TwoFactorBackupCode",
     "User",
 ]

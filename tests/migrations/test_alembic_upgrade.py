@@ -74,6 +74,8 @@ def test_public_upgrade_creates_all_global_tables(tmp_path):
         "revoked_tokens",
         # 0003
         "password_reset_tokens",
+        # 0004
+        "two_factor_backup_codes",
     }.issubset(tables), f"Missing tables. Got: {tables}"
 
 

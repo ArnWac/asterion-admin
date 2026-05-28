@@ -8,6 +8,7 @@ from adminfoundry.admin.login_contract_router import router as login_contract_ro
 from adminfoundry.admin.navigation_router import router as navigation_router
 from adminfoundry.admin.saved_filter_router import router as saved_filter_router
 from adminfoundry.auth.router import router as auth_router
+from adminfoundry.auth.two_factor_router import router as two_factor_router
 from adminfoundry.contract.router import router as contract_router
 from adminfoundry.core.config import CoreAdminConfig
 from adminfoundry.core.health import router as health_router
@@ -73,6 +74,12 @@ def install_routes(
         auth_router,
         prefix=config.auth_api_prefix,
         tags=["auth"],
+    )
+
+    app.include_router(
+        two_factor_router,
+        prefix=config.auth_api_prefix,
+        tags=["auth-2fa"],
     )
 
     app.include_router(

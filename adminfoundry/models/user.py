@@ -49,6 +49,22 @@ class User(GlobalModel):
         nullable=False,
     )
 
+    #: Base32 TOTP shared secret (Roadmap 3.4). Set during 2FA setup;
+    #: ``totp_enabled`` flips to True only after the first code is
+    #: verified at the enable step. ``None`` means no 2FA configured.
+    totp_secret: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    #: Whether 2FA is active for this user. A secret can be present
+    #: (pending) while this is False between setup and enable.
+    totp_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
     memberships: Mapped[list[TenantMembership]] = relationship(
         "TenantMembership",
         back_populates="user",
