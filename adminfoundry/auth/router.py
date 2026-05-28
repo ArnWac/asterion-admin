@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from adminfoundry.audit import (
     LOGIN_FAILURE,
     LOGIN_SUCCESS,
+    LOGOUT,
     LOGOUT_ALL,
     record_audit,
     record_audit_in_session,
@@ -13,7 +14,9 @@ from adminfoundry.audit import (
 )
 from adminfoundry.auth.dependencies import get_current_user
 from adminfoundry.auth.rate_limiter import InMemoryLoginRateLimiter
+from adminfoundry.auth.revocation import revoke_token, token_exp_as_datetime
 from adminfoundry.auth.schemas import LoginRequest, MeResponse, TokenResponse
+from adminfoundry.auth.tokens import get_token_jti
 from adminfoundry.db.dependencies import get_async_session
 from adminfoundry.models.user import User
 from adminfoundry.providers.base import (
@@ -156,6 +159,43 @@ async def me(
     )
 
 
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> dict[str, str]:
+    """Revoke ONLY the access token used for this request (Roadmap 3.2).
+
+    Records the token's ``jti`` in ``revoked_tokens``; both auth paths
+    reject a revoked jti on subsequent requests. Other sessions for the
+    same user keep working — use ``/logout-all`` to invalidate every
+    session at once.
+
+    Idempotent: logging out a token whose jti is already revoked
+    returns 200 without writing a duplicate row.
+    """
+    payload = getattr(request.state, "token_payload", {}) or {}
+    jti = get_token_jti(payload)
+    newly_revoked = await revoke_token(
+        session,
+        jti=jti,
+        user_id=current_user.id,
+        expires_at=token_exp_as_datetime(payload),
+        reason="logout",
+    )
+
+    await record_audit_in_session(
+        session,
+        action=LOGOUT,
+        actor=current_user,
+        changes={"jti": jti, "newly_revoked": newly_revoked},
+        **request_audit_kwargs(request, status_code=status.HTTP_200_OK),
+    )
+
+    return {"detail": "Session invalidated."}
+
+
 @router.post("/logout-all", status_code=status.HTTP_200_OK)
 async def logout_all(
     request: Request,
@@ -166,8 +206,8 @@ async def logout_all(
 
     Implementation: bumps ``User.token_version``. Every token in the wild
     carries a ``tkv`` claim; ``get_current_user`` rejects with 401 when
-    they no longer match. Single-token logout (per-jti revocation) is
-    deliberately out of scope — see ``docs/security.md``.
+    they no longer match. Single-token logout is ``/logout`` (per-jti
+    revocation via ``revoked_tokens``).
     """
     current_user.token_version = (current_user.token_version or 0) + 1
     await session.flush()

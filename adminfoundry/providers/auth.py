@@ -22,11 +22,13 @@ from fastapi.security import HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from adminfoundry.auth.revocation import is_token_revoked
 from adminfoundry.auth.tokens import (
     TokenError,
     create_access_token,
     decode_access_token,
     get_subject_user_id,
+    get_token_jti,
     get_token_version,
 )
 from adminfoundry.auth.password import verify_password
@@ -71,16 +73,20 @@ class BuiltinJWTAuthProvider:
             )
             user_id = get_subject_user_id(payload)
             token_version = get_token_version(payload)
+            jti = get_token_jti(payload)
         except TokenError as exc:
             raise _unauthorized("Invalid access token.") from exc
 
         # token_version is a JWT-specific invariant; it does not belong on
         # the neutral AdminPrincipal DTO. We check it here so that external
         # auth providers (which don't have token_version) don't have to
-        # know about this concept.
+        # know about this concept. The per-token jti revocation check
+        # (Roadmap 3.2) rides on the same DB session.
         runtime = request.app.state.adminfoundry
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
+            if await is_token_revoked(session, jti):
+                raise _unauthorized("Token has been revoked.")
             stored_version = (
                 await session.execute(
                     select(User.token_version).where(User.id == user_id)

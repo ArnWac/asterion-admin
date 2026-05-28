@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 LOGIN_SUCCESS = "login_success"
 LOGIN_FAILURE = "login_failure"
+LOGOUT = "logout"
 LOGOUT_ALL = "logout_all"
 CRUD_CREATE = "crud_create"
 CRUD_UPDATE = "crud_update"

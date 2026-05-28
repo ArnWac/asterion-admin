@@ -69,6 +69,9 @@ def test_public_upgrade_creates_all_global_tables(tmp_path):
         "permission_catalog",
         "audit_logs",
         "impersonation_logs",
+        # 0002 — added after the initial cut
+        "saved_filters",
+        "revoked_tokens",
     }.issubset(tables), f"Missing tables. Got: {tables}"
 
 

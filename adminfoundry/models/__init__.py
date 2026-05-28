@@ -1,6 +1,7 @@
 from adminfoundry.models.audit_log import AuditLog
 from adminfoundry.models.impersonation_log import ImpersonationLog
 from adminfoundry.models.permission_catalog import PermissionCatalog
+from adminfoundry.models.revoked_token import RevokedToken
 from adminfoundry.models.saved_filter import SavedFilter
 from adminfoundry.models.tenant import Tenant
 from adminfoundry.models.tenant_membership import TenantMembership
@@ -15,6 +16,7 @@ __all__ = [
     "AuditLog",
     "ImpersonationLog",
     "PermissionCatalog",
+    "RevokedToken",
     "SavedFilter",
     "Tenant",
     "TenantMembership",

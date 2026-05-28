@@ -5,10 +5,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adminfoundry.auth.revocation import is_token_revoked
 from adminfoundry.auth.tokens import (
     TokenError,
     decode_access_token,
     get_subject_user_id,
+    get_token_jti,
     get_token_version,
     is_impersonation_token,
 )
@@ -45,8 +47,14 @@ async def get_current_user(
         )
         user_id = get_subject_user_id(payload)
         token_version = get_token_version(payload)
+        jti = get_token_jti(payload)
     except TokenError as exc:
         raise _unauthorized("Invalid access token.") from exc
+
+    # Single-token revocation (Roadmap 3.2): a token whose jti was
+    # logged out is rejected even though its signature + tkv are valid.
+    if await is_token_revoked(session, jti):
+        raise _unauthorized("Token has been revoked.")
 
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
