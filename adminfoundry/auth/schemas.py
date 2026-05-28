@@ -21,6 +21,15 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class PasswordResetRequestBody(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmBody(BaseModel):
+    token: str
+    new_password: str
+
+
 class MeResponse(BaseModel):
     id: str
     email: EmailStr

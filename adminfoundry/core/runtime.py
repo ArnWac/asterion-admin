@@ -69,6 +69,9 @@ class AdminRuntime:
     #: during their setup phase. Read by ``schemas/builder.py`` and
     #: ``contract/service.py`` to introspect model columns.
     fields: FieldRegistry = field(default_factory=build_default_registry)
+    #: Delivers password-reset links (Roadmap 3.3). Defaults to the
+    #: dev-only logging notifier; apps pass a real one to ``create_admin``.
+    password_reset_notifier: Any = None
     #: Module-level singleton — every runtime references the same registry.
     #: Extension ``register_protected_fields`` hooks write into it before
     #: ``create_admin`` freezes it for the duration of the request lifecycle.

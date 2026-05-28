@@ -72,6 +72,8 @@ def test_public_upgrade_creates_all_global_tables(tmp_path):
         # 0002 — added after the initial cut
         "saved_filters",
         "revoked_tokens",
+        # 0003
+        "password_reset_tokens",
     }.issubset(tables), f"Missing tables. Got: {tables}"
 
 

@@ -9,11 +9,18 @@ from adminfoundry.audit import (
     LOGIN_SUCCESS,
     LOGOUT,
     LOGOUT_ALL,
+    PASSWORD_RESET_CONFIRM,
+    PASSWORD_RESET_REQUEST,
     record_audit,
     record_audit_in_session,
     request_audit_kwargs,
 )
 from adminfoundry.auth.dependencies import get_current_user
+from adminfoundry.auth.password import hash_password, validate_password_strength
+from adminfoundry.auth.password_reset import (
+    consume_password_reset,
+    create_password_reset,
+)
 from adminfoundry.auth.rate_limiter import InMemoryLoginRateLimiter
 from adminfoundry.auth.revocation import (
     is_token_revoked,
@@ -23,10 +30,13 @@ from adminfoundry.auth.revocation import (
 from adminfoundry.auth.schemas import (
     LoginRequest,
     MeResponse,
+    PasswordResetConfirmBody,
+    PasswordResetRequestBody,
     RefreshRequest,
     TokenResponse,
 )
 from adminfoundry.auth.tokens import (
+    TokenError,
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
@@ -41,7 +51,6 @@ from adminfoundry.providers.base import (
     LoginCredentials,
     LoginError,
 )
-from adminfoundry.auth.tokens import TokenError
 
 router = APIRouter()
 
@@ -322,3 +331,99 @@ async def logout_all(
     )
 
     return {"detail": "All sessions invalidated."}
+
+
+@router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
+async def password_reset_request(
+    payload: PasswordResetRequestBody,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+) -> dict[str, str]:
+    """Begin a password reset (Roadmap 3.3).
+
+    ALWAYS returns 202 regardless of whether the email maps to a known,
+    active user — this prevents account enumeration. When the email does
+    match an active user, a single-use token is generated, its hash
+    stored, and the raw token handed to the configured
+    ``PasswordResetNotifier`` for delivery.
+    """
+    runtime = request.app.state.adminfoundry
+    config = runtime.config
+
+    user = (
+        await session.execute(select(User).where(User.email == payload.email))
+    ).scalar_one_or_none()
+
+    issued = False
+    if user is not None and user.is_active:
+        raw_token = await create_password_reset(
+            session,
+            user=user,
+            ttl_minutes=config.password_reset_token_expire_minutes,
+        )
+        notifier = runtime.password_reset_notifier
+        if notifier is not None:
+            await notifier.send_reset(
+                email=payload.email, token=raw_token, request=request
+            )
+        issued = True
+
+    await record_audit_in_session(
+        session,
+        action=PASSWORD_RESET_REQUEST,
+        actor=user if issued else None,
+        changes={"email": payload.email, "issued": issued},
+        **request_audit_kwargs(request, status_code=status.HTTP_202_ACCEPTED),
+    )
+
+    # Identical response on both branches — no enumeration signal.
+    return {"detail": "If the account exists, a reset link has been sent."}
+
+
+@router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
+async def password_reset_confirm(
+    payload: PasswordResetConfirmBody,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+) -> dict[str, str]:
+    """Complete a password reset (Roadmap 3.3).
+
+    Verifies + consumes the single-use token, sets the new password, and
+    bumps ``token_version`` so every existing session for the user is
+    invalidated. Returns 400 for an invalid / expired / already-used
+    token without revealing which.
+    """
+    config = request.app.state.adminfoundry.config
+
+    try:
+        validate_password_strength(
+            payload.new_password, min_length=config.password_min_length
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    user = await consume_password_reset(session, raw_token=payload.token)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token.",
+        )
+
+    user.hashed_password = hash_password(payload.new_password)
+    # Invalidate every existing session — a reset implies the old
+    # credentials may be compromised.
+    user.token_version = (user.token_version or 0) + 1
+    await session.flush()
+
+    await record_audit_in_session(
+        session,
+        action=PASSWORD_RESET_CONFIRM,
+        actor=user,
+        changes={"bumped_to": user.token_version},
+        **request_audit_kwargs(request, status_code=status.HTTP_200_OK),
+    )
+
+    return {"detail": "Password updated."}

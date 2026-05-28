@@ -38,6 +38,7 @@ def create_admin(
     user_provider: UserProvider | None = None,
     permission_provider: PermissionProvider | None = None,
     tenant_provider: TenantProvider | None = None,
+    password_reset_notifier=None,
     **fastapi_kwargs,
 ) -> FastAPI:
     config = config or CoreAdminConfig.from_env()
@@ -73,6 +74,13 @@ def create_admin(
         tenants=tenant_provider or BuiltinTenantProvider(),
     )
 
+    # Password-reset delivery (Roadmap 3.3). Defaults to the dev-only
+    # logging notifier; production apps pass a real email sender.
+    if password_reset_notifier is None:
+        from adminfoundry.auth.password_reset import LoggingPasswordResetNotifier
+
+        password_reset_notifier = LoggingPasswordResetNotifier()
+
     runtime = AdminRuntime(
         config=config,
         db=DatabaseManager(
@@ -83,6 +91,7 @@ def create_admin(
             pool_pre_ping=config.db_pool_pre_ping,
         ),
         providers=providers,
+        password_reset_notifier=password_reset_notifier,
     )
 
     # Register extensions up front so the lifespan composer can see them.

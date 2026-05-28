@@ -111,6 +111,9 @@ class CoreAdminConfig:
     #: for a fresh access+refresh pair (rotation); the old refresh
     #: token is revoked on each exchange.
     refresh_token_expire_minutes: int = 60 * 24 * 7
+    #: Password-reset token lifetime (Roadmap 3.3). Default 30 minutes
+    #: — short because the link grants account access.
+    password_reset_token_expire_minutes: int = 30
     password_min_length: int = 8
 
     enable_builtin_ui: bool = True
@@ -197,6 +200,10 @@ class CoreAdminConfig:
             refresh_token_expire_minutes=_env_int(
                 "ADMINFOUNDRY_REFRESH_TOKEN_EXPIRE_MINUTES",
                 60 * 24 * 7,
+            ),
+            password_reset_token_expire_minutes=_env_int(
+                "ADMINFOUNDRY_PASSWORD_RESET_TOKEN_EXPIRE_MINUTES",
+                30,
             ),
             password_min_length=_env_int(
                 "ADMINFOUNDRY_PASSWORD_MIN_LENGTH",
@@ -296,6 +303,9 @@ class CoreAdminConfig:
         if self.refresh_token_expire_minutes <= 0:
             raise ValueError("refresh_token_expire_minutes must be greater than 0")
 
+        if self.password_reset_token_expire_minutes <= 0:
+            raise ValueError("password_reset_token_expire_minutes must be greater than 0")
+
         if self.password_min_length < 8:
             raise ValueError("password_min_length must be at least 8")
 
@@ -394,6 +404,7 @@ class CoreAdminConfig:
             "jwt_algorithm": self.jwt_algorithm,
             "access_token_expire_minutes": self.access_token_expire_minutes,
             "refresh_token_expire_minutes": self.refresh_token_expire_minutes,
+            "password_reset_token_expire_minutes": self.password_reset_token_expire_minutes,
             "password_min_length": self.password_min_length,
             "enable_builtin_ui": self.enable_builtin_ui,
             "enable_builtin_admins": self.enable_builtin_admins,
