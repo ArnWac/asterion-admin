@@ -127,6 +127,7 @@ def test_providers_all_matches_pinned_set():
 # ---------------------------------------------------------------------------
 
 FIELDS_PUBLIC: set[str] = {
+    "DEFAULT_FILE_ADAPTERS",
     "DEFAULT_RELATION_ADAPTERS",
     "DEFAULT_SCALAR_ADAPTERS",
     "BooleanAdapter",
@@ -135,6 +136,8 @@ FIELDS_PUBLIC: set[str] = {
     "FieldAdapter",
     "FieldContract",
     "FieldRegistry",
+    "FileFieldAdapter",
+    "FileFieldType",
     "FloatAdapter",
     "ForeignKeyAdapter",
     "IntegerAdapter",

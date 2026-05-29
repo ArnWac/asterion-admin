@@ -100,6 +100,7 @@ def test_default_registry_has_expected_adapters():
     names = [a.name for a in registry.adapters()]
     assert names == [
         "foreign_key",
+        "file",
         "uuid",
         "boolean",
         "datetime",
@@ -110,7 +111,7 @@ def test_default_registry_has_expected_adapters():
         "text",
         "string",
     ]
-    assert len(registry) == 10
+    assert len(registry) == 11
 
 
 def test_build_default_registry_returns_fresh_instance():

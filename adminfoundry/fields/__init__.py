@@ -31,6 +31,11 @@ Default registration order (priority highest first):
 from __future__ import annotations
 
 from adminfoundry.fields.base import FieldAdapter, FieldContract
+from adminfoundry.fields.file_field import (
+    DEFAULT_FILE_ADAPTERS,
+    FileFieldAdapter,
+    FileFieldType,
+)
 from adminfoundry.fields.registry import FieldRegistry
 from adminfoundry.fields.relation import DEFAULT_RELATION_ADAPTERS, ForeignKeyAdapter
 from adminfoundry.fields.scalar import (
@@ -51,8 +56,10 @@ def build_default_registry() -> FieldRegistry:
     """Construct a registry populated with all default adapters.
 
     Order: relation adapters first (so a FK column wins over the
-    scalar that matches its underlying type), then scalar adapters in
-    the order pinned in :data:`DEFAULT_SCALAR_ADAPTERS`.
+    scalar that matches its underlying type), then file adapters
+    (must beat StringAdapter — :class:`FileFieldType` extends String),
+    then scalar adapters in the order pinned in
+    :data:`DEFAULT_SCALAR_ADAPTERS`.
 
     Each call returns a fresh registry — tests that mutate the registry
     should not call this once and share. The runtime builds one of these
@@ -61,12 +68,15 @@ def build_default_registry() -> FieldRegistry:
     registry = FieldRegistry()
     for adapter_cls in DEFAULT_RELATION_ADAPTERS:
         registry.register(adapter_cls())
+    for adapter_cls in DEFAULT_FILE_ADAPTERS:
+        registry.register(adapter_cls())
     for adapter_cls in DEFAULT_SCALAR_ADAPTERS:
         registry.register(adapter_cls())
     return registry
 
 
 __all__ = [
+    "DEFAULT_FILE_ADAPTERS",
     "DEFAULT_RELATION_ADAPTERS",
     "DEFAULT_SCALAR_ADAPTERS",
     "BooleanAdapter",
@@ -75,6 +85,8 @@ __all__ = [
     "FieldAdapter",
     "FieldContract",
     "FieldRegistry",
+    "FileFieldAdapter",
+    "FileFieldType",
     "FloatAdapter",
     "ForeignKeyAdapter",
     "IntegerAdapter",

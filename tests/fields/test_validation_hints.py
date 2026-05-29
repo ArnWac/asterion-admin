@@ -151,6 +151,7 @@ def test_default_registry_unaffected_by_validation_changes():
     names = [a.name for a in registry.adapters()]
     assert names == [
         "foreign_key",
+        "file",
         "uuid",
         "boolean",
         "datetime",
