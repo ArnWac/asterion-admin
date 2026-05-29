@@ -167,58 +167,44 @@ Admin-Eingriff, einzelne Sessions logoutbar.
 
 ---
 
-### Phase 4 — Extension-Fundament (Events + Jobs + Storage SPI)
+### Phase 4 — Storage-SPI + File/Image Fields
 
-**Ziel:** Drei Querschnitts-Primitiven bauen, die ALLE folgenden
-Extensions brauchen. Ohne sie würden Webhooks/Workflows/Observability
-jeweils ihre eigene halbgare Lösung erfinden.
+**Ziel:** Den einzig konkret nachgefragten Extension-Use-Case sauber
+abdecken: Datei-Uploads. SPI klein halten, S3-Adapter als Beispiel.
 
-| # | Aufgabe | Quelle | Aufwand |
-|---|---|---|---|
-| 4.1 | **Event-Abstraktion**: `EventBus`-Protocol (publish/subscribe), Domain-Events `crud.created/updated/deleted`, `action.executed`, `auth.login_success/failure`. Audit-Service wird Consumer dieses Bus. Synchron im selben TX, async opt-in via Job. | Doc 3 E3 „Braucht vorher: Audit/Event-Abstraktion" | mittel-groß |
-| 4.2 | **Job-Queue-Protocol**: `JobQueue`-Protocol (`enqueue(name, payload, ctx)`, `worker_loop()`), In-Memory-Default, RQ/Celery/SQS-Adapter später. JobModel in DB für Status-Tracking. | Doc 3 E4 | groß |
-| 4.3 | **Storage SPI**: `StorageBackend`-Protocol (`save(key, bytes)`, `read(key)`, `presigned_url(key, ttl)`, `delete(key)`), Local-FS-Default. S3-Adapter als Extension. | Doc 3 E7 | mittel |
-
-**DoD:** Webhooks/Workflows/Observability/Dashboard können sich auf
-diese drei Primitiven stützen, ohne sie zu duplizieren.
-
----
-
-### Phase 5 — Extension-Welle 1
-
-Reihenfolge wählt die einfachsten zuerst, damit jede Extension
-unabhängig nutzbar ist.
-
-| # | Extension | Stützt sich auf | Aufwand |
-|---|---|---|---|
-| 5.1 | **Observability** (`extensions/observability/`) — Prometheus-Counter für request_count/duration, audit-Events, error_rate; optionaler `/metrics`-Endpoint | Phase 4.1 (EventBus) | mittel |
-| 5.2 | **Webhooks** (`extensions/webhooks/`) — Webhook-Subscription-Modell, HMAC-Signing, Retry mit Exponential Backoff, Dead-Letter-Tabelle | Phase 4.1 + 4.2 | mittel-groß |
-| 5.3 | **Jobs UI** (`extensions/jobs_admin/`) — Admin-Resource für JobModel mit Status/Retry/Cancel-Actions | Phase 4.2 | klein |
-| 5.4 | **Workflows / Approval** (`extensions/workflows/`) — State-Machine, Reviewer-Liste, `requires_approval=True` auf ModelAdmin, Audit-Diff vor + nach Approval | Phase 4.1 + 4.2 | groß |
-| 5.5 | **Dashboard** (`extensions/dashboard/`) — Widget-Protocol, Counts/Recent-Activity/Audit-Stream als Default-Widgets, App-eigene Widgets via Registry | Phase 5.1 + 4.1 | mittel |
-| 5.6 | **FileField / ImageField** + **S3-Storage-Extension** — `fields/files.py` (Plan-Modul, fehlt), `extensions/storage_s3/` als Storage-Backend-Adapter | Phase 4.3 + Gap §5 + §13 | mittel-groß |
-| 5.7 | **Import/Export ausbauen** — Dry-Run, Fehler-Report, Bulk-Validation, async via Job-Queue; CSV/JSON/XLSX heute schon da, fehlen Dry-Run + Async | Phase 4.2 | mittel |
-
-**DoD:** Jede Extension ist optional, hat eigene Doku + Beispiel-App
-unter `examples/`, ist CI-getestet.
-
----
-
-### Phase 6 — UI- und Enterprise-Tiefe (parallel möglich)
-
-**Ziel:** Was in Doc 1 §11/§12 als „spätere Erweiterungen" markiert ist.
-Reine Frontend-Arbeit + Enterprise-Identity. Können parallel zu Phase 4/5
-laufen, wenn Frontend-Kapazität vorhanden ist.
-
-| # | Bereich | Aufgaben |
+| # | Aufgabe | Aufwand |
 |---|---|---|
-| 6.1 | **Form Layout (UI)** | Tabs, Conditional Fields, Dependent Fields, Side Panels, Placeholders, Custom Components |
-| 6.2 | **List View (UI)** | Date Hierarchy, Bulk Edit (`list_editable`), Custom Row Badges, List Density, Default Ordering per User, Column Visibility als dedizierter Mechanismus statt SavedFilter-Payload |
-| 6.3 | **Admin Pages / Plugin Slots** | Custom Pages außerhalb des CRUD-Schemas (für Reports, Tools); UI-Plugin-Slots für Extensions | Gap §14 P1 |
-| 6.4 | **Audit-UI** | Read-only Admin auf `AuditLog`-Tabelle mit Diff-Viewer, Filter, Export |
-| 6.5 | **Permission-Matrix-UI** | RBAC-Matrix-Editor für `TenantRole × Permissions` |
-| 6.6 | **SCIM / SAML** | Enterprise-Identity-Standards. SCIM-Provisioning, SAML-Login |
-| 6.7 | **Action Progress + Partial Success** | Long-running Actions melden Progress via Job-Status, Partial-Failure-Report im Response | Gap §10 + Phase 4.2 |
+| 4.1 | **Storage SPI**: `StorageBackend`-Protocol (`save(key, bytes)`, `read(key)`, `presigned_url(key, ttl)`, `delete(key)`), Local-FS-Default. Klein, kein Job-Queue-/Event-Hop dazwischen. | klein |
+| 4.2 | **FileField / ImageField** + `fields/files.py` (Plan-Modul, fehlt). Upload-Endpoint + Storage-Backend-Aufruf, Validation (MIME, Größe). | mittel |
+| 4.3 | **S3-Storage-Adapter** als optionale Extension `extensions/storage_s3/` (boto3-Dependency). | klein |
+| 4.4 | **Generic `Notifier`-Protocol** — Verallgemeinerung des `PasswordResetNotifier` aus 3.3 zu einem app-weiten Notifier-SPI für transaktionale Emails (welcome, password-change-notification, 2FA-disabled-warnung). Klein, hoher Wiederverwendungswert. | klein |
+
+**DoD:** Eine App kann FileField nutzen, lokales Storage funktioniert
+out-of-the-box, S3-Wechsel ist ein Provider-Tausch.
+
+---
+
+### Phase 5 — UI-Tiefe + Admin-UI-Erweiterungen
+
+**Ziel:** Bestehende Daten (Audit, RBAC, AdminContext) endlich in der UI
+sichtbar machen. Frontend-Arbeit.
+
+| # | Bereich | Wert |
+|---|---|---|
+| 5.1 | **Audit-UI** — Read-only Admin auf `AuditLog`-Tabelle mit Diff-Viewer, Filter, Export. Kleines Add-on, sofort hoher Compliance/Debugging-Wert. | hoch |
+| 5.2 | **Permission-Matrix-UI** — RBAC-Matrix-Editor für `TenantRole × Permissions`. Schließt eine bekannte UX-Lücke. | hoch |
+| 5.3 | **Import/Export-Ausbau** — Dry-Run, Fehler-Report, Bulk-Validation. Heute schon CSV/JSON/XLSX da, fehlen Dry-Run + Report. (Async via Jobs entfällt — siehe „Bewusst gestrichen" unten.) | mittel |
+| 5.4 | **Form Layout (UI)** — Tabs, Conditional Fields, Dependent Fields, Side Panels, Placeholders, Custom Components | mittel |
+| 5.5 | **List View (UI)** — Date Hierarchy, Bulk Edit (`list_editable`), Custom Row Badges, List Density, Default Ordering per User, Column Visibility als dedizierter Mechanismus | mittel |
+| 5.6 | **Admin Pages / Plugin Slots** — Custom Pages außerhalb des CRUD-Schemas (für Reports, Tools); UI-Plugin-Slots für Extensions | mittel |
+
+---
+
+### Phase 6 — Enterprise-Identity
+
+| # | Bereich | Wert |
+|---|---|---|
+| 6.1 | **SCIM / SAML** — Enterprise-Identity-Standards. SCIM-Provisioning, SAML-Login | hoch (für Enterprise-Kunden) |
 
 ---
 
@@ -248,7 +234,32 @@ Aus den drei Quelldokumenten kondensiert — explizite Nicht-Ziele:
   (`protected_fields._singleton`, `schema_builder`) entweder entfernen
   (4.2) oder app-state-scopen (Phase 1).
 - **Kein OIDC/SAML/SCIM** in Auth-Hardening (Phase 3) — gehört nach
-  Phase 6.6, wenn Refresh/2FA stabil sind.
+  Phase 6, wenn Refresh/2FA stabil sind.
+
+### Bewusst gestrichen (waren in früherer Version, jetzt raus)
+
+Sechs Items aus der alten Phase 4 + 5, die nach kritischer Bewertung
+mehr Komplexität als Wert eingebracht hätten — siehe Commit-Diskussion:
+
+- **EventBus / Domain-Event-System** — Audit + Lifecycle-Hooks reichen.
+  Apps mit eigenem Event-Bedarf bauen einen winzigen `emit()` direkt.
+- **JobQueue (Framework-eigen)** — jede Produktiv-App hat schon ein
+  Celery/RQ/arq. Framework-eigenes Protocol wird nicht genutzt.
+- **Observability / `/metrics` als Extension** — wäre ~80 LoC; falls
+  überhaupt, gehört es direkt in den Core, nicht in eine Extension.
+- **Webhooks-Extension** — Apps nutzen Svix/Hookdeck/eigene Lambda;
+  Framework-Webhooks mit HMAC/Retry/Dead-Letter sind 1500+ LoC für
+  selten genutzte Funktionalität.
+- **Jobs UI** — abhängig von der gestrichenen JobQueue, fällt mit ihr.
+- **Workflows / Approval-Engine** — ist ein eigenes Produkt
+  (State-Machine, Reviewer-Pools, Notifications). Wer's braucht,
+  baut spezifisch oder kauft ein dediziertes Tool.
+
+Daraus folgt: **kein Phase-4-„Fundament"** (EventBus + JobQueue + Storage
+zusammen war Overengineering). Storage-SPI ist klein genug, um zusammen
+mit File/Image direkt als Phase 4 zu laufen, und braucht keine
+Querschnitts-Primitiven obendrauf. Action-Progress (Gap §10) entfällt
+ebenfalls, da es Jobs voraussetzte.
 
 ---
 
@@ -259,25 +270,25 @@ Aus den drei Quelldokumenten kondensiert — explizite Nicht-Ziele:
 | 1 (Robustheit) | AdminRegistry-Freeze hart; keine globalen Singletons (außer dokumentiert); Public API getestet; `User`-Imports nur in Builtin-Providern; CRUD-Testmatrix vollständig; Beispiele kuratiert + CI-getestet |
 | 2 (Konsolidierung) | Eine FieldPolicy-Pipeline (kein 3-Wege-Mechanismus mehr); Inline-Permission funktional; `AuthProvider.login/logout` + `UserProvider.list_users` im Protocol |
 | 3 (Auth-Hardening) | Refresh Tokens + RevokedToken + Password Reset + 2FA produktiv; OAuth-Flow vollständig |
-| 4 (Extension-Fundament) | EventBus + JobQueue + StorageBackend als Protocols + Default-Implementierungen + Tests |
-| 5 (Extensions Welle 1) | Observability, Webhooks, Jobs, Workflows, Dashboard, Storage S3, Import/Export-Ausbau, FileField — jede als optionale Extension mit Doku + Beispiel |
-| 6 (UI + Enterprise) | UI-Tiefe gemäß Doc 1 §11/§12 + SCIM/SAML |
+| 4 (Storage + Files) | StorageBackend-SPI + FileField/ImageField + S3-Adapter + Generic Notifier-Protocol |
+| 5 (UI-Tiefe) | Audit-UI + Permission-Matrix-UI + Form-Layout-Erweiterungen + List-View-Erweiterungen + Admin-Pages |
+| 6 (Enterprise-Identity) | SCIM-Provisioning + SAML-Login |
 | 7 (Enterprise Restposten) | nicht zwingend abgeschlossen — geparkt bis Bedarf |
 
 ---
 
 ## Kurz-Zusammenfassung
 
-Stand: **prod-ready Core** + **Architektur-Reife (Block A–D)** ist
-erreicht. Was offen ist gliedert sich in fünf nicht-überlappende Themen:
+Stand: **Phasen 1 + 2** ✅ und der Großteil von **Phase 3** (Auth-
+Hardening: 3.1 Refresh, 3.2 Revocation, 3.3 Password-Reset, 3.4a 2FA-
+Enrollment) sind committed. Offen sind:
 
-1. **Robustheits-Kanten glätten** (Doc 2 Reste + 5 Audit-Findings)
-2. **Eine FieldPolicy + komplette Provider-Schicht** (Gap §1, §4, §6, §8 Reste)
-3. **Auth-Hardening für public Admin-Panels** (Refresh/Revoke/Reset/2FA/OAuth)
-4. **Extension-Fundament + Welle 1** (EventBus, Jobs, Storage SPI als Voraussetzung; dann Webhooks/Observability/Dashboard/Workflows/Files)
-5. **UI-Tiefe + Enterprise-Identity** (Tabs/Bulk Edit/Audit-UI/SCIM/SAML)
+1. **Phase 3 Rest** — 3.4b (Login-Step-Up) + 3.5 (OAuth-Vervollständigung)
+2. **Phase 4** — Storage-SPI + FileField/ImageField + S3-Adapter + Generic Notifier-Protocol
+3. **Phase 5** — Audit-UI, Permission-Matrix-UI, Form-/List-View-UI-Tiefe, Admin-Pages, Import/Export-Ausbau
+4. **Phase 6** — SCIM/SAML (wenn Enterprise-Bedarf besteht)
+5. **Phase 7** — Restparken (Billing, White Labeling, Multi-Region, Flutter UI)
 
-Empfehlung: Phasen 1 + 2 sind die nächste sinnvolle Arbeitseinheit
-(Robustheit + Konsolidierung), bevor neue Feature-Ebenen aufgesetzt
-werden. Phase 3 (Auth-Hardening) ist die zweite, weil ohne sie kein
-externer Admin-Login produktiv geht.
+Bewusst nicht mehr in der Roadmap: EventBus, JobQueue, Webhooks,
+Observability-Extension, Jobs UI, Workflows — siehe „Bewusst gestrichen"
+oben.
