@@ -15,6 +15,7 @@ class TokenError(Exception):
 ACCESS_TOKEN_TYPE = "access"
 IMPERSONATION_TOKEN_TYPE = "impersonation"
 REFRESH_TOKEN_TYPE = "refresh"
+MFA_CHALLENGE_TOKEN_TYPE = "mfa_challenge"
 
 
 def _now_utc() -> datetime:
@@ -123,6 +124,50 @@ def decode_refresh_token(
 
 def is_refresh_token(payload: dict[str, Any]) -> bool:
     return payload.get("type") == REFRESH_TOKEN_TYPE
+
+
+def create_mfa_challenge_token(
+    user_id: str | UUID,
+    *,
+    secret_key: str,
+    algorithm: str,
+    expires_minutes: int = 5,
+    token_version: int = 0,
+) -> str:
+    """Short-lived token returned by ``/auth/login`` when the user has
+    2FA enabled (Roadmap 3.4b).
+
+    Carries only ``sub`` + ``tkv``; it does NOT authenticate any other
+    request. The companion endpoint ``/auth/2fa/login`` exchanges it
+    (plus a TOTP code or backup code) for the real access+refresh pair.
+    Default TTL is 5 minutes — long enough for the user to grab their
+    authenticator, short enough that a leaked challenge is mostly dead.
+    """
+    return _create_token(
+        {
+            "sub": str(user_id),
+            "tkv": token_version,
+        },
+        secret_key=secret_key,
+        algorithm=algorithm,
+        expires_delta=timedelta(minutes=expires_minutes),
+        token_type=MFA_CHALLENGE_TOKEN_TYPE,
+    )
+
+
+def decode_mfa_challenge_token(
+    token: str,
+    *,
+    secret_key: str,
+    algorithm: str,
+) -> dict[str, Any]:
+    """Decode + type-check an MFA challenge token. Raises :class:`TokenError`
+    for any other token type so a stale access token can't be replayed
+    at ``/auth/2fa/login``."""
+    payload = decode_token(token, secret_key=secret_key, algorithm=algorithm)
+    if payload.get("type") != MFA_CHALLENGE_TOKEN_TYPE:
+        raise TokenError("Invalid token type")
+    return payload
 
 
 def create_impersonation_token(

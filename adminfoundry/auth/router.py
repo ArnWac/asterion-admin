@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +40,7 @@ from adminfoundry.auth.schemas import (
 from adminfoundry.auth.tokens import (
     TokenError,
     create_access_token,
+    create_mfa_challenge_token,
     create_refresh_token,
     decode_refresh_token,
     get_subject_user_id,
@@ -97,6 +100,7 @@ async def _audit_login(
 async def login(
     payload: LoginRequest,
     request: Request,
+    session: AsyncSession = Depends(get_async_session),
 ) -> TokenResponse:
     """Password login.
 
@@ -151,6 +155,46 @@ async def login(
         raise HTTPException(status_code=http_status, detail=detail) from exc
 
     await _login_limiter.clear(email_key)
+
+    # 2FA step-up (Roadmap 3.4b). Builtin-only concern — the User
+    # model carries totp_enabled. External auth providers handle MFA
+    # at the IdP, so when the subject doesn't map to a builtin user
+    # we just hand back the token pair the provider minted.
+    user_for_mfa: User | None = None
+    if session_result.subject is not None:
+        try:
+            uuid_subject = uuid.UUID(session_result.subject)
+            user_for_mfa = (
+                await session.execute(select(User).where(User.id == uuid_subject))
+            ).scalar_one_or_none()
+        except (ValueError, AttributeError):
+            user_for_mfa = None
+
+    if user_for_mfa is not None and user_for_mfa.totp_enabled:
+        config = request.app.state.adminfoundry.config
+        challenge = create_mfa_challenge_token(
+            user_for_mfa.id,
+            secret_key=config.secret_key,
+            algorithm=config.jwt_algorithm,
+            token_version=user_for_mfa.token_version,
+        )
+        # Audit at LOGIN_SUCCESS — the password factor passed; the
+        # second-factor outcome will produce its own audit row at
+        # /auth/2fa/login.
+        await _audit_login(
+            request,
+            action=LOGIN_SUCCESS,
+            status_code=200,
+            email=payload.email,
+            actor=AdminPrincipal(id=session_result.subject, email=payload.email),
+            reason="mfa_required",
+        )
+        return TokenResponse(
+            access_token=None,
+            refresh_token=None,
+            mfa_required=True,
+            mfa_token=challenge,
+        )
 
     actor = (
         AdminPrincipal(id=session_result.subject, email=payload.email)
