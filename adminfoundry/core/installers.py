@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from adminfoundry.actions.router import router as actions_router
 from adminfoundry.admin.login_contract_router import router as login_contract_router
 from adminfoundry.admin.navigation_router import router as navigation_router
+from adminfoundry.admin.permission_matrix_router import (
+    router as permission_matrix_router,
+)
 from adminfoundry.admin.saved_filter_router import router as saved_filter_router
 from adminfoundry.auth.router import router as auth_router
 from adminfoundry.auth.two_factor_router import router as two_factor_router
@@ -154,6 +157,15 @@ def install_routes(
         storage_router,
         prefix=config.admin_api_prefix,
         tags=["admin-storage"],
+    )
+
+    # Permission-matrix bulk read + bulk write (P5.2). Same routing
+    # constraint as above — ``_permission_matrix`` must beat the
+    # dynamic ``/{resource}`` CRUD routes.
+    app.include_router(
+        permission_matrix_router,
+        prefix=config.admin_api_prefix,
+        tags=["admin-permission-matrix"],
     )
 
     # Actions before CRUD so /{resource}/_actions/{action} is matched first.
