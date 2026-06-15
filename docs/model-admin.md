@@ -47,6 +47,7 @@ class PostAdmin(ModelAdmin):
 | `policy` | `AdminPolicy \| None` | Object/field-level rules layered on top of permission keys. |
 | `fieldsets` | `list[Fieldset]` | Form-layout grouping; rendered as collapsible sections (Roadmap 5.4). |
 | `form_layout` | `str` | `"sections"` (default) or `"tabs"` — how `fieldsets` are laid out (Roadmap 5.4). |
+| `list_badges` | `dict[str, dict]` | List-view badge styling, e.g. `{"status": {"published": "success"}}` (Roadmap 5.5). |
 | `placeholders` | `dict[str, str]` | Per-field placeholder text shown in form inputs (Roadmap 5.4). |
 | `field_conditions` | `dict[str, dict]` | Per-field conditional visibility, e.g. `{"vat_id": {"field": "is_business", "equals": True}}` (Roadmap 5.4). |
 
