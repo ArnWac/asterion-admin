@@ -5,6 +5,7 @@ import { APIError, admin } from "../api.js";
 import { getFullContract, getResourceContract } from "../contract.js";
 import { clear, el, mount, setBreadcrumb, showToast } from "../dom.js";
 import { formatValue } from "../format.js";
+import { composeDateHierarchy, editIsDirty, nextSortState } from "../logic.js";
 import { openImportModal } from "./import_modal.js";
 
 const cfg = window.ADMINFOUNDRY || {};
@@ -192,7 +193,6 @@ export async function mountList(root, resource) {
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December",
     ];
-    const pad2 = (n) => String(n).padStart(2, "0");
 
     const yearInput = el("input", {
       type: "number",
@@ -228,15 +228,7 @@ export async function mountList(root, resource) {
       }
       if (!monthSelect.value) daySelect.value = "";
 
-      let dh = null;
-      if (year) {
-        dh = year;
-        if (monthSelect.value) {
-          dh += `-${pad2(monthSelect.value)}`;
-          if (daySelect.value) dh += `-${pad2(daySelect.value)}`;
-        }
-      }
-      state.dh = dh;
+      state.dh = composeDateHierarchy(year, monthSelect.value, daySelect.value);
       state.offset = 0;
       load();
     }
@@ -323,10 +315,7 @@ export async function mountList(root, resource) {
   }
 
   function toggleSort(colName) {
-    // Cycle per column: ascending → descending → off (server default).
-    if (state.ordering === colName) state.ordering = `-${colName}`;
-    else if (state.ordering === `-${colName}`) state.ordering = null;
-    else state.ordering = colName;
+    state.ordering = nextSortState(state.ordering, colName);
     prefs.setOrdering(state.ordering);
     state.offset = 0;
     load();
@@ -446,8 +435,7 @@ export async function mountList(root, resource) {
       row = {};
       edits.set(id, row);
     }
-    // Compare via stringify so "5" vs 5 / Date equality don't false-flag.
-    if (String(val) === String(original == null ? "" : original)) delete row[field.name];
+    if (!editIsDirty(val, original)) delete row[field.name];
     else row[field.name] = val;
     if (Object.keys(row).length === 0) edits.delete(id);
     input.classList.toggle("dirty", edits.has(id) && field.name in (edits.get(id) || {}));

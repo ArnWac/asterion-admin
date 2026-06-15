@@ -6,6 +6,7 @@
 import { APIError, admin } from "../api.js";
 import { getResourceContract } from "../contract.js";
 import { el, mount, setBreadcrumb, showToast } from "../dom.js";
+import { allowedDependencyOptions, conditionSatisfied } from "../logic.js";
 
 const cfg = window.ADMINFOUNDRY || {};
 
@@ -99,7 +100,7 @@ export async function mountForm(root, resource, mode, recordId) {
       const refField = fieldByName.get(f.condition.field);
       const refValue =
         refInput && refField ? readInputValue(refInput, refField) : null;
-      const visible = valueSatisfies(f.condition, refValue);
+      const visible = conditionSatisfied(f.condition, refValue);
       const container = fieldDivs.get(f.name);
       if (container) container.hidden = !visible;
       if (visible) hiddenByCondition.delete(f.name);
@@ -130,7 +131,7 @@ export async function mountForm(root, resource, mode, recordId) {
       const ctrlField = fieldByName.get(f.dependency.field);
       const ctrlValue =
         ctrlInput && ctrlField ? readInputValue(ctrlInput, ctrlField) : null;
-      const allowed = (f.dependency.options || {})[String(ctrlValue)] || [];
+      const allowed = allowedDependencyOptions(f.dependency, ctrlValue);
       rebuildSelectOptions(select, f, allowed);
     }
   }
@@ -289,24 +290,6 @@ function buildSection(label, description, collapsed, fieldNodes) {
   if (description) children.push(el("p", { class: "fieldset-description" }, description));
   children.push(...fieldNodes);
   return el("details", { class: "fieldset", open: !collapsed }, children);
-}
-
-function valueSatisfies(condition, value) {
-  if (!condition) return true;
-  if ("equals" in condition) return looseEq(value, condition.equals);
-  if ("in" in condition && Array.isArray(condition.in)) {
-    return condition.in.some((v) => looseEq(v, value));
-  }
-  return true; // unknown rule shape → don't hide
-}
-
-function looseEq(a, b) {
-  // Form inputs normalize to string/number/boolean; tolerate the
-  // string/number coercion (e.g. select value "2" vs rule value 2) while
-  // keeping booleans and exact matches strict.
-  if (a === b) return true;
-  if (a == null || b == null) return false;
-  return String(a) === String(b);
 }
 
 function rebuildSelectOptions(select, field, allowed) {
