@@ -154,6 +154,7 @@ export async function mountList(root, resource) {
       return;
     }
     const fieldsByName = Object.fromEntries(contract.fields.map((f) => [f.name, f]));
+    const badges = contract.list_badges || {};
     for (const item of items) {
       const id = String(item[pkField.name]);
       const checkbox = el("input", {
@@ -164,6 +165,20 @@ export async function mountList(root, resource) {
       });
       const cells = [el("td", { class: "checkbox-cell" }, [checkbox])];
       for (const colName of columns) {
+        // Badge styling (Roadmap 5.5): a configured value renders as a
+        // colored chip instead of plain formatted text.
+        const badgeStyle =
+          item[colName] != null && badges[colName]
+            ? badges[colName][String(item[colName])]
+            : undefined;
+        if (badgeStyle) {
+          cells.push(
+            el("td", {}, [
+              el("span", { class: `badge badge-${badgeStyle}` }, String(item[colName])),
+            ])
+          );
+          continue;
+        }
         const formatted = formatValue(item[colName], fieldsByName[colName]);
         const td = el("td", { class: formatted.muted ? "muted" : "" }, formatted.text);
         if (formatted.mono) td.style.fontFamily = "ui-monospace, SFMono-Regular, monospace";

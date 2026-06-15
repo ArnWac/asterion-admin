@@ -751,3 +751,19 @@ form .tabs .tab.active {
   .sidebar-nav { max-height: 50vh; }
   .main { padding: 1rem; }
 }
+
+/* --- list-view badges (Roadmap 5.5) --- */
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+.badge-neutral { background: #eef1f4; color: #586069; border-color: #d0d7de; }
+.badge-success { background: #e3fcef; color: #006644; border-color: #79f2c0; }
+.badge-warning { background: #fff7e6; color: #974f00; border-color: #ffc069; }
+.badge-danger  { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border); }
+.badge-info    { background: #e6f0ff; color: #0043a8; border-color: #99c0ff; }
