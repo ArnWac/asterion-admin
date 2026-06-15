@@ -38,6 +38,8 @@ export async function mountForm(root, resource, mode, recordId) {
   const form = el("form", { class: "admin-form", novalidate: true });
   const inputs = new Map();
   const errorBoxes = new Map();
+  const fieldDivs = new Map(); // field name -> rendered .field block
+  const renderedOrder = []; // field names actually rendered, in contract order
 
   for (const field of editableFields) {
     const disabled = isEdit ? field.read_only : field.read_only && !field.primary_key;
@@ -55,16 +57,64 @@ export async function mountForm(root, resource, mode, recordId) {
     const errorBox = el("p", { class: "field-error", id: `${id}-error`, hidden: true });
     errorBoxes.set(field.name, errorBox);
 
-    form.appendChild(
+    fieldDivs.set(
+      field.name,
       el("div", { class: "field" }, [
         el("label", { for: id }, prettify(field.name) + (field.nullable ? "" : " *")),
         input,
+        field.help_text ? el("p", { class: "field-hint" }, field.help_text) : null,
         field.read_only
           ? el("p", { class: "field-hint" }, "Read-only — managed by the server.")
           : null,
         errorBox,
       ])
     );
+    renderedOrder.push(field.name);
+  }
+
+  // Lay the rendered fields out: grouped into sections when the contract
+  // declares fieldsets (Roadmap 5.4), flat otherwise. Fields not named in
+  // any fieldset are appended after the sections so nothing is dropped.
+  for (const node of buildFormBody(
+    contract.fieldsets || [],
+    fieldDivs,
+    renderedOrder,
+    contract.form_layout || "sections"
+  )) {
+    form.appendChild(node);
+  }
+
+  // Conditional fields (Roadmap 5.4): show/hide a dependent field based on
+  // another field's live value, and exclude hidden fields from the payload
+  // so the server never receives a value the user couldn't see.
+  const fieldByName = new Map(editableFields.map((f) => [f.name, f]));
+  const hiddenByCondition = new Set();
+  const conditionalFields = editableFields.filter(
+    (f) => f.condition && fieldDivs.has(f.name)
+  );
+
+  function evaluateConditions() {
+    for (const f of conditionalFields) {
+      const refInput = inputs.get(f.condition.field);
+      const refField = fieldByName.get(f.condition.field);
+      const refValue =
+        refInput && refField ? readInputValue(refInput, refField) : null;
+      const visible = valueSatisfies(f.condition, refValue);
+      const container = fieldDivs.get(f.name);
+      if (container) container.hidden = !visible;
+      if (visible) hiddenByCondition.delete(f.name);
+      else hiddenByCondition.add(f.name);
+    }
+  }
+
+  if (conditionalFields.length) {
+    for (const refName of new Set(conditionalFields.map((f) => f.condition.field))) {
+      const refInput = inputs.get(refName);
+      if (!refInput) continue;
+      refInput.addEventListener("input", evaluateConditions);
+      refInput.addEventListener("change", evaluateConditions);
+    }
+    evaluateConditions();
   }
 
   const summary = el("p", { class: "form-error", role: "alert", hidden: true });
@@ -87,7 +137,7 @@ export async function mountForm(root, resource, mode, recordId) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     clearErrors(errorBoxes, summary);
-    const payload = collectPayload(editableFields, inputs, isEdit);
+    const payload = collectPayload(editableFields, inputs, isEdit, hiddenByCondition);
     submitBtn.disabled = true;
     try {
       let result;
@@ -120,9 +170,123 @@ export async function mountForm(root, resource, mode, recordId) {
   );
 }
 
+function buildFormBody(fieldsets, fieldDivs, renderedOrder, layout) {
+  // No fieldsets declared → flat list in contract order (legacy layout).
+  if (!fieldsets.length) {
+    return renderedOrder.map((name) => fieldDivs.get(name)).filter(Boolean);
+  }
+
+  // Collect each fieldset's rendered nodes once, tracking what's placed so
+  // leftovers (fields in no fieldset) can be appended without duplication.
+  const groups = []; // { label, description, collapsed, nodes }
+  const placed = new Set();
+  for (const fs of fieldsets) {
+    const fieldNodes = (fs.fields || [])
+      .filter((name) => fieldDivs.has(name) && !placed.has(name))
+      .map((name) => {
+        placed.add(name);
+        return fieldDivs.get(name);
+      });
+    if (fieldNodes.length === 0) continue; // skip empty section
+    groups.push({
+      label: fs.label,
+      description: fs.description,
+      collapsed: !!fs.collapsed,
+      nodes: fieldNodes,
+    });
+  }
+
+  const leftovers = renderedOrder
+    .filter((name) => !placed.has(name))
+    .map((name) => fieldDivs.get(name))
+    .filter(Boolean);
+
+  if (layout === "tabs") {
+    return buildTabs(groups, leftovers);
+  }
+
+  // "sections" (default): collapsible <details> blocks + loose leftovers.
+  const nodes = groups.map((g) => buildSection(g.label, g.description, g.collapsed, g.nodes));
+  nodes.push(...leftovers);
+  return nodes;
+}
+
+function buildTabs(groups, leftovers) {
+  const tabs = groups.map((g) => {
+    const panelChildren = [];
+    if (g.description) panelChildren.push(el("p", { class: "fieldset-description" }, g.description));
+    panelChildren.push(...g.nodes);
+    return { label: g.label, panel: el("div", { class: "tab-panel" }, panelChildren) };
+  });
+  if (leftovers.length) {
+    tabs.push({ label: "Other", panel: el("div", { class: "tab-panel" }, leftovers) });
+  }
+  if (!tabs.length) return [];
+
+  const tablist = el("div", { class: "tabs", role: "tablist" });
+  const panelsWrap = el("div", { class: "tab-panels" });
+
+  tabs.forEach((t, i) => {
+    const btn = el(
+      "button",
+      {
+        type: "button",
+        class: "tab" + (i === 0 ? " active" : ""),
+        role: "tab",
+        "aria-selected": i === 0 ? "true" : "false",
+      },
+      t.label
+    );
+    t.panel.hidden = i !== 0;
+    btn.addEventListener("click", () => {
+      for (const b of tablist.children) {
+        b.classList.remove("active");
+        b.setAttribute("aria-selected", "false");
+      }
+      for (const p of panelsWrap.children) p.hidden = true;
+      btn.classList.add("active");
+      btn.setAttribute("aria-selected", "true");
+      t.panel.hidden = false;
+    });
+    tablist.appendChild(btn);
+    panelsWrap.appendChild(t.panel);
+  });
+
+  return [tablist, panelsWrap];
+}
+
+function buildSection(label, description, collapsed, fieldNodes) {
+  // <details> gives a native collapse affordance; open unless collapsed.
+  const children = [el("summary", { class: "fieldset-legend" }, label)];
+  if (description) children.push(el("p", { class: "fieldset-description" }, description));
+  children.push(...fieldNodes);
+  return el("details", { class: "fieldset", open: !collapsed }, children);
+}
+
+function valueSatisfies(condition, value) {
+  if (!condition) return true;
+  if ("equals" in condition) return looseEq(value, condition.equals);
+  if ("in" in condition && Array.isArray(condition.in)) {
+    return condition.in.some((v) => looseEq(v, value));
+  }
+  return true; // unknown rule shape → don't hide
+}
+
+function looseEq(a, b) {
+  // Form inputs normalize to string/number/boolean; tolerate the
+  // string/number coercion (e.g. select value "2" vs rule value 2) while
+  // keeping booleans and exact matches strict.
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
 function buildInput(field, id, initial, disabled) {
   const type = field.type;
   const baseAttrs = { id, name: field.name, disabled: disabled || false };
+  // Placeholder (Roadmap 5.4) — harmless on input types that ignore it
+  // (checkbox, datetime-local); only set when the contract supplies one.
+  if (field.placeholder) baseAttrs.placeholder = field.placeholder;
 
   if (type === "boolean") {
     return el("input", {
@@ -157,9 +321,11 @@ function buildInput(field, id, initial, disabled) {
   });
 }
 
-function collectPayload(fields, inputs, isEdit) {
+function collectPayload(fields, inputs, isEdit, hiddenSet) {
   const payload = {};
   for (const field of fields) {
+    // A field hidden by a conditional rule submits no value.
+    if (hiddenSet && hiddenSet.has(field.name)) continue;
     const input = inputs.get(field.name);
     if (!input || input.disabled) continue;
     const value = readInputValue(input, field);

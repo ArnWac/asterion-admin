@@ -6,6 +6,7 @@ CapabilitiesMeta block. Contract-version bumped to ``"2"``.
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import Column, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase
 
@@ -219,6 +220,124 @@ def test_capabilities_respect_global_wildcard():
     assert contract.capabilities.update is True
     assert contract.capabilities.delete is True
     assert set(contract.capabilities.bulk_actions) == {"publish", "archive"}
+
+
+# ---------------------------------------------------------------------------
+# placeholder (Roadmap 5.4)
+# ---------------------------------------------------------------------------
+
+
+class _PlaceholderAdmin(ModelAdmin):
+    model = _Post
+    placeholders = {"title": "e.g. My first post", "summary": "Short teaser"}
+
+
+def test_placeholder_emitted_from_admin_mapping():
+    metas = build_field_metadata(_PlaceholderAdmin())
+    assert _meta_by_name(metas, "title").placeholder == "e.g. My first post"
+    assert _meta_by_name(metas, "summary").placeholder == "Short teaser"
+
+
+def test_placeholder_none_when_not_configured():
+    """Fields without a placeholders entry — and admins that set none —
+    report ``None`` so the renderer shows no placeholder."""
+    metas = build_field_metadata(_PostAdmin())
+    assert _meta_by_name(metas, "title").placeholder is None
+    # Even on the placeholder admin, an unlisted field stays None.
+    metas2 = build_field_metadata(_PlaceholderAdmin())
+    assert _meta_by_name(metas2, "body").placeholder is None
+
+
+# ---------------------------------------------------------------------------
+# conditional fields (Roadmap 5.4)
+# ---------------------------------------------------------------------------
+
+
+class _ConditionAdmin(ModelAdmin):
+    model = _Post
+    field_conditions = {
+        # valid: equals rule referencing an existing field
+        "summary": {"field": "status", "equals": "published"},
+        # valid: in rule
+        "body": {"field": "status", "in": ["draft", "review"]},
+        # dropped: references a field that isn't in the contract
+        "title": {"field": "does_not_exist", "equals": 1},
+    }
+
+
+def test_condition_equals_emitted():
+    metas = build_field_metadata(_ConditionAdmin())
+    assert _meta_by_name(metas, "summary").condition == {
+        "field": "status",
+        "equals": "published",
+    }
+
+
+def test_condition_in_emitted():
+    metas = build_field_metadata(_ConditionAdmin())
+    assert _meta_by_name(metas, "body").condition == {
+        "field": "status",
+        "in": ["draft", "review"],
+    }
+
+
+def test_condition_with_dangling_reference_dropped():
+    """A rule pointing at a non-existent field degrades to 'always
+    visible' (condition None) instead of shipping an unevaluable rule."""
+    metas = build_field_metadata(_ConditionAdmin())
+    assert _meta_by_name(metas, "title").condition is None
+
+
+def test_condition_none_when_not_configured():
+    metas = build_field_metadata(_PostAdmin())
+    assert _meta_by_name(metas, "summary").condition is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"field": "status"},  # no equals/in
+        {"field": "status", "equals": 1, "in": [1]},  # both
+        {"equals": 1},  # no field
+        {"field": "status", "in": "notalist"},  # in not a list
+        "notadict",
+    ],
+)
+def test_malformed_condition_dropped(bad):
+    class _A(ModelAdmin):
+        model = _Post
+        field_conditions = {"summary": bad}
+
+    metas = build_field_metadata(_A())
+    assert _meta_by_name(metas, "summary").condition is None
+
+
+# ---------------------------------------------------------------------------
+# form_layout (Roadmap 5.4)
+# ---------------------------------------------------------------------------
+
+
+def test_form_layout_defaults_to_sections():
+    contract = build_model_contract(_PostAdmin())
+    assert contract.form_layout == "sections"
+
+
+def test_form_layout_tabs_emitted():
+    class _TabsAdmin(ModelAdmin):
+        model = _Post
+        form_layout = "tabs"
+
+    contract = build_model_contract(_TabsAdmin())
+    assert contract.form_layout == "tabs"
+
+
+def test_form_layout_unknown_falls_back_to_sections():
+    class _WeirdAdmin(ModelAdmin):
+        model = _Post
+        form_layout = "carousel"
+
+    contract = build_model_contract(_WeirdAdmin())
+    assert contract.form_layout == "sections"
 
 
 # ---------------------------------------------------------------------------

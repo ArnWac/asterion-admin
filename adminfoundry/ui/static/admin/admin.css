@@ -459,6 +459,50 @@ form .form-actions {
   border-top: 1px solid var(--border);
 }
 
+/* --- form fieldsets (Roadmap 5.4) --- */
+form .fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem 0.75rem;
+  margin: 0 0 1rem;
+}
+form .fieldset > .fieldset-legend {
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0;
+  list-style: revert; /* keep the native disclosure triangle */
+}
+form .fieldset > .fieldset-description {
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+  margin: 0.1rem 0 0.6rem;
+}
+
+/* --- form tabs (Roadmap 5.4) --- */
+form .tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0 0 1rem;
+}
+form .tabs .tab {
+  appearance: none;
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  color: var(--fg-muted);
+  font: inherit;
+}
+form .tabs .tab.active {
+  color: inherit;
+  border-color: var(--border);
+  background: var(--bg, #fff);
+  margin-bottom: -1px;
+}
+
 /* Card-wrapped forms get internal padding */
 .card > form { padding: 1.25rem 1.5rem; }
 .card > .detail-grid { padding: 1rem 1.5rem; }

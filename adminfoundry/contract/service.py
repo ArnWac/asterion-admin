@@ -52,6 +52,17 @@ class FieldMeta(BaseModel):
     #: Human-readable help text. Sourced from SQLAlchemy ``Column.doc``
     #: when available; ``None`` otherwise.
     help_text: str | None = None
+    #: Placeholder text for the form input when empty (Roadmap 5.4).
+    #: Sourced from ``ModelAdmin.placeholders``; ``None`` means the
+    #: renderer shows no placeholder.
+    placeholder: str | None = None
+    #: Conditional-visibility rule (Roadmap 5.4). ``None`` means the
+    #: field is always shown. When present it is a normalized dict of the
+    #: shape ``{"field": "<other>", "equals": v}`` or
+    #: ``{"field": "<other>", "in": [...]}``; the UI shows this field only
+    #: while the referenced field's value satisfies the rule, and omits it
+    #: from the submitted payload otherwise.
+    condition: dict[str, Any] | None = None
     #: Adapter-supplied or admin-supplied validation hints (e.g.
     #: ``{"min_length": 1, "max_length": 200}``). Empty when the adapter
     #: did not contribute any.
@@ -192,6 +203,10 @@ class ModelContractMeta(BaseModel):
     capabilities: CapabilitiesMeta
     relations: list[RelationMeta] = []
     fieldsets: list[FieldsetMeta] = []
+    #: How the UI should lay out ``fieldsets`` (Roadmap 5.4): ``"sections"``
+    #: (collapsible blocks) or ``"tabs"`` (a tab bar). ``"sections"`` is the
+    #: safe default for clients that don't special-case tabs.
+    form_layout: str = "sections"
     inlines: list[InlineMeta] = []
     filters: list[FilterMeta] = []
     list_display: list[str]
@@ -259,6 +274,7 @@ def _field_meta_from_adapter(
     registry: FieldRegistry,
     readonly_set: set[str],
     field_permission: str = "write",
+    placeholders: dict[str, str] | None = None,
 ) -> FieldMeta:
     """Run a column through the registry and turn the resulting
     :class:`FieldContract` into the wire-format :class:`FieldMeta`.
@@ -272,6 +288,7 @@ def _field_meta_from_adapter(
     :meth:`AdminPolicy.field_permission` (Roadmap 2.4). Defaults to
     ``"write"`` for the legacy / no-policy path.
     """
+    placeholders = placeholders or {}
     adapter = registry.find_adapter(col)
     if adapter is None:
         # build_default_registry includes StringAdapter as the universal
@@ -292,6 +309,7 @@ def _field_meta_from_adapter(
             widget=None,
             required=_column_is_required(col, readonly_set=readonly_set),
             help_text=_column_help_text(col),
+            placeholder=placeholders.get(col.name),
             validation={},
             metadata={},
             field_permission=field_permission,
@@ -313,10 +331,37 @@ def _field_meta_from_adapter(
         widget=widget,
         required=_column_is_required(col, readonly_set=readonly_set),
         help_text=_column_help_text(col),
+        placeholder=placeholders.get(contract.name),
         validation=validation,
         metadata=leftover_metadata,
         field_permission=field_permission,
     )
+
+
+def _normalize_condition(
+    raw: Any, valid_names: set[str]
+) -> dict[str, Any] | None:
+    """Validate a single conditional-visibility rule (Roadmap 5.4).
+
+    Returns the normalized ``{"field", "equals"|"in"}`` dict, or ``None``
+    when the rule is malformed or references a field that isn't in
+    ``valid_names`` (so a typo degrades to "always visible" rather than
+    shipping a dangling rule the UI can't evaluate).
+    """
+    if not isinstance(raw, dict):
+        return None
+    ref = raw.get("field")
+    if not isinstance(ref, str) or ref not in valid_names:
+        return None
+    has_equals = "equals" in raw
+    has_in = "in" in raw
+    if has_equals == has_in:  # need exactly one
+        return None
+    if has_equals:
+        return {"field": ref, "equals": raw["equals"]}
+    if not isinstance(raw["in"], (list, tuple)):
+        return None
+    return {"field": ref, "in": list(raw["in"])}
 
 
 def build_field_metadata(
@@ -349,6 +394,7 @@ def build_field_metadata(
     mapper = sa_inspect(model_admin.model)
     protected = model_admin.all_protected
     readonly_set = set(model_admin.readonly_fields)
+    placeholders = dict(getattr(model_admin, "placeholders", {}) or {})
 
     fields: list[FieldMeta] = []
 
@@ -364,6 +410,7 @@ def build_field_metadata(
                 registry=registry,
                 readonly_set=readonly_set,
                 field_permission=perm,
+                placeholders=placeholders,
             )
         )
 
@@ -383,11 +430,26 @@ def build_field_metadata(
                 widget=None,
                 required=False,
                 help_text=None,
+                placeholder=placeholders.get(fname),
                 validation={},
                 metadata={},
                 field_permission="read",  # calculated fields are inherently read-only
             )
         )
+
+    # Conditional-visibility rules (Roadmap 5.4). Stamped after the field
+    # list exists so a rule can only reference a field that's actually in
+    # the contract; dangling / malformed rules are dropped.
+    conditions = dict(getattr(model_admin, "field_conditions", {}) or {})
+    if conditions:
+        valid_names = {f.name for f in fields}
+        for f in fields:
+            raw = conditions.get(f.name)
+            if raw is None:
+                continue
+            norm = _normalize_condition(raw, valid_names)
+            if norm is not None:
+                f.condition = norm
 
     return fields
 
@@ -755,6 +817,9 @@ def build_model_contract(
         capabilities=_build_capabilities(model_admin, permissions=permissions),
         relations=build_relation_metadata(model_admin, admin_registry=admin_registry),
         fieldsets=build_fieldset_metadata(model_admin),
+        form_layout=(
+            "tabs" if getattr(model_admin, "form_layout", "sections") == "tabs" else "sections"
+        ),
         inlines=build_inline_metadata(model_admin),
         filters=build_filter_metadata(model_admin, registry=registry),
         list_display=list(model_admin.list_display),

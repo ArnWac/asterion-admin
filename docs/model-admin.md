@@ -42,11 +42,17 @@ class PostAdmin(ModelAdmin):
 | `protected_fields` | `list[str]` | Never serialized; never accepted on writes. Adds to framework-wide `GLOBALLY_PROTECTED`. |
 | `actions` | `list[AdminAction]` | Bulk actions exposed at `POST /{resource}/_actions/{action_name}`. |
 | `calculated_fields` | `dict[str, Callable]` | Read-only computed columns. Surface in contract + serializer. Writes rejected. |
+| `filter_fields` | `list[str]` | Columns filterable via `?filter_<name>=<value>` on the list view. |
+| `inlines` | `list[InlineAdmin]` | Child models edited inline with the parent record. |
+| `policy` | `AdminPolicy \| None` | Object/field-level rules layered on top of permission keys. |
+| `fieldsets` | `list[Fieldset]` | Form-layout grouping; rendered as collapsible sections (Roadmap 5.4). |
+| `form_layout` | `str` | `"sections"` (default) or `"tabs"` — how `fieldsets` are laid out (Roadmap 5.4). |
+| `placeholders` | `dict[str, str]` | Per-field placeholder text shown in form inputs (Roadmap 5.4). |
+| `field_conditions` | `dict[str, dict]` | Per-field conditional visibility, e.g. `{"vat_id": {"field": "is_business", "equals": True}}` (Roadmap 5.4). |
 
-That is the full strict-MVP surface. Everything older
-(`field_policies`, `record_filter`, `permission_matrix`, `widget_overrides`,
-`fieldsets`, `inline_fields`, `allow_import`, `requires_approval`, …)
-was dropped in the v1 cleanup.
+Everything older (`field_policies`, `record_filter`, `widget_overrides`,
+`inline_fields`, `allow_import`, `requires_approval`, …) was dropped in the
+v1 cleanup and is not coming back.
 
 ## Built-in admins
 
