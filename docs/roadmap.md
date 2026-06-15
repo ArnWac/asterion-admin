@@ -298,6 +298,10 @@ aktiven Phasen.
 1. **Phase 6** — SCIM/SAML (Enterprise-Identity)
 2. **Phase 7** — Billing, White Labeling, Multi-Region, Redis-Cache, Flutter UI
 
+**Vor 1.0:** Härtung statt Features — siehe
+[docs/stabilization.md](stabilization.md) (JS-Test-Harness,
+Contract-Snapshots, `mypy` in CI, A0.4/A0.5-Entscheidungen).
+
 Bewusst nicht mehr in der Roadmap: EventBus, JobQueue, Webhooks,
 Observability-Extension, Jobs UI, Workflows — siehe „Bewusst gestrichen"
 oben.
