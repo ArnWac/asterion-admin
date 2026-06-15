@@ -46,6 +46,7 @@ class PostAdmin(ModelAdmin):
 | `inlines` | `list[InlineAdmin]` | Child models edited inline with the parent record. |
 | `policy` | `AdminPolicy \| None` | Object/field-level rules layered on top of permission keys. |
 | `fieldsets` | `list[Fieldset]` | Form-layout grouping; rendered as collapsible sections (Roadmap 5.4). |
+| `form_layout` | `str` | `"sections"` (default) or `"tabs"` — how `fieldsets` are laid out (Roadmap 5.4). |
 | `placeholders` | `dict[str, str]` | Per-field placeholder text shown in form inputs (Roadmap 5.4). |
 | `field_conditions` | `dict[str, dict]` | Per-field conditional visibility, e.g. `{"vat_id": {"field": "is_business", "equals": True}}` (Roadmap 5.4). |
 
