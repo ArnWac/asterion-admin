@@ -153,6 +153,12 @@ class FieldMeta(BaseModel):
     #: branch on this to disable inputs for ``"read"`` fields and hide
     #: them entirely for ``"hidden"``. Roadmap 2.4.
     field_permission: str = "write"
+    #: Dependent-choice rule (Roadmap 5.4). ``None`` when the field's
+    #: choices are static. When present:
+    #: ``{"field": "<controlling>", "options": {value: [allowed, …]}}`` —
+    #: the UI narrows this field's ``<select>`` to the options matching the
+    #: controlling field's current value.
+    dependency: dict[str, Any] | None = None
 
 
 class AdminActionMeta(BaseModel):
@@ -451,6 +457,31 @@ def _normalize_condition(
     return {"field": ref, "in": list(raw["in"])}
 
 
+def _normalize_dependency(
+    raw: Any, valid_names: set[str]
+) -> dict[str, Any] | None:
+    """Validate a dependent-choice rule (Roadmap 5.4).
+
+    Shape: ``{"field": <controlling>, "options": {value: [allowed, …]}}``.
+    Returns the normalized dict (keys + values stringified) or ``None``
+    when malformed or the controlling field doesn't exist, so a typo
+    degrades to "static choices" rather than shipping an unusable rule.
+    """
+    if not isinstance(raw, dict):
+        return None
+    ref = raw.get("field")
+    options = raw.get("options")
+    if not isinstance(ref, str) or ref not in valid_names:
+        return None
+    if not isinstance(options, dict):
+        return None
+    norm: dict[str, list[str]] = {}
+    for key, allowed in options.items():
+        if isinstance(allowed, (list, tuple)):
+            norm[str(key)] = [str(v) for v in allowed]
+    return {"field": ref, "options": norm}
+
+
 def build_field_metadata(
     model_admin: ModelAdmin,
     *,
@@ -546,6 +577,19 @@ def build_field_metadata(
             override = widget_overrides.get(f.name)
             if isinstance(override, str) and override:
                 f.widget = override
+
+    # Dependent-choice rules (Roadmap 5.4) — stamped after the field list
+    # exists so the controlling field can be validated against it.
+    dependencies = dict(getattr(model_admin, "field_dependencies", {}) or {})
+    if dependencies:
+        valid_names = {f.name for f in fields}
+        for f in fields:
+            raw = dependencies.get(f.name)
+            if raw is None:
+                continue
+            norm = _normalize_dependency(raw, valid_names)
+            if norm is not None:
+                f.dependency = norm
 
     return fields
 

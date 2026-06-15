@@ -101,6 +101,23 @@ class ModelAdmin:
     #: ``?dh=YYYY[-MM[-DD]]`` to filter to that period.
     date_hierarchy: str | None = None
 
+    #: Optional dependent-field choices (Roadmap 5.4). Maps a dependent
+    #: (select) field to a controlling field plus the allowed choice values
+    #: per controlling value::
+    #:
+    #:     field_dependencies = {
+    #:         "state": {
+    #:             "field": "country",
+    #:             "options": {"US": ["CA", "NY"], "DE": ["BY", "BE"]},
+    #:         },
+    #:     }
+    #:
+    #: The form narrows the dependent ``<select>`` to the options matching
+    #: the controlling field's current value. ``field`` must reference an
+    #: existing field; malformed/dangling rules are dropped by the contract
+    #: builder. Only meaningful for fields rendered as a select.
+    field_dependencies: dict[str, dict] = {}
+
     #: Optional list-view badge styling (Roadmap 5.5). Maps a column
     #: name to a ``{value: style}`` table; the list view renders matching
     #: cell values as a colored badge instead of plain text::
@@ -174,6 +191,8 @@ class ModelAdmin:
             cls.field_conditions = {}
         if "list_badges" not in cls.__dict__:
             cls.list_badges = {}
+        if "field_dependencies" not in cls.__dict__:
+            cls.field_dependencies = {}
 
     # ------------------------------------------------------------------
     # Lifecycle hooks (B1)
