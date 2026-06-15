@@ -43,6 +43,11 @@ export async function mountList(root, resource) {
   const isSortable = (colName) =>
     !!fieldsByNameAll[colName] && !fieldsByNameAll[colName].calculated;
 
+  // Inline edit (Roadmap 5.5): editable columns render as inputs; changed
+  // values accumulate per row in `edits` and save via per-row PATCH.
+  const editableSet = new Set(contract.list_editable || []);
+  const edits = new Map(); // row id -> { fieldName: newValue }
+
   const searchInput = el("input", {
     type: "search",
     placeholder: contract.search_fields.length
@@ -73,6 +78,14 @@ export async function mountList(root, resource) {
     { class: "btn btn-primary", href: `${cfg.uiPath}/${resource}/new` },
     "+ New"
   );
+
+  // Save-all for inline edits (Roadmap 5.5); hidden until something changes.
+  const saveEditsBtn = el(
+    "button",
+    { type: "button", class: "btn btn-primary", hidden: true },
+    "Save changes"
+  );
+  saveEditsBtn.addEventListener("click", saveEdits);
 
   // Import/Export buttons — rendered only when the import_export
   // extension is actually mounted server-side. The full contract's
@@ -251,7 +264,7 @@ export async function mountList(root, resource) {
     el("div", { class: "page-header" }, [
       el("h1", {}, contract.label_plural),
       el("div", { class: "page-actions" }, [
-        importBtn, exportCsvBtn, exportXlsxBtn, newBtn,
+        saveEditsBtn, importBtn, exportCsvBtn, exportXlsxBtn, newBtn,
       ].filter(Boolean)),
     ]),
     el("div", { class: "card" }, [
@@ -322,6 +335,11 @@ export async function mountList(root, resource) {
   function renderRows(items) {
     state.items = items;
     const cols = visibleColumns();
+    // Any re-render (reload, sort, column toggle) recreates the inputs, so
+    // in-progress inline edits are discarded to stay consistent with the
+    // freshly rendered values.
+    edits.clear();
+    updateSaveBtn();
     clear(tableBody);
     if (items.length === 0) {
       tableBody.appendChild(
@@ -341,6 +359,18 @@ export async function mountList(root, resource) {
       });
       const cells = [el("td", { class: "checkbox-cell" }, [checkbox])];
       for (const colName of cols) {
+        // Inline edit (Roadmap 5.5): editable columns render as an input
+        // pre-filled with the current value; edits accumulate per row.
+        if (editableSet.has(colName) && fieldsByName[colName]) {
+          const field = fieldsByName[colName];
+          const original = item[colName];
+          const input = buildEditCell(field, original);
+          const onChange = () => onEditChange(id, field, input, original);
+          input.addEventListener("input", onChange);
+          input.addEventListener("change", onChange);
+          cells.push(el("td", {}, [input]));
+          continue;
+        }
         // Badge styling (Roadmap 5.5): a configured value renders as a
         // colored chip instead of plain formatted text.
         const badgeStyle =
@@ -371,6 +401,83 @@ export async function mountList(root, resource) {
       );
       tableBody.appendChild(el("tr", {}, cells));
     }
+  }
+
+  // --- inline edit (Roadmap 5.5) ---
+
+  function buildEditCell(field, value) {
+    if (field.type === "boolean") {
+      return el("input", { type: "checkbox", class: "edit-cell", checked: !!value });
+    }
+    if (field.type === "integer" || field.type === "float") {
+      return el("input", {
+        type: "number",
+        class: "edit-cell",
+        step: field.type === "integer" ? "1" : "any",
+        value: value == null ? "" : String(value),
+      });
+    }
+    if (field.type === "datetime") {
+      return el("input", { type: "datetime-local", class: "edit-cell", value: toDatetimeLocal(value) });
+    }
+    return el("input", { type: "text", class: "edit-cell", value: value == null ? "" : String(value) });
+  }
+
+  function readEditValue(input, field) {
+    if (field.type === "boolean") return !!input.checked;
+    const raw = input.value;
+    if (raw === "") return field.nullable ? null : "";
+    if (field.type === "integer") {
+      const n = parseInt(raw, 10);
+      return Number.isNaN(n) ? raw : n;
+    }
+    if (field.type === "float") {
+      const n = parseFloat(raw);
+      return Number.isNaN(n) ? raw : n;
+    }
+    if (field.type === "datetime") return new Date(raw).toISOString();
+    return raw;
+  }
+
+  function onEditChange(id, field, input, original) {
+    const val = readEditValue(input, field);
+    let row = edits.get(id);
+    if (!row) {
+      row = {};
+      edits.set(id, row);
+    }
+    // Compare via stringify so "5" vs 5 / Date equality don't false-flag.
+    if (String(val) === String(original == null ? "" : original)) delete row[field.name];
+    else row[field.name] = val;
+    if (Object.keys(row).length === 0) edits.delete(id);
+    input.classList.toggle("dirty", edits.has(id) && field.name in (edits.get(id) || {}));
+    updateSaveBtn();
+  }
+
+  function updateSaveBtn() {
+    const n = edits.size;
+    saveEditsBtn.hidden = n === 0;
+    saveEditsBtn.disabled = n === 0;
+    saveEditsBtn.textContent = n ? `Save ${n} row${n === 1 ? "" : "s"}` : "Save changes";
+  }
+
+  async function saveEdits() {
+    if (edits.size === 0) return;
+    saveEditsBtn.disabled = true;
+    const entries = Array.from(edits.entries());
+    let ok = 0;
+    let failed = 0;
+    for (const [id, fieldsObj] of entries) {
+      try {
+        await admin.update(resource, id, fieldsObj);
+        ok += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    if (failed === 0) showToast(`Saved ${ok} row${ok === 1 ? "" : "s"}.`);
+    else showToast(`Saved ${ok}, ${failed} failed.`, { type: "error" });
+    load(); // refetch + re-render (also clears edits)
   }
 
   function renderPagination(total) {
@@ -500,6 +607,17 @@ export async function mountList(root, resource) {
 
 function prettify(name) {
   return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function toDatetimeLocal(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
 }
 
 // Per-user list preferences (Roadmap 5.5), persisted in localStorage and
