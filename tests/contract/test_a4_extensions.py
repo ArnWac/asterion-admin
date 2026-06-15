@@ -362,6 +362,86 @@ def test_list_badges_default_empty():
 
 
 # ---------------------------------------------------------------------------
+# dependent fields (Roadmap 5.4)
+# ---------------------------------------------------------------------------
+
+
+def test_dependency_emitted_and_stringified():
+    class _A(ModelAdmin):
+        model = _Post
+        field_dependencies = {
+            "summary": {"field": "status", "options": {"published": ["a", "b"]}}
+        }
+
+    metas = build_field_metadata(_A())
+    assert _meta_by_name(metas, "summary").dependency == {
+        "field": "status",
+        "options": {"published": ["a", "b"]},
+    }
+
+
+def test_dependency_dangling_controlling_field_dropped():
+    class _A(ModelAdmin):
+        model = _Post
+        field_dependencies = {"summary": {"field": "nope", "options": {"x": ["y"]}}}
+
+    metas = build_field_metadata(_A())
+    assert _meta_by_name(metas, "summary").dependency is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"field": "status"},  # no options
+        {"options": {"x": ["y"]}},  # no field
+        {"field": "status", "options": "notadict"},
+        "notadict",
+    ],
+)
+def test_dependency_malformed_dropped(bad):
+    class _A(ModelAdmin):
+        model = _Post
+        field_dependencies = {"summary": bad}
+
+    metas = build_field_metadata(_A())
+    assert _meta_by_name(metas, "summary").dependency is None
+
+
+def test_dependency_default_none():
+    metas = build_field_metadata(_PostAdmin())
+    assert _meta_by_name(metas, "summary").dependency is None
+
+
+# ---------------------------------------------------------------------------
+# widget override (Roadmap 5.4)
+# ---------------------------------------------------------------------------
+
+
+def test_widget_override_replaces_adapter_widget():
+    class _A(ModelAdmin):
+        model = _Post
+        widgets = {"summary": "textarea"}
+
+    metas = build_field_metadata(_A())
+    assert _meta_by_name(metas, "summary").widget == "textarea"
+
+
+def test_widget_override_only_affects_named_fields():
+    class _A(ModelAdmin):
+        model = _Post
+        widgets = {"summary": "textarea"}
+
+    metas = build_field_metadata(_A())
+    # title got no override → keeps its adapter default (None here).
+    assert _meta_by_name(metas, "title").widget is None
+
+
+def test_widget_override_default_noop():
+    metas = build_field_metadata(_PostAdmin())
+    assert _meta_by_name(metas, "summary").widget is None
+
+
+# ---------------------------------------------------------------------------
 # list_editable (Roadmap 5.5)
 # ---------------------------------------------------------------------------
 

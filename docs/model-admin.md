@@ -50,6 +50,8 @@ class PostAdmin(ModelAdmin):
 | `list_badges` | `dict[str, dict]` | List-view badge styling, e.g. `{"status": {"published": "success"}}` (Roadmap 5.5). |
 | `date_hierarchy` | `str \| None` | Date/DateTime column for a year→month→day list filter (Roadmap 5.5). |
 | `list_editable` | `list[str]` | Writable `list_display` columns editable inline in the list; saved per-row (Roadmap 5.5). |
+| `widgets` | `dict[str, str]` | Per-field widget override, e.g. `{"bio": "textarea"}` (Roadmap 5.4). |
+| `field_dependencies` | `dict[str, dict]` | Dependent select choices keyed by a controlling field's value (Roadmap 5.4). |
 | `placeholders` | `dict[str, str]` | Per-field placeholder text shown in form inputs (Roadmap 5.4). |
 | `field_conditions` | `dict[str, dict]` | Per-field conditional visibility, e.g. `{"vat_id": {"field": "is_business", "equals": True}}` (Roadmap 5.4). |
 

@@ -117,6 +117,34 @@ export async function mountForm(root, resource, mode, recordId) {
     evaluateConditions();
   }
 
+  // Dependent fields (Roadmap 5.4): narrow a dependent <select>'s options
+  // to those allowed for the controlling field's current value.
+  const dependentFields = editableFields.filter(
+    (f) => f.dependency && inputs.get(f.name) && inputs.get(f.name).tagName === "SELECT"
+  );
+
+  function evaluateDependencies() {
+    for (const f of dependentFields) {
+      const select = inputs.get(f.name);
+      const ctrlInput = inputs.get(f.dependency.field);
+      const ctrlField = fieldByName.get(f.dependency.field);
+      const ctrlValue =
+        ctrlInput && ctrlField ? readInputValue(ctrlInput, ctrlField) : null;
+      const allowed = (f.dependency.options || {})[String(ctrlValue)] || [];
+      rebuildSelectOptions(select, f, allowed);
+    }
+  }
+
+  if (dependentFields.length) {
+    for (const ctrlName of new Set(dependentFields.map((f) => f.dependency.field))) {
+      const ctrlInput = inputs.get(ctrlName);
+      if (!ctrlInput) continue;
+      ctrlInput.addEventListener("input", evaluateDependencies);
+      ctrlInput.addEventListener("change", evaluateDependencies);
+    }
+    evaluateDependencies();
+  }
+
   const summary = el("p", { class: "form-error", role: "alert", hidden: true });
   const submitBtn = el(
     "button",
@@ -281,12 +309,47 @@ function looseEq(a, b) {
   return String(a) === String(b);
 }
 
+function rebuildSelectOptions(select, field, allowed) {
+  // Replace a dependent select's options with the allowed set, preserving
+  // the current selection when it's still valid (else it falls back to the
+  // first option — the empty placeholder for nullable fields).
+  const current = select.value;
+  while (select.firstChild) select.removeChild(select.firstChild);
+  if (field.nullable) select.appendChild(el("option", { value: "" }, "—"));
+  for (const choice of allowed) {
+    const val = String(choice);
+    const attrs = { value: val };
+    if (val === current) attrs.selected = true;
+    select.appendChild(el("option", attrs, val));
+  }
+}
+
 function buildInput(field, id, initial, disabled) {
   const type = field.type;
   const baseAttrs = { id, name: field.name, disabled: disabled || false };
   // Placeholder (Roadmap 5.4) — harmless on input types that ignore it
   // (checkbox, datetime-local); only set when the contract supplies one.
   if (field.placeholder) baseAttrs.placeholder = field.placeholder;
+
+  // Widget-driven inputs (Roadmap 5.4): the contract has carried
+  // widget + choices since A4, but the form ignored them. Honour the
+  // two built-in widgets here; custom widgets are handled by the registry
+  // in mountForm before this function is reached.
+  const choices = (field.metadata && field.metadata.choices) || null;
+  if (field.widget === "select" && Array.isArray(choices)) {
+    const options = [];
+    if (field.nullable) options.push(el("option", { value: "" }, "—"));
+    for (const choice of choices) {
+      const val = String(choice);
+      const attrs = { value: val };
+      if (initial != null && String(initial) === val) attrs.selected = true;
+      options.push(el("option", attrs, val));
+    }
+    return el("select", baseAttrs, options);
+  }
+  if (field.widget === "textarea") {
+    return el("textarea", { ...baseAttrs, rows: 4 }, initial == null ? "" : String(initial));
+  }
 
   if (type === "boolean") {
     return el("input", {

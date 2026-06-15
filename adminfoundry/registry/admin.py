@@ -69,6 +69,14 @@ class ModelAdmin:
     #: value falls back to ``"sections"`` in the contract builder.
     form_layout: str = "sections"
 
+    #: Optional per-field widget override (Roadmap 5.4). Maps a field name
+    #: to a built-in widget hint that replaces the adapter-derived one on
+    #: ``FieldMeta.widget`` — e.g. ``{"bio": "textarea"}`` to render a
+    #: String column as a multi-line box. The built-in UI understands
+    #: ``"textarea"`` and ``"select"`` (the latter needs ``choices``);
+    #: unknown names pass through for a custom client to interpret.
+    widgets: dict[str, str] = {}
+
     #: Optional per-field placeholder text (Roadmap 5.4). Maps a field
     #: name to the placeholder string the form input should show when
     #: empty. Surfaced on ``FieldMeta.placeholder`` in the contract;
@@ -92,6 +100,23 @@ class ModelAdmin:
     #: missing or not a date type); the list endpoint accepts
     #: ``?dh=YYYY[-MM[-DD]]`` to filter to that period.
     date_hierarchy: str | None = None
+
+    #: Optional dependent-field choices (Roadmap 5.4). Maps a dependent
+    #: (select) field to a controlling field plus the allowed choice values
+    #: per controlling value::
+    #:
+    #:     field_dependencies = {
+    #:         "state": {
+    #:             "field": "country",
+    #:             "options": {"US": ["CA", "NY"], "DE": ["BY", "BE"]},
+    #:         },
+    #:     }
+    #:
+    #: The form narrows the dependent ``<select>`` to the options matching
+    #: the controlling field's current value. ``field`` must reference an
+    #: existing field; malformed/dangling rules are dropped by the contract
+    #: builder. Only meaningful for fields rendered as a select.
+    field_dependencies: dict[str, dict] = {}
 
     #: Optional list-view badge styling (Roadmap 5.5). Maps a column
     #: name to a ``{value: style}`` table; the list view renders matching
@@ -160,10 +185,14 @@ class ModelAdmin:
             cls.calculated_fields = {}
         if "placeholders" not in cls.__dict__:
             cls.placeholders = {}
+        if "widgets" not in cls.__dict__:
+            cls.widgets = {}
         if "field_conditions" not in cls.__dict__:
             cls.field_conditions = {}
         if "list_badges" not in cls.__dict__:
             cls.list_badges = {}
+        if "field_dependencies" not in cls.__dict__:
+            cls.field_dependencies = {}
 
     # ------------------------------------------------------------------
     # Lifecycle hooks (B1)
