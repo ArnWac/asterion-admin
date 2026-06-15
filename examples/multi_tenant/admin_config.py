@@ -1,34 +1,36 @@
 """Admin registration for the multi-tenant issue-tracker demo.
 
-Everything visible in the admin UI is registered here explicitly —
-``enable_builtin_admins=False`` in app.py, so nothing is auto-installed
-behind the scenes. The same pattern is used in
-``examples/basic_single/admin_config.py``.
+Like the single-tenant example, the app-specific admins here are
+deliberately exhaustive — ``TicketAdmin`` and ``ProjectAdmin`` together
+exercise the full ``ModelAdmin`` surface (badges, conditional/dependent
+fields, fieldsets/tabs, widgets, inline edit, protected field, an
+object-level policy, calculated fields, an inline child).
 
 Registered admins:
 
-* ``ProjectAdmin``, ``TicketAdmin`` — the demo's tenant-scoped models
-  (plus the custom ``CloseTicketsAction``).
-* ``UserAdmin``, ``TenantAdmin``, ``TenantMembershipAdmin``,
-  ``AuditLogAdmin``, ``ImpersonationLogAdmin`` — framework global tables,
-  defined in ``global_admins.py`` next to this file.
-* ``TenantRoleAdmin``, ``TenantRolePermissionAdmin``,
-  ``TenantMembershipRoleAdmin`` — tenant-local RBAC, imported directly
-  from ``adminfoundry.builtins.admin``. Their tables live inside each
-  tenant schema (provisioned by ``bootstrap_tenant``).
+* ``ProjectAdmin``, ``TicketAdmin`` — tenant-scoped models (+ the custom
+  ``CloseTicketsAction``, + ``TicketInline`` under projects).
+* framework global tables — from ``global_admins.py``.
+* tenant-local RBAC admins — from ``adminfoundry.builtins.admin``.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from adminfoundry import AdminRegistry, ModelAdmin
 from adminfoundry.actions import BulkDeleteAction
+from adminfoundry.admin.context import AdminContext
+from adminfoundry.admin.fieldset import Fieldset
+from adminfoundry.admin.inline import InlineAdmin
+from adminfoundry.admin.policy import AdminPolicy
 from adminfoundry.builtins.admin import (
     TenantMembershipRoleAdmin,
     TenantRoleAdmin,
     TenantRolePermissionAdmin,
 )
 from examples.multi_tenant.global_admins import register_global_admins
-from examples.multi_tenant.models import Project, Ticket
+from examples.multi_tenant.models import Project, Ticket, TicketStatus
 
 
 class CloseTicketsAction(BulkDeleteAction):
@@ -47,30 +49,99 @@ class CloseTicketsAction(BulkDeleteAction):
         }
 
 
+class TicketPolicy(AdminPolicy):
+    """Object-level rule: only closed tickets may be deleted."""
+
+    async def can_delete_object(self, obj: Any, ctx: AdminContext) -> bool:
+        return getattr(obj, "status", None) in ("closed", TicketStatus.closed)
+
+
+def _description_words(obj: Ticket) -> int:
+    return len((obj.description or "").split())
+
+
+class TicketInline(InlineAdmin):
+    model = Ticket
+    fk_name = "project_id"
+    fields = ["title", "status", "priority", "assignee"]
+    readonly_fields = ["created_at"]
+    ordering = ["-created_at"]
+    extra = 1
+    can_delete = True
+
+
 class ProjectAdmin(ModelAdmin):
     model = Project
     label = "Project"
     label_plural = "Projects"
-    description = "Tenant-scoped projects."
+    description = "Tenant-scoped projects, with their tickets edited inline."
 
     list_display = ["key", "name", "created_at"]
     search_fields = ["key", "name", "description"]
     ordering = ["key"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    date_hierarchy = "created_at"
+
+    fieldsets = [
+        Fieldset("Project", fields=["name", "key", "description"]),
+    ]
+    placeholders = {"key": "e.g. WEB", "name": "Project name"}
+    widgets = {"description": "textarea"}
+
     actions = [BulkDeleteAction()]
+    inlines = [TicketInline]
+    calculated_fields = {"slug": lambda obj: (obj.key or "").lower()}
 
 
 class TicketAdmin(ModelAdmin):
     model = Ticket
     label = "Ticket"
     label_plural = "Tickets"
-    description = "Tenant-scoped tickets, one row per issue."
+    description = "Tenant-scoped tickets — a tour of the full ModelAdmin surface."
 
-    list_display = ["title", "status", "priority", "assignee", "created_at"]
+    # --- list view ---
+    list_display = ["title", "status", "priority", "category", "assignee", "created_at"]
     search_fields = ["title", "description", "assignee"]
     ordering = ["-created_at"]
+    filter_fields = ["status", "priority", "category"]
+    date_hierarchy = "created_at"
+    list_badges = {
+        "status": {"open": "info", "in_progress": "warning", "closed": "success"},
+        "priority": {"low": "neutral", "normal": "info", "high": "warning", "urgent": "danger"},
+    }
+    list_editable = ["title", "assignee"]  # inline text edit
+
+    # --- field access ---
     readonly_fields = ["id", "created_at", "updated_at"]
+    protected_fields = ["secret_ref"]
+    policy = TicketPolicy()
+
+    # --- form layout ---
+    form_layout = "tabs"
+    fieldsets = [
+        Fieldset("Overview", fields=["title", "description", "project_id"]),
+        Fieldset("Triage", fields=["status", "priority", "category", "component", "assignee"]),
+        Fieldset("Resolution", fields=["resolution", "secret_ref"], collapsed=True),
+    ]
+    placeholders = {"title": "Short summary", "assignee": "email or name"}
+    widgets = {"description": "textarea", "resolution": "textarea"}
+    field_conditions = {
+        "resolution": {"field": "status", "equals": "closed"},
+    }
+    field_dependencies = {
+        "component": {
+            "field": "category",
+            "options": {
+                "bug": ["api", "ui", "db"],
+                "feature": ["integration", "reporting"],
+                "chore": ["ci", "docs"],
+            },
+        },
+    }
+
+    # --- behaviour ---
     actions = [BulkDeleteAction(), CloseTicketsAction()]
+    calculated_fields = {"description_words": _description_words}
 
 
 def register(registry: AdminRegistry) -> None:

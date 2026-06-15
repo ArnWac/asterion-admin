@@ -17,6 +17,14 @@ and tenant-scoped models in `~200` lines of app code.
   every schema from the admin UI.
 - **A custom `CloseTicketsAction`** that closes the selected tickets in
   bulk — demonstrates how to override `AdminAction.execute`.
+- **A full `ModelAdmin` feature tour**: `TicketAdmin` / `ProjectAdmin`
+  exercise every attribute — status/priority badges, column filters,
+  date-hierarchy drill-down, inline edit, tabbed fieldsets, textarea
+  widgets + placeholders, conditional (`resolution` when closed) and
+  dependent (`component` ← `category`) fields, a protected field
+  (`secret_ref`), an object-level policy (only closed tickets deletable),
+  calculated fields, and a `Ticket` inline under each project. Read
+  `admin_config.py` as a feature index.
 - **Global-schema admins** for `User`, `Tenant`, `TenantMembership`,
   `AuditLog`, `ImpersonationLog` — registered from `global_admins.py`.
   The audit/impersonation admins are read-only in the UI (every field

@@ -31,6 +31,25 @@ class TicketPriority(enum.StrEnum):
     urgent = "urgent"
 
 
+class TicketCategory(enum.StrEnum):
+    bug = "bug"
+    feature = "feature"
+    chore = "chore"
+
+
+class TicketComponent(enum.StrEnum):
+    # bug
+    api = "api"
+    ui = "ui"
+    db = "db"
+    # feature
+    integration = "integration"
+    reporting = "reporting"
+    # chore
+    ci = "ci"
+    docs = "docs"
+
+
 class Project(TenantModel):
     __tablename__ = "projects"
 
@@ -69,5 +88,20 @@ class Ticket(TenantModel):
         default=TicketPriority.normal,
     )
     assignee: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    category: Mapped[TicketCategory] = mapped_column(
+        SAEnum(TicketCategory, name="ticket_category"),
+        nullable=False,
+        default=TicketCategory.bug,
+    )
+    # Narrowed by ``category`` via ``field_dependencies`` in admin_config.
+    component: Mapped[TicketComponent | None] = mapped_column(
+        SAEnum(TicketComponent, name="ticket_component"),
+        nullable=True,
+    )
+    # Shown in the form only when status == "closed" (field_conditions).
+    resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Never serialized / accepted — listed in protected_fields.
+    secret_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     project: Mapped[Project] = relationship("Project", back_populates="tickets")

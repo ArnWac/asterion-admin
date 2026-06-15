@@ -15,8 +15,13 @@ lives in `basic_single.db`.
 
 ## What's registered
 
-- `PostAdmin` — list, search, filter, computed fields (`word_count`,
-  `read_time`, `excerpt`), bulk-delete action, two-section form layout.
+- `PostAdmin` — a guided tour of the **full `ModelAdmin` surface**: list
+  badges, column filters, date-hierarchy drill-down, inline edit, fieldsets
+  rendered as **tabs**, placeholders + textarea widgets, conditional +
+  dependent fields, a protected field (`api_secret`), a per-field policy
+  (`internal_notes` read-only for non-superadmins), calculated fields
+  (`word_count`, `read_time`), a bulk-delete action, and an inline
+  `Comment` child. Read `admin_config.py` top-to-bottom as a feature index.
 
 The tenant RBAC builtins (`TenantRoleAdmin`, etc.) are skipped because this
 example sets `enable_multi_tenant=False` and `enable_builtin_admins=False`.
