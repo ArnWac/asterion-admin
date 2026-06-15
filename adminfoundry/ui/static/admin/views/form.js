@@ -79,6 +79,39 @@ export async function mountForm(root, resource, mode, recordId) {
     form.appendChild(node);
   }
 
+  // Conditional fields (Roadmap 5.4): show/hide a dependent field based on
+  // another field's live value, and exclude hidden fields from the payload
+  // so the server never receives a value the user couldn't see.
+  const fieldByName = new Map(editableFields.map((f) => [f.name, f]));
+  const hiddenByCondition = new Set();
+  const conditionalFields = editableFields.filter(
+    (f) => f.condition && fieldDivs.has(f.name)
+  );
+
+  function evaluateConditions() {
+    for (const f of conditionalFields) {
+      const refInput = inputs.get(f.condition.field);
+      const refField = fieldByName.get(f.condition.field);
+      const refValue =
+        refInput && refField ? readInputValue(refInput, refField) : null;
+      const visible = valueSatisfies(f.condition, refValue);
+      const container = fieldDivs.get(f.name);
+      if (container) container.hidden = !visible;
+      if (visible) hiddenByCondition.delete(f.name);
+      else hiddenByCondition.add(f.name);
+    }
+  }
+
+  if (conditionalFields.length) {
+    for (const refName of new Set(conditionalFields.map((f) => f.condition.field))) {
+      const refInput = inputs.get(refName);
+      if (!refInput) continue;
+      refInput.addEventListener("input", evaluateConditions);
+      refInput.addEventListener("change", evaluateConditions);
+    }
+    evaluateConditions();
+  }
+
   const summary = el("p", { class: "form-error", role: "alert", hidden: true });
   const submitBtn = el(
     "button",
@@ -99,7 +132,7 @@ export async function mountForm(root, resource, mode, recordId) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     clearErrors(errorBoxes, summary);
-    const payload = collectPayload(editableFields, inputs, isEdit);
+    const payload = collectPayload(editableFields, inputs, isEdit, hiddenByCondition);
     submitBtn.disabled = true;
     try {
       let result;
@@ -174,6 +207,24 @@ function buildSection(label, description, collapsed, fieldNodes) {
   return el("details", { class: "fieldset", open: !collapsed }, children);
 }
 
+function valueSatisfies(condition, value) {
+  if (!condition) return true;
+  if ("equals" in condition) return looseEq(value, condition.equals);
+  if ("in" in condition && Array.isArray(condition.in)) {
+    return condition.in.some((v) => looseEq(v, value));
+  }
+  return true; // unknown rule shape → don't hide
+}
+
+function looseEq(a, b) {
+  // Form inputs normalize to string/number/boolean; tolerate the
+  // string/number coercion (e.g. select value "2" vs rule value 2) while
+  // keeping booleans and exact matches strict.
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
 function buildInput(field, id, initial, disabled) {
   const type = field.type;
   const baseAttrs = { id, name: field.name, disabled: disabled || false };
@@ -214,9 +265,11 @@ function buildInput(field, id, initial, disabled) {
   });
 }
 
-function collectPayload(fields, inputs, isEdit) {
+function collectPayload(fields, inputs, isEdit, hiddenSet) {
   const payload = {};
   for (const field of fields) {
+    // A field hidden by a conditional rule submits no value.
+    if (hiddenSet && hiddenSet.has(field.name)) continue;
     const input = inputs.get(field.name);
     if (!input || input.disabled) continue;
     const value = readInputValue(input, field);
