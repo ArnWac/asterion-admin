@@ -25,6 +25,7 @@ from fastapi import FastAPI
 
 from adminfoundry.extensions.context import ExtensionContext
 from adminfoundry.extensions.registry import ExtensionRegistry
+from adminfoundry.ui.admin_pages import mirror_pages_into_navigation
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +46,11 @@ def run_setup_phase(
     2. ``register_permissions``
     3. ``register_protected_fields``
     4. ``register_contract_contributions``
-    5. ``register_navigation``
-    6. ``register_models``       ← side-effect: forces import + collects classes
-    7. ``register_routes``       ← only step that gets ``app``
+    5. ``register_admin_pages``
+    6. ``register_navigation``
+    7. mirror permission-bearing admin pages into navigation
+    8. ``register_models``       ← side-effect: forces import + collects classes
+    9. ``register_routes``       ← only step that gets ``app``
 
     After this returns, every extension-side registry is frozen. The
     flattened tuple of extension-contributed model classes is returned
@@ -58,7 +61,7 @@ def run_setup_phase(
     for ext in extensions:
         ext.configure(ctx.config)
 
-    # Steps 2-5: contributions into the four registries.
+    # Steps 2-6: contributions into the extension-side registries.
     for ext in extensions:
         ext.register_permissions(ctx.permissions)
     for ext in extensions:
@@ -66,9 +69,21 @@ def run_setup_phase(
     for ext in extensions:
         ext.register_contract_contributions(ctx.contract)
     for ext in extensions:
+        ext.register_admin_pages(ctx.admin_pages)
+    for ext in extensions:
         ext.register_navigation(ctx.navigation)
 
-    # Step 6: model declarations. Calling the hook forces the import of
+    # Step 7: mirror admin pages into navigation. Must run AFTER both
+    # registries are populated and BEFORE either is frozen below, so a
+    # page's sidebar entry appears without a separate register_navigation
+    # call. See adminfoundry/ui/admin_pages.py.
+    mirror_pages_into_navigation(
+        ctx.admin_pages,
+        ctx.navigation,
+        ui_path=ctx.config.admin_ui_path,
+    )
+
+    # Step 8: model declarations. Calling the hook forces the import of
     # the extension's model module, which is what actually attaches
     # the ``Table`` objects to the shared metadata. We flatten the
     # results into a single tuple for runtime introspection.
@@ -77,7 +92,7 @@ def run_setup_phase(
         for model in ext.register_models():
             collected_models.append(model)
 
-    # Step 7: routes. ``app`` is intentionally only available here.
+    # Step 9: routes. ``app`` is intentionally only available here.
     for ext in extensions:
         ext.register_routes(app, ctx)
 
@@ -87,6 +102,7 @@ def run_setup_phase(
     ctx.protected_fields.freeze()
     ctx.contract.freeze()
     ctx.navigation.freeze()
+    ctx.admin_pages.freeze()
     extensions.freeze()
 
     return tuple(collected_models)

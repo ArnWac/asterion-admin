@@ -82,6 +82,27 @@ SUPPORTED_EXPORT_FORMATS: tuple[str, ...] = ("csv", "xlsx")
 MAX_IMPORT_ROWS: int = 5_000
 
 
+def xlsx_available() -> bool:
+    """True when ``openpyxl`` is importable (so the xlsx format works).
+
+    Checked without importing openpyxl itself — the dependency stays
+    lazy, loaded only inside the export/import handlers.
+    """
+    import importlib.util
+
+    return importlib.util.find_spec("openpyxl") is not None
+
+
+def available_formats() -> tuple[str, ...]:
+    """Formats this install can actually export/import.
+
+    CSV is always available; XLSX needs ``openpyxl``. The extension
+    publishes this through the contract so the UI never offers a format
+    the server would answer with 501.
+    """
+    return ("csv", "xlsx") if xlsx_available() else ("csv",)
+
+
 def _resolve_admin(request: Request, resource: str) -> type[ModelAdmin]:
     try:
         resource = validate_resource_name(resource)

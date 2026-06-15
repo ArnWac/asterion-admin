@@ -1,2 +1,0 @@
-- [adminfoundry v1 refactor — execution state](project_adminfoundry_v1_refactor.md) — Phase-by-phase rebuild per adminfoundry_v1_next_phase_stabilize_core_then_mvp.md; tracks where we paused.
-- [adminfoundry collaboration preferences](feedback_adminfoundry_style.md) — strict MVP, no backwards-compat hacks, phase-by-phase with checkpoints.

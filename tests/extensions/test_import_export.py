@@ -162,6 +162,69 @@ def test_export_csv_omits_protected_fields(app):
     assert "topsecret" not in resp.text
 
 
+# --- contract capability advertisement (A2) ---
+
+
+def test_extension_contributes_import_export_capability_fragment():
+    """The extension publishes its capability so the UI can gate the
+    Import / Export controls instead of rendering buttons that 404."""
+    from adminfoundry.contract.contributions import ContractContributionRegistry
+    from adminfoundry.extensions.import_export import available_formats
+
+    registry = ContractContributionRegistry()
+    ImportExportExtension().register_contract_contributions(registry)
+
+    frag = registry.all()["import_export"]
+    assert frag["export_formats"] == list(available_formats())
+    assert frag["import_formats"] == list(available_formats())
+    assert "csv" in frag["export_formats"]
+    assert frag["max_export_rows"] == MAX_EXPORT_ROWS
+    assert frag["max_import_rows"] == MAX_IMPORT_ROWS
+
+
+def test_full_contract_advertises_import_export_when_mounted(app):
+    _grant(app, {"admin.export_widgets.list"})
+    resp = _client(app).get("/api/v1/admin/_contract")
+    assert resp.status_code == 200
+    exts = resp.json()["extensions"]
+    assert "import_export" in exts
+    assert "csv" in exts["import_export"]["export_formats"]
+
+
+def test_full_contract_omits_import_export_when_not_mounted(tmp_path):
+    """An app booted WITHOUT the extension must not advertise the
+    capability — otherwise the UI would render dead Import/Export
+    buttons (the exact mismatch A2 closes)."""
+    application = create_admin(
+        config=CoreAdminConfig(
+            database_url=f"sqlite+aiosqlite:///{tmp_path / 'noie.db'}",
+            secret_key="test-export-secret",
+            enable_multi_tenant=False,
+            enable_builtin_ui=False,
+            enable_builtin_admins=False,
+        ),
+        register=lambda reg: reg.register(WidgetAdmin),
+    )
+    runtime = application.state.adminfoundry
+
+    async def _setup():
+        async with runtime.db.engine.begin() as conn:
+            await conn.run_sync(GlobalModel.metadata.create_all)
+            await conn.run_sync(Widget.metadata.create_all)
+
+    asyncio.run(_setup())
+    override_admin_context(
+        application, principal=make_admin_principal(email="alice@example.com")
+    )
+    _grant(application, {"admin.export_widgets.list"})
+    try:
+        resp = _client(application).get("/api/v1/admin/_contract")
+        assert resp.status_code == 200
+        assert "import_export" not in resp.json()["extensions"]
+    finally:
+        asyncio.run(runtime.db.dispose())
+
+
 # --- input handling ---
 
 

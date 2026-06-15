@@ -49,6 +49,7 @@ from adminfoundry.extensions.import_export.router import (
     MAX_EXPORT_ROWS,
     MAX_IMPORT_ROWS,
     SUPPORTED_EXPORT_FORMATS,
+    available_formats,
 )
 from adminfoundry.extensions.import_export.router import (
     router as _import_export_router,
@@ -59,6 +60,26 @@ class ImportExportExtension(AdminExtension):
     """CSV (always) + XLSX (with openpyxl) export and import endpoints."""
 
     name = "import_export"
+
+    def register_contract_contributions(self, registry) -> None:
+        """Advertise import/export availability under the ``import_export``
+        contract namespace.
+
+        Without this, the built-in UI can only learn the endpoints exist
+        by clicking a button and getting a 404. Publishing the capability
+        (and the formats actually usable in this install) lets the UI gate
+        the Import / Export controls on real availability.
+        """
+        formats = list(available_formats())
+        registry.add(
+            "import_export",
+            {
+                "export_formats": formats,
+                "import_formats": formats,
+                "max_export_rows": MAX_EXPORT_ROWS,
+                "max_import_rows": MAX_IMPORT_ROWS,
+            },
+        )
 
     def register_routes(self, app: FastAPI, ctx: ExtensionContext) -> None:
         app.include_router(
@@ -75,4 +96,5 @@ __all__ = [
     "MAX_IMPORT_ROWS",
     "SUPPORTED_EXPORT_FORMATS",
     "ImportExportExtension",
+    "available_formats",
 ]

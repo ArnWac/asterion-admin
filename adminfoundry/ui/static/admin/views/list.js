@@ -2,7 +2,7 @@
 // Supports bulk admin actions declared in admin_actions.
 
 import { APIError, admin } from "../api.js";
-import { getResourceContract } from "../contract.js";
+import { getFullContract, getResourceContract } from "../contract.js";
 import { clear, el, mount, setBreadcrumb, showToast } from "../dom.js";
 import { formatValue } from "../format.js";
 import { openImportModal } from "./import_modal.js";
@@ -58,16 +58,32 @@ export async function mountList(root, resource) {
     "+ New"
   );
 
-  // Import/Export buttons. The endpoints exist only when the import_export
-  // extension is mounted; clicking when it isn't returns 404 and surfaces
-  // a clear error toast — no client-side feature flag needed.
-  const importBtn = el("button", { type: "button", class: "btn" }, "Import");
-  const exportCsvBtn = el("button", { type: "button", class: "btn" }, "Export CSV");
-  const exportXlsxBtn = el("button", { type: "button", class: "btn" }, "Export XLSX");
+  // Import/Export buttons — rendered only when the import_export
+  // extension is actually mounted server-side. The full contract's
+  // `extensions.import_export` fragment is the source of truth (it also
+  // lists the formats usable in this install), so we never show a button
+  // that would 404 or a format the server would 501 on.
+  const fullContract = await getFullContract();
+  const ieCap = (fullContract.extensions && fullContract.extensions.import_export) || null;
+  const exportFormats = (ieCap && ieCap.export_formats) || [];
 
-  importBtn.addEventListener("click", () => openImportModal(resource, contract, () => load()));
-  exportCsvBtn.addEventListener("click", () => doExport("csv"));
-  exportXlsxBtn.addEventListener("click", () => doExport("xlsx"));
+  const importBtn = ieCap
+    ? el("button", { type: "button", class: "btn" }, "Import")
+    : null;
+  const exportCsvBtn = exportFormats.includes("csv")
+    ? el("button", { type: "button", class: "btn" }, "Export CSV")
+    : null;
+  const exportXlsxBtn = exportFormats.includes("xlsx")
+    ? el("button", { type: "button", class: "btn" }, "Export XLSX")
+    : null;
+
+  if (importBtn) {
+    importBtn.addEventListener("click", () =>
+      openImportModal(resource, contract, () => load(), ieCap)
+    );
+  }
+  if (exportCsvBtn) exportCsvBtn.addEventListener("click", () => doExport("csv"));
+  if (exportXlsxBtn) exportXlsxBtn.addEventListener("click", () => doExport("xlsx"));
 
   async function doExport(format) {
     const ids = Array.from(state.selectedIds);
@@ -86,8 +102,8 @@ export async function mountList(root, resource) {
   function refreshExportLabels() {
     const n = state.selectedIds.size;
     const suffix = n > 0 ? ` (${n} selected)` : "";
-    exportCsvBtn.textContent = `Export CSV${suffix}`;
-    exportXlsxBtn.textContent = `Export XLSX${suffix}`;
+    if (exportCsvBtn) exportCsvBtn.textContent = `Export CSV${suffix}`;
+    if (exportXlsxBtn) exportXlsxBtn.textContent = `Export XLSX${suffix}`;
   }
 
   const layout = el("div", {}, [
@@ -95,7 +111,7 @@ export async function mountList(root, resource) {
       el("h1", {}, contract.label_plural),
       el("div", { class: "page-actions" }, [
         importBtn, exportCsvBtn, exportXlsxBtn, newBtn,
-      ]),
+      ].filter(Boolean)),
     ]),
     el("div", { class: "card" }, [
       el("div", { class: "toolbar" }, [

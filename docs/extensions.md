@@ -53,13 +53,15 @@ order. Each hook has a no-op default — override only what you need.
 | 2 | `register_permissions(registry)` | Add namespaced permission keys (`"oauth.identities.list"`) | once |
 | 3 | `register_protected_fields(registry)` | Add field names that must never serialize / log (`"hashed_password"`) | once |
 | 4 | `register_contract_contributions(registry)` | Add a namespaced fragment to `GET /_contract` for the UI to consume | once |
-| 5 | `register_navigation(registry)` | Add permission-gated sidebar nav items | once |
-| 6 | `register_models()` | Return ORM classes whose tables this extension owns | once |
-| 7 | `register_routes(app, ctx)` | Mount routers on the FastAPI app | once |
+| 5 | `register_admin_pages(registry)` | Register custom pages outside the CRUD schema (Roadmap 5.6) | once |
+| 6 | `register_navigation(registry)` | Add permission-gated sidebar nav items | once |
+| — | _Framework step:_ permission-bearing admin pages are mirrored into the navigation registry | | |
+| 7 | `register_models()` | Return ORM classes whose tables this extension owns | once |
+| 8 | `register_routes(app, ctx)` | Mount routers on the FastAPI app | once |
 | — | **All registries freeze here.** Any later attempt to register raises `RegistryFrozenError`. | | |
-| 8 | `startup(app)` | Async resource setup (DB pools, JWKS clients, background jobs) | once per process |
-| 9 | _(requests served)_ | | |
-| 10 | `shutdown(app)` | Async resource teardown — called in **reverse** registration order; failures logged but never raised | once per process |
+| 9 | `startup(app)` | Async resource setup (DB pools, JWKS clients, background jobs) | once per process |
+| 10 | _(requests served)_ | | |
+| 11 | `shutdown(app)` | Async resource teardown — called in **reverse** registration order; failures logged but never raised | once per process |
 
 Only `register_routes` receives the `app` directly. Extension routes
 are mounted **before** the framework's dynamic `/{resource}` catch-all,
@@ -67,9 +69,9 @@ so a static-path extension route (`/{resource}/_export`) wins.
 
 ---
 
-## The four extension-side registries
+## The extension-side registries
 
-All four are populated **only** during the corresponding hook, then
+Each is populated **only** during the corresponding hook, then
 frozen. They live on the `AdminRuntime` (`request.app.state.adminfoundry`)
 and are reachable from routes / templates.
 
@@ -131,6 +133,36 @@ def register_navigation(self, registry):
 
 Superadmins bypass the permission filter — see [auth-architecture.md](auth-architecture.md).
 
+### `AdminPageRegistry` — `runtime.admin_pages`
+
+Custom pages outside the CRUD schema (Roadmap 5.6) — a Reports view, a
+status dashboard, a bulk-operation wizard. Each page declares a URL-safe
+`id`, a sidebar `label`, and a `js_module` URL the built-in SPA
+dynamically imports when the page is visited. Pages are served under the
+reserved `{admin_ui_path}/_pages/{id}` prefix (mounted before the dynamic
+`/{resource}` route, so a slug can never collide with a resource).
+
+```python
+from adminfoundry.ui.admin_pages import AdminPage
+
+def register_admin_pages(self, registry):
+    registry.register(
+        AdminPage(
+            id="reports",                       # url-safe: [a-z][a-z0-9_-]*
+            label="Reports",
+            js_module="/admin/static/reports.js",  # SPA import()s this
+            permission="reports.view",          # gates the nav item
+            category="Tools",                   # optional grouping
+        )
+    )
+```
+
+A page that declares a `permission` is mirrored into the navigation
+registry automatically, so it shows up in the sidebar without a separate
+`register_navigation` call. The `js_module` must export a
+`mount(root, ctx)` function (or a default export of that shape); the SPA
+host (`views/page.js`) imports it and hands it the page's root element.
+
 ---
 
 ## ORM models — `register_models()`
@@ -190,8 +222,8 @@ changes. Each host opts in by importing.
 
 ## `ExtensionContext`
 
-The bundle handed to `register_*` hooks. Carries the four registries
-plus the validated framework config.
+The bundle handed to `register_*` hooks. Carries the extension-side
+registries plus the validated framework config.
 
 ```python
 @dataclass
@@ -201,6 +233,7 @@ class ExtensionContext:
     contract: ContractContributionRegistry
     navigation: NavigationRegistry
     protected_fields: ProtectedFieldRegistry
+    admin_pages: AdminPageRegistry
     logger: logging.Logger
 ```
 

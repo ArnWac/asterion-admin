@@ -13,16 +13,22 @@
 import { APIError, admin } from "../api.js";
 import { clear, el, showToast } from "../dom.js";
 
-export function openImportModal(resource, contract, onDone) {
+export function openImportModal(resource, contract, onDone, capability) {
   const overlay = el("div", { class: "modal-overlay", role: "dialog", "aria-modal": "true" });
   const box = el("div", { class: "modal-box" });
   overlay.appendChild(box);
 
+  // Restrict the picker to the formats this install can actually parse.
+  // Falls back to both when the capability is absent (older callers).
+  const formats = (capability && capability.import_formats) || ["csv", "xlsx"];
+  const accept = formats.map((f) => `.${f}`).join(",");
+  const acceptLabel = formats.map((f) => f.toUpperCase()).join(" or ");
+
   const fileInput = el("input", {
     type: "file",
     name: "file",
-    accept: ".csv,.xlsx",
-    "aria-label": "Choose CSV or XLSX file",
+    accept,
+    "aria-label": `Choose ${acceptLabel} file`,
   });
   const submitBtn = el("button", { type: "submit", class: "btn btn-primary" }, "Upload");
   const cancelBtn = el("button", { type: "button", class: "btn btn-link" }, "Cancel");

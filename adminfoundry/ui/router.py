@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -27,6 +27,8 @@ def _template_context(
     view: str,
     resource: str | None = None,
     record_id: str | None = None,
+    page_id: str | None = None,
+    page_module: str | None = None,
 ) -> dict[str, Any]:
     runtime = request.app.state.adminfoundry
     config = runtime.config
@@ -40,6 +42,8 @@ def _template_context(
         "view": view,
         "resource": resource,
         "record_id": record_id,
+        "page_id": page_id,
+        "page_module": page_module,
     }
 
 
@@ -49,6 +53,8 @@ def _app(
     view: str,
     resource: str | None = None,
     record_id: str | None = None,
+    page_id: str | None = None,
+    page_module: str | None = None,
 ):
     return templates.TemplateResponse(
         request,
@@ -58,6 +64,8 @@ def _app(
             view=view,
             resource=resource,
             record_id=record_id,
+            page_id=page_id,
+            page_module=page_module,
         ),
     )
 
@@ -113,6 +121,34 @@ async def ui_permissions(request: Request):
     ``/{resource}``) so the dynamic CRUD router can't shadow it.
     """
     return _app(request, view="permissions")
+
+
+@router.get("/_pages/{page_id}", response_class=HTMLResponse, include_in_schema=False)
+async def ui_page(request: Request, page_id: str):
+    """Serve a registered custom Admin Page (Roadmap 5.6).
+
+    Mounted under the reserved ``_pages/`` prefix and BEFORE the dynamic
+    ``/{resource}`` routes so a page slug can never be shadowed by — or
+    shadow — a CRUD resource. The shell carries the page's ``js_module``
+    so the SPA can dynamically import the page module without a second
+    round-trip. Unknown slugs 404 instead of booting an empty shell.
+
+    The shell itself is not data-bearing; the page's own API endpoints
+    enforce permissions, and the sidebar link is permission-filtered by
+    the navigation endpoint — same contract as every other UI route.
+    """
+    page = request.app.state.adminfoundry.admin_pages.get(page_id)
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Admin page '{page_id}' is not registered.",
+        )
+    return _app(
+        request,
+        view="page",
+        page_id=page.id,
+        page_module=page.js_module,
+    )
 
 
 @router.get("/{resource}/new", response_class=HTMLResponse, include_in_schema=False)

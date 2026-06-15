@@ -164,6 +164,7 @@ adminfoundry doctor
 - [`docs/tenancy.md`](docs/tenancy.md) — schema-per-tenant strategy + bootstrap
 - [`docs/model-admin.md`](docs/model-admin.md) — `ModelAdmin` API reference
 - [`docs/deployment.md`](docs/deployment.md) — Docker, env, health probes, observability
+- [`docs/roadmap.md`](docs/roadmap.md) — binding roadmap: scope, phases, deliberate non-goals
 
 ---
 

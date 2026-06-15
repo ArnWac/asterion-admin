@@ -158,6 +158,39 @@ def test_registry_field_does_not_appear_in_full_model_contract():
     assert "external_token" not in names
 
 
+# --- Deliberate global semantics (A1: pinned, not refactored) ---
+
+
+def test_runtime_protected_fields_defaults_to_the_global_singleton():
+    """``AdminRuntime.protected_fields`` deliberately defaults to the
+    module-level singleton, so every app instance in a process shares
+    one registry.
+
+    This is a *documented* singleton (see runtime.py + protected_fields.py
+    docstrings and docs/roadmap.md). Two apps sharing it can only ever
+    over-protect (a field protected by app B is also stripped for app A),
+    never leak — protected fields are a global, fail-safe concern. If a
+    future change makes this per-runtime, it MUST also re-route every
+    reader of ``ModelAdmin.all_protected``; this test is the tripwire.
+    """
+    import dataclasses
+
+    from adminfoundry.core.runtime import AdminRuntime
+
+    pf_field = {f.name: f for f in dataclasses.fields(AdminRuntime)}["protected_fields"]
+    assert pf_field.default_factory is not dataclasses.MISSING
+    assert pf_field.default_factory() is get_registry()
+
+
+def test_protected_field_is_shared_across_admin_instances():
+    """A field registered once is honoured by every admin everywhere —
+    the global-concern guarantee the read path relies on."""
+    get_registry().register("external_token")
+    assert "external_token" in WidgetAdmin().all_protected
+    # A second, independently-constructed admin sees it too.
+    assert "external_token" in WidgetAdmin().all_protected
+
+
 # --- The default GLOBALLY_PROTECTED alias still works ---
 
 
