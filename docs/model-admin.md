@@ -49,6 +49,7 @@ class PostAdmin(ModelAdmin):
 | `form_layout` | `str` | `"sections"` (default) or `"tabs"` — how `fieldsets` are laid out (Roadmap 5.4). |
 | `list_badges` | `dict[str, dict]` | List-view badge styling, e.g. `{"status": {"published": "success"}}` (Roadmap 5.5). |
 | `date_hierarchy` | `str \| None` | Date/DateTime column for a year→month→day list filter (Roadmap 5.5). |
+| `list_editable` | `list[str]` | Writable `list_display` columns editable inline in the list; saved per-row (Roadmap 5.5). |
 | `placeholders` | `dict[str, str]` | Per-field placeholder text shown in form inputs (Roadmap 5.4). |
 | `field_conditions` | `dict[str, dict]` | Per-field conditional visibility, e.g. `{"vat_id": {"field": "is_business", "equals": True}}` (Roadmap 5.4). |
 
