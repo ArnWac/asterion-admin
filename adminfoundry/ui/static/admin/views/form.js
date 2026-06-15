@@ -288,6 +288,26 @@ function buildInput(field, id, initial, disabled) {
   // (checkbox, datetime-local); only set when the contract supplies one.
   if (field.placeholder) baseAttrs.placeholder = field.placeholder;
 
+  // Widget-driven inputs (Roadmap 5.4): the contract has carried
+  // widget + choices since A4, but the form ignored them. Honour the
+  // two built-in widgets here; custom widgets are handled by the registry
+  // in mountForm before this function is reached.
+  const choices = (field.metadata && field.metadata.choices) || null;
+  if (field.widget === "select" && Array.isArray(choices)) {
+    const options = [];
+    if (field.nullable) options.push(el("option", { value: "" }, "—"));
+    for (const choice of choices) {
+      const val = String(choice);
+      const attrs = { value: val };
+      if (initial != null && String(initial) === val) attrs.selected = true;
+      options.push(el("option", attrs, val));
+    }
+    return el("select", baseAttrs, options);
+  }
+  if (field.widget === "textarea") {
+    return el("textarea", { ...baseAttrs, rows: 4 }, initial == null ? "" : String(initial));
+  }
+
   if (type === "boolean") {
     return el("input", {
       ...baseAttrs,
