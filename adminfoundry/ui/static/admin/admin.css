@@ -829,3 +829,23 @@ table.compact-table td {
 }
 .th-sort:hover { color: var(--accent); }
 .th-sort.active { color: var(--accent); }
+
+/* Date hierarchy drill-down (Roadmap 5.5). */
+.date-hierarchy {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.date-hierarchy .dh-year { width: 5.5rem; }
+
+/* Inline-editable list cells (Roadmap 5.5). */
+.edit-cell {
+  width: 100%;
+  min-width: 5rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font: inherit;
+}
+.edit-cell[type="checkbox"] { width: auto; min-width: 0; }
+.edit-cell.dirty { border-color: var(--accent); background: #f0f6ff; }

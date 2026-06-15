@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry.crud.query import (
+    _parse_date_hierarchy,
+    apply_date_hierarchy,
     apply_ordering,
     apply_search,
     coerce_primary_key_value,
@@ -25,12 +27,18 @@ class Product(_Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100))
     sku = Column(String(50))
+    created_at = Column(DateTime)
 
 
 class ProductAdmin(ModelAdmin):
     model = Product
     search_fields = ["name", "sku"]
     ordering = ["name"]
+
+
+class DatedAdmin(ModelAdmin):
+    model = Product
+    date_hierarchy = "created_at"
 
 
 # --- normalize_limit_offset ---
@@ -135,3 +143,71 @@ def test_apply_ordering_unknown_request_field_falls_back_to_default():
     # Falls back to admin.ordering = ["name"]; no request column, no tiebreaker.
     assert "PRODUCTS.NAME ASC" in clause
     assert "PRODUCTS.SKU" not in clause
+
+
+# --- date hierarchy ---
+
+
+def test_parse_date_hierarchy_year():
+    import datetime as dt
+
+    assert _parse_date_hierarchy("2026") == (dt.datetime(2026, 1, 1), dt.datetime(2027, 1, 1))
+
+
+def test_parse_date_hierarchy_month():
+    import datetime as dt
+
+    assert _parse_date_hierarchy("2026-03") == (dt.datetime(2026, 3, 1), dt.datetime(2026, 4, 1))
+
+
+def test_parse_date_hierarchy_december_rolls_to_next_year():
+    import datetime as dt
+
+    assert _parse_date_hierarchy("2026-12") == (dt.datetime(2026, 12, 1), dt.datetime(2027, 1, 1))
+
+
+def test_parse_date_hierarchy_day():
+    import datetime as dt
+
+    assert _parse_date_hierarchy("2026-03-15") == (
+        dt.datetime(2026, 3, 15),
+        dt.datetime(2026, 3, 16),
+    )
+
+
+@pytest.mark.parametrize("bad", ["", "abcd", "2026-13", "2026-02-30", "2026-03-15-1", "20x6"])
+def test_parse_date_hierarchy_invalid_returns_none(bad):
+    assert _parse_date_hierarchy(bad) is None
+
+
+def test_apply_date_hierarchy_adds_range_where():
+    from sqlalchemy import select
+
+    stmt = apply_date_hierarchy(select(Product), DatedAdmin(), "2026-03")
+    sql = str(stmt).upper()
+    assert "WHERE" in sql
+    # Half-open range → two predicates on the date column in the WHERE clause.
+    where_clause = sql.split("WHERE", 1)[1]
+    assert where_clause.count("PRODUCTS.CREATED_AT") == 2
+    assert ">=" in where_clause and "<" in where_clause
+
+
+def test_apply_date_hierarchy_noop_without_admin_field():
+    from sqlalchemy import select
+
+    stmt = select(Product)
+    assert str(apply_date_hierarchy(stmt, ProductAdmin(), "2026")) == str(stmt)
+
+
+def test_apply_date_hierarchy_noop_for_unparseable_value():
+    from sqlalchemy import select
+
+    stmt = select(Product)
+    assert str(apply_date_hierarchy(stmt, DatedAdmin(), "not-a-date")) == str(stmt)
+
+
+def test_apply_date_hierarchy_noop_for_empty_value():
+    from sqlalchemy import select
+
+    stmt = select(Product)
+    assert str(apply_date_hierarchy(stmt, DatedAdmin(), None)) == str(stmt)

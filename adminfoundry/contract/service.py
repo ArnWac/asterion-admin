@@ -40,6 +40,52 @@ ALLOWED_BADGE_STYLES: frozenset[str] = frozenset(
 )
 
 
+def resolve_date_hierarchy(model_admin: ModelAdmin) -> str | None:
+    """Validate ``ModelAdmin.date_hierarchy`` for the contract (Roadmap 5.5).
+
+    Returns the field name only when it's a real ``Date``/``DateTime``
+    column on the model; otherwise ``None`` so a typo or non-date column
+    degrades to "no drill-down" rather than shipping an unusable hint.
+    """
+    from sqlalchemy import Date, DateTime
+
+    field = getattr(model_admin, "date_hierarchy", None)
+    if not field:
+        return None
+    try:
+        column = sa_inspect(model_admin.model).columns[field]
+    except KeyError:
+        return None
+    return field if isinstance(column.type, (Date, DateTime)) else None
+
+
+def build_list_editable(
+    model_admin: ModelAdmin, field_metas: list[FieldMeta]
+) -> list[str]:
+    """Resolve ``ModelAdmin.list_editable`` for the wire (Roadmap 5.5).
+
+    Keeps only names that are in ``list_display`` AND correspond to a
+    writable field in the contract — primary keys, read-only, hidden,
+    calculated, and protected columns (which never reach ``field_metas``)
+    are dropped so the UI never offers an inline editor the update
+    endpoint would reject. Declaration order is preserved.
+    """
+    declared = list(getattr(model_admin, "list_editable", []) or [])
+    if not declared:
+        return []
+    list_display = set(model_admin.list_display)
+    by_name = {f.name: f for f in field_metas}
+    out: list[str] = []
+    for name in declared:
+        meta = by_name.get(name)
+        if meta is None or name not in list_display:
+            continue
+        if meta.primary_key or meta.read_only or meta.calculated or meta.hidden:
+            continue
+        out.append(name)
+    return out
+
+
 def build_list_badges(model_admin: ModelAdmin) -> dict[str, dict[str, str]]:
     """Normalize ``ModelAdmin.list_badges`` for the wire (Roadmap 5.5).
 
@@ -242,6 +288,14 @@ class ModelContractMeta(BaseModel):
     #: where ``style`` is one of :data:`ALLOWED_BADGE_STYLES`. Values are
     #: stringified so the UI can match them against rendered cell text.
     list_badges: dict[str, dict[str, str]] = {}
+    #: Date drill-down column (Roadmap 5.5). The name of a Date/DateTime
+    #: column the list view filters by year/month/day, or ``None`` when
+    #: unset or the named column is missing / not a date type.
+    date_hierarchy: str | None = None
+    #: Columns the UI may edit inline in the list (Roadmap 5.5). A subset
+    #: of ``list_display`` containing only writable fields; saved through
+    #: the normal per-row update endpoint.
+    list_editable: list[str] = []
     list_display: list[str]
     search_fields: list[str]
     ordering: list[str]
@@ -836,15 +890,16 @@ def build_model_contract(
     None means "no per-caller policy ran" — every field falls back to
     the default ``"write"``.
     """
+    field_metas = build_field_metadata(
+        model_admin, registry=registry, field_permissions=field_permissions
+    )
     return ModelContractMeta(
         contract_version=CONTRACT_VERSION,
         resource=model_admin.model_name,
         label=model_admin.display_label,
         label_plural=model_admin.display_label_plural,
         description=model_admin.description,
-        fields=build_field_metadata(
-            model_admin, registry=registry, field_permissions=field_permissions
-        ),
+        fields=field_metas,
         crud_actions=list(CRUD_ACTIONS),
         admin_actions=[_admin_action_meta(a) for a in model_admin.actions],
         capabilities=_build_capabilities(model_admin, permissions=permissions),
@@ -856,6 +911,8 @@ def build_model_contract(
         inlines=build_inline_metadata(model_admin),
         filters=build_filter_metadata(model_admin, registry=registry),
         list_badges=build_list_badges(model_admin),
+        date_hierarchy=resolve_date_hierarchy(model_admin),
+        list_editable=build_list_editable(model_admin, field_metas),
         list_display=list(model_admin.list_display),
         search_fields=list(model_admin.search_fields),
         ordering=list(model_admin.ordering),

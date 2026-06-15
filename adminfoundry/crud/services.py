@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from adminfoundry.crud.payload import clean_write_payload
 from adminfoundry.crud.query import (
+    apply_date_hierarchy,
     apply_filters,
     apply_ordering,
     apply_search,
@@ -151,6 +152,7 @@ async def list_records(
     search: str | None = None,
     filters: dict[str, Any] | None = None,
     ordering: str | None = None,
+    date_hierarchy: str | None = None,
     ctx: "AdminContext | None" = None,
 ) -> dict[str, Any]:
     model = admin_class.model
@@ -167,6 +169,7 @@ async def list_records(
 
     base_stmt = select(model)
     base_stmt = apply_filters(base_stmt, admin_class, filters or {})
+    base_stmt = apply_date_hierarchy(base_stmt, admin_class, date_hierarchy)
     base_stmt = apply_search(base_stmt, admin_class, search)
 
     total = (await session.execute(count_statement_for(base_stmt))).scalar_one()

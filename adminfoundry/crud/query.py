@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import String, cast, func, inspect, or_, select
+from sqlalchemy import Date, DateTime, String, cast, func, inspect, or_, select
 from sqlalchemy.orm import ColumnProperty
 from sqlalchemy.sql import Select
 
@@ -238,6 +239,60 @@ def apply_filters(
         coerced = _coerce_filter_value(column, str(raw_value))
         stmt = stmt.where(column == coerced)
     return stmt
+
+
+def _parse_date_hierarchy(value: str) -> tuple[datetime, datetime] | None:
+    """Parse ``YYYY`` / ``YYYY-MM`` / ``YYYY-MM-DD`` into a ``[start, end)``
+    half-open datetime range. Returns ``None`` for anything unparseable so
+    the caller can fall back to "no date filter" instead of erroring."""
+    parts = value.split("-")
+    try:
+        if len(parts) == 1:
+            year = int(parts[0])
+            return datetime(year, 1, 1), datetime(year + 1, 1, 1)
+        if len(parts) == 2:
+            year, month = int(parts[0]), int(parts[1])
+            if not 1 <= month <= 12:
+                return None
+            start = datetime(year, month, 1)
+            end = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+            return start, end
+        if len(parts) == 3:
+            year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+            start = datetime(year, month, day)
+            return start, start + timedelta(days=1)
+    except (ValueError, OverflowError):
+        return None
+    return None
+
+
+def apply_date_hierarchy(
+    stmt: Select,
+    admin_class: type[ModelAdmin],
+    value: str | None,
+) -> Select:
+    """Filter to a date period over ``ModelAdmin.date_hierarchy`` (Roadmap 5.5).
+
+    No-op when the admin declares no ``date_hierarchy``, the request omits
+    ``value``, the named column is missing, or ``value`` doesn't parse —
+    each degrades to "no date filter" rather than erroring.
+    """
+    field = getattr(admin_class, "date_hierarchy", None)
+    if not field or not value:
+        return stmt
+    if field not in model_column_names(admin_class.model):
+        return stmt
+    parsed = _parse_date_hierarchy(value)
+    if parsed is None:
+        return stmt
+    start, end = parsed
+    column = get_model_column(admin_class.model, field)
+    # Match the column's granularity so Date columns compare cleanly.
+    if isinstance(column.type, Date) and not isinstance(column.type, DateTime):
+        lo, hi = start.date(), end.date()
+    else:
+        lo, hi = start, end
+    return stmt.where(column >= lo, column < hi)
 
 
 def apply_search(
