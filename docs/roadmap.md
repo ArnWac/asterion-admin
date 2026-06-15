@@ -184,10 +184,15 @@ out-of-the-box, S3-Wechsel ist ein Provider-Tausch.
 
 ---
 
-### Phase 5 — UI-Tiefe + Admin-UI-Erweiterungen
+### Phase 5 — UI-Tiefe + Admin-UI-Erweiterungen ✅ ABGESCHLOSSEN
 
 **Ziel:** Bestehende Daten (Audit, RBAC, AdminContext) endlich in der UI
 sichtbar machen. Frontend-Arbeit.
+
+Alle Punkte 5.1–5.6 umgesetzt (inkl. 5.4 Form Layout: Placeholders,
+help_text, Fieldsets, Tabs, Conditional/Dependent Fields, Widget-Override;
+5.5 List View: Row Badges, Column Visibility, Density, Sortable Columns,
+Date Hierarchy, Inline Bulk Edit).
 
 | # | Bereich | Wert |
 |---|---|---|
@@ -200,11 +205,15 @@ sichtbar machen. Frontend-Arbeit.
 
 ---
 
-### Phase 6 — Enterprise-Identity
+### Phase 6 — Enterprise-Identity (GEPARKT)
 
-| # | Bereich | Wert |
-|---|---|---|
-| 6.1 | **SCIM / SAML** — Enterprise-Identity-Standards. SCIM-Provisioning, SAML-Login | hoch (für Enterprise-Kunden) |
+Bewusst zurückgestellt — wird erst bei konkretem Enterprise-Bedarf
+aufgenommen und davor eigens gescoped (eigene Extension(s), neue
+Security-Oberfläche). Kein nahes Deadline-Ziel.
+
+- **SCIM / SAML** — Enterprise-Identity-Standards: SCIM-Provisioning,
+  SAML-Login. Hoher Wert für Enterprise-Kunden, aber großer, eigenständiger
+  Block; nicht Teil des aktuellen Scopes.
 
 ---
 
@@ -272,22 +281,22 @@ ebenfalls, da es Jobs voraussetzte.
 | 3 (Auth-Hardening) | Refresh Tokens + RevokedToken + Password Reset + 2FA produktiv; OAuth-Flow vollständig |
 | 4 (Storage + Files) | StorageBackend-SPI + FileField/ImageField + S3-Adapter + Generic Notifier-Protocol |
 | 5 (UI-Tiefe) | Audit-UI + Permission-Matrix-UI + Form-Layout-Erweiterungen + List-View-Erweiterungen + Admin-Pages |
-| 6 (Enterprise-Identity) | SCIM-Provisioning + SAML-Login |
+| 6 (Enterprise-Identity) | **GEPARKT** — SCIM-Provisioning + SAML-Login; erst bei konkretem Bedarf |
 | 7 (Enterprise Restposten) | nicht zwingend abgeschlossen — geparkt bis Bedarf |
 
 ---
 
 ## Kurz-Zusammenfassung
 
-Stand: **Phasen 1 + 2** ✅ und der Großteil von **Phase 3** (Auth-
-Hardening: 3.1 Refresh, 3.2 Revocation, 3.3 Password-Reset, 3.4a 2FA-
-Enrollment) sind committed. Offen sind:
+Stand: **Phasen 1–5 abgeschlossen** ✅ (Robustheit, Konsolidierung,
+Auth-Hardening inkl. 2FA-Login-Step-Up + OAuth, Storage/Files/Notifier,
+sowie die volle UI-Tiefe von Phase 5). Keine offenen Punkte in den
+aktiven Phasen.
 
-1. **Phase 3 Rest** — 3.4b (Login-Step-Up) + 3.5 (OAuth-Vervollständigung)
-2. **Phase 4** — Storage-SPI + FileField/ImageField + S3-Adapter + Generic Notifier-Protocol
-3. **Phase 5** — Audit-UI, Permission-Matrix-UI, Form-/List-View-UI-Tiefe, Admin-Pages, Import/Export-Ausbau
-4. **Phase 6** — SCIM/SAML (wenn Enterprise-Bedarf besteht)
-5. **Phase 7** — Restparken (Billing, White Labeling, Multi-Region, Flutter UI)
+**Geparkt** (erst bei konkretem Bedarf, jeweils eigenes Scoping):
+
+1. **Phase 6** — SCIM/SAML (Enterprise-Identity)
+2. **Phase 7** — Billing, White Labeling, Multi-Region, Redis-Cache, Flutter UI
 
 Bewusst nicht mehr in der Roadmap: EventBus, JobQueue, Webhooks,
 Observability-Extension, Jobs UI, Workflows — siehe „Bewusst gestrichen"
