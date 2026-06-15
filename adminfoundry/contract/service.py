@@ -56,6 +56,13 @@ class FieldMeta(BaseModel):
     #: Sourced from ``ModelAdmin.placeholders``; ``None`` means the
     #: renderer shows no placeholder.
     placeholder: str | None = None
+    #: Conditional-visibility rule (Roadmap 5.4). ``None`` means the
+    #: field is always shown. When present it is a normalized dict of the
+    #: shape ``{"field": "<other>", "equals": v}`` or
+    #: ``{"field": "<other>", "in": [...]}``; the UI shows this field only
+    #: while the referenced field's value satisfies the rule, and omits it
+    #: from the submitted payload otherwise.
+    condition: dict[str, Any] | None = None
     #: Adapter-supplied or admin-supplied validation hints (e.g.
     #: ``{"min_length": 1, "max_length": 200}``). Empty when the adapter
     #: did not contribute any.
@@ -327,6 +334,32 @@ def _field_meta_from_adapter(
     )
 
 
+def _normalize_condition(
+    raw: Any, valid_names: set[str]
+) -> dict[str, Any] | None:
+    """Validate a single conditional-visibility rule (Roadmap 5.4).
+
+    Returns the normalized ``{"field", "equals"|"in"}`` dict, or ``None``
+    when the rule is malformed or references a field that isn't in
+    ``valid_names`` (so a typo degrades to "always visible" rather than
+    shipping a dangling rule the UI can't evaluate).
+    """
+    if not isinstance(raw, dict):
+        return None
+    ref = raw.get("field")
+    if not isinstance(ref, str) or ref not in valid_names:
+        return None
+    has_equals = "equals" in raw
+    has_in = "in" in raw
+    if has_equals == has_in:  # need exactly one
+        return None
+    if has_equals:
+        return {"field": ref, "equals": raw["equals"]}
+    if not isinstance(raw["in"], (list, tuple)):
+        return None
+    return {"field": ref, "in": list(raw["in"])}
+
+
 def build_field_metadata(
     model_admin: ModelAdmin,
     *,
@@ -399,6 +432,20 @@ def build_field_metadata(
                 field_permission="read",  # calculated fields are inherently read-only
             )
         )
+
+    # Conditional-visibility rules (Roadmap 5.4). Stamped after the field
+    # list exists so a rule can only reference a field that's actually in
+    # the contract; dangling / malformed rules are dropped.
+    conditions = dict(getattr(model_admin, "field_conditions", {}) or {})
+    if conditions:
+        valid_names = {f.name for f in fields}
+        for f in fields:
+            raw = conditions.get(f.name)
+            if raw is None:
+                continue
+            norm = _normalize_condition(raw, valid_names)
+            if norm is not None:
+                f.condition = norm
 
     return fields
 

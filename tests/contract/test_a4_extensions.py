@@ -6,6 +6,7 @@ CapabilitiesMeta block. Contract-version bumped to ``"2"``.
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import Column, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase
 
@@ -245,6 +246,70 @@ def test_placeholder_none_when_not_configured():
     # Even on the placeholder admin, an unlisted field stays None.
     metas2 = build_field_metadata(_PlaceholderAdmin())
     assert _meta_by_name(metas2, "body").placeholder is None
+
+
+# ---------------------------------------------------------------------------
+# conditional fields (Roadmap 5.4)
+# ---------------------------------------------------------------------------
+
+
+class _ConditionAdmin(ModelAdmin):
+    model = _Post
+    field_conditions = {
+        # valid: equals rule referencing an existing field
+        "summary": {"field": "status", "equals": "published"},
+        # valid: in rule
+        "body": {"field": "status", "in": ["draft", "review"]},
+        # dropped: references a field that isn't in the contract
+        "title": {"field": "does_not_exist", "equals": 1},
+    }
+
+
+def test_condition_equals_emitted():
+    metas = build_field_metadata(_ConditionAdmin())
+    assert _meta_by_name(metas, "summary").condition == {
+        "field": "status",
+        "equals": "published",
+    }
+
+
+def test_condition_in_emitted():
+    metas = build_field_metadata(_ConditionAdmin())
+    assert _meta_by_name(metas, "body").condition == {
+        "field": "status",
+        "in": ["draft", "review"],
+    }
+
+
+def test_condition_with_dangling_reference_dropped():
+    """A rule pointing at a non-existent field degrades to 'always
+    visible' (condition None) instead of shipping an unevaluable rule."""
+    metas = build_field_metadata(_ConditionAdmin())
+    assert _meta_by_name(metas, "title").condition is None
+
+
+def test_condition_none_when_not_configured():
+    metas = build_field_metadata(_PostAdmin())
+    assert _meta_by_name(metas, "summary").condition is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"field": "status"},  # no equals/in
+        {"field": "status", "equals": 1, "in": [1]},  # both
+        {"equals": 1},  # no field
+        {"field": "status", "in": "notalist"},  # in not a list
+        "notadict",
+    ],
+)
+def test_malformed_condition_dropped(bad):
+    class _A(ModelAdmin):
+        model = _Post
+        field_conditions = {"summary": bad}
+
+    metas = build_field_metadata(_A())
+    assert _meta_by_name(metas, "summary").condition is None
 
 
 # ---------------------------------------------------------------------------

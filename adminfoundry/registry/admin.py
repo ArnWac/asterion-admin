@@ -69,6 +69,24 @@ class ModelAdmin:
     #: placeholder). Unknown field names are ignored by the builder.
     placeholders: dict[str, str] = {}
 
+    #: Optional conditional-visibility rules (Roadmap 5.4). Maps a
+    #: *dependent* field name to a rule that references another field::
+    #:
+    #:     field_conditions = {
+    #:         "vat_id": {"field": "is_business", "equals": True},
+    #:         "shipping_note": {"field": "ship_method", "in": ["air", "sea"]},
+    #:     }
+    #:
+    #: The dependent field is shown only while the rule holds; the UI
+    #: hides it and drops it from the submitted payload otherwise. A rule
+    #: must carry ``field`` plus exactly one of ``equals`` / ``in``, and
+    #: ``field`` must reference an existing (visible) field — malformed or
+    #: dangling rules are dropped by the contract builder so a typo
+    #: degrades to "always visible" rather than a 500. Conditionally
+    #: hidden fields should be nullable, since a hidden field submits no
+    #: value.
+    field_conditions: dict[str, dict] = {}
+
     #: Optional :class:`~adminfoundry.admin.policy.AdminPolicy` instance
     #: layered on top of the permission-key checks. ``None`` means
     #: "permission keys alone decide" (legacy / quickstart behavior).
@@ -102,6 +120,8 @@ class ModelAdmin:
             cls.calculated_fields = {}
         if "placeholders" not in cls.__dict__:
             cls.placeholders = {}
+        if "field_conditions" not in cls.__dict__:
+            cls.field_conditions = {}
 
     # ------------------------------------------------------------------
     # Lifecycle hooks (B1)
