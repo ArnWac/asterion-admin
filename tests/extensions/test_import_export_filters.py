@@ -86,9 +86,7 @@ def app(tmp_path):
                 )
 
     asyncio.run(_setup())
-    override_admin_context(
-        application, principal=make_admin_principal(email="alice@example.com")
-    )
+    override_admin_context(application, principal=make_admin_principal(email="alice@example.com"))
 
     yield application
     asyncio.run(runtime.db.dispose())
@@ -130,9 +128,7 @@ def test_export_with_single_filter_narrows_rows(app):
             {"name": "c", "color": "red", "count": 2},
         ],
     )
-    resp = _client(app).get(
-        "/api/v1/admin/d4_widgets/_export?format=csv&filter_color=red"
-    )
+    resp = _client(app).get("/api/v1/admin/d4_widgets/_export?format=csv&filter_color=red")
     assert resp.status_code == 200, resp.text
     rows = _parse(resp.text)
     assert sorted(r["name"] for r in rows) == ["a", "c"]
@@ -167,8 +163,7 @@ def test_export_filter_composes_with_search(app):
         ],
     )
     resp = _client(app).get(
-        "/api/v1/admin/d4_widgets/_export"
-        "?format=csv&filter_color=red&search=alphabet"
+        "/api/v1/admin/d4_widgets/_export?format=csv&filter_color=red&search=alphabet"
     )
     assert resp.status_code == 200
     rows = _parse(resp.text)
@@ -183,18 +178,14 @@ def test_export_filter_composes_with_search(app):
 def test_export_unknown_filter_field_returns_422(app):
     _grant(app)
     _seed(app, [{"name": "a", "color": "red"}])
-    resp = _client(app).get(
-        "/api/v1/admin/d4_widgets/_export?format=csv&filter_ghost=anything"
-    )
+    resp = _client(app).get("/api/v1/admin/d4_widgets/_export?format=csv&filter_ghost=anything")
     assert resp.status_code == 422
 
 
 def test_export_bad_integer_filter_returns_422(app):
     _grant(app)
     _seed(app, [{"name": "a", "count": 1}])
-    resp = _client(app).get(
-        "/api/v1/admin/d4_widgets/_export?format=csv&filter_count=not-an-int"
-    )
+    resp = _client(app).get("/api/v1/admin/d4_widgets/_export?format=csv&filter_count=not-an-int")
     assert resp.status_code == 422
 
 
@@ -216,10 +207,7 @@ def test_export_with_ids_ignores_filter_params(app):
         ],
     )
     # color=red would normally exclude "b", but the explicit ids list wins.
-    resp = _client(app).get(
-        "/api/v1/admin/d4_widgets/_export"
-        "?format=csv&ids=2&filter_color=red"
-    )
+    resp = _client(app).get("/api/v1/admin/d4_widgets/_export?format=csv&ids=2&filter_color=red")
     assert resp.status_code == 200
     rows = _parse(resp.text)
     assert [r["name"] for r in rows] == ["b"]
@@ -231,14 +219,13 @@ def test_export_with_ids_ignores_filter_params(app):
 
 
 def test_export_audit_records_filters(app):
-    from adminfoundry.models.audit_log import AuditLog
     from sqlalchemy import select
+
+    from adminfoundry.models.audit_log import AuditLog
 
     _grant(app)
     _seed(app, [{"name": "a", "color": "red"}])
-    resp = _client(app).get(
-        "/api/v1/admin/d4_widgets/_export?format=csv&filter_color=red"
-    )
+    resp = _client(app).get("/api/v1/admin/d4_widgets/_export?format=csv&filter_color=red")
     assert resp.status_code == 200
 
     runtime = app.state.adminfoundry

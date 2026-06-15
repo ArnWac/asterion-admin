@@ -330,9 +330,7 @@ class _CheckChangesAdmin(ModelAdmin):
 async def test_after_update_sees_post_before_update_changes(db_session: AsyncSession):
     admin = _CheckChangesAdmin()
     created = await create_record(db_session, admin, {"name": "Hi"})
-    await update_record(
-        db_session, admin, str(created["id"]), {"name": "Bye"}, ctx=_ctx()
-    )
+    await update_record(db_session, admin, str(created["id"]), {"name": "Bye"}, ctx=_ctx())
     assert admin.last_changes is not None
     assert admin.last_changes["color"] == "stamped"
     assert admin.last_changes["name"] == "Bye"

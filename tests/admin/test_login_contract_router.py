@@ -63,30 +63,44 @@ def test_returns_empty_list_when_oauth_not_installed(tmp_path):
 def test_returns_configured_oauth_providers(tmp_path):
     app = create_admin(
         config=_config(tmp_path),
-        extensions=[OAuthExtension(providers=[
-            GoogleOIDCProvider(client_id="x", client_secret="y"),
-        ])],
+        extensions=[
+            OAuthExtension(
+                providers=[
+                    GoogleOIDCProvider(client_id="x", client_secret="y"),
+                ]
+            )
+        ],
     )
     with TestClient(app, raise_server_exceptions=False) as c:
         body = c.get("/api/v1/admin/_login_contract").json()
-    assert body == {"oauth_providers": [
-        {"id": "google", "label": "Google", "login_url": "/api/v1/oauth/google/login"},
-    ]}
+    assert body == {
+        "oauth_providers": [
+            {"id": "google", "label": "Google", "login_url": "/api/v1/oauth/google/login"},
+        ]
+    }
 
 
 def test_handles_multiple_providers_in_order(tmp_path):
     app = create_admin(
         config=_config(tmp_path),
-        extensions=[OAuthExtension(providers=[
-            GoogleOIDCProvider(
-                client_id="x", client_secret="y",
-                id="google_workspace", label="Google Workspace",
-            ),
-            GoogleOIDCProvider(
-                client_id="a", client_secret="b",
-                id="google_personal", label="Google Personal",
-            ),
-        ])],
+        extensions=[
+            OAuthExtension(
+                providers=[
+                    GoogleOIDCProvider(
+                        client_id="x",
+                        client_secret="y",
+                        id="google_workspace",
+                        label="Google Workspace",
+                    ),
+                    GoogleOIDCProvider(
+                        client_id="a",
+                        client_secret="b",
+                        id="google_personal",
+                        label="Google Personal",
+                    ),
+                ]
+            )
+        ],
     )
     with TestClient(app, raise_server_exceptions=False) as c:
         ids = [p["id"] for p in c.get("/api/v1/admin/_login_contract").json()["oauth_providers"]]
@@ -101,9 +115,13 @@ def test_response_contains_only_oauth_providers_key(tmp_path):
     catches it — the public endpoint's surface should stay narrow."""
     app = create_admin(
         config=_config(tmp_path),
-        extensions=[OAuthExtension(providers=[
-            GoogleOIDCProvider(client_id="x", client_secret="y"),
-        ])],
+        extensions=[
+            OAuthExtension(
+                providers=[
+                    GoogleOIDCProvider(client_id="x", client_secret="y"),
+                ]
+            )
+        ],
     )
     with TestClient(app, raise_server_exceptions=False) as c:
         body = c.get("/api/v1/admin/_login_contract").json()
@@ -116,9 +134,13 @@ def test_provider_response_only_contains_three_fields(tmp_path):
     to the three the login page actually needs."""
     app = create_admin(
         config=_config(tmp_path),
-        extensions=[OAuthExtension(providers=[
-            GoogleOIDCProvider(client_id="x", client_secret="y"),
-        ])],
+        extensions=[
+            OAuthExtension(
+                providers=[
+                    GoogleOIDCProvider(client_id="x", client_secret="y"),
+                ]
+            )
+        ],
     )
     with TestClient(app, raise_server_exceptions=False) as c:
         provider = c.get("/api/v1/admin/_login_contract").json()["oauth_providers"][0]

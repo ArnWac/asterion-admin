@@ -146,9 +146,9 @@ def test_login_complete_page_blocks_search_indexing(client):
     /admin/login-complete — exclude from search engines anyway."""
     resp = client.get("/admin/login-complete")
     assert 'name="robots"' in resp.text
-    assert 'noindex' in resp.text.lower()
+    assert "noindex" in resp.text.lower()
     assert 'name="referrer"' in resp.text
-    assert 'no-referrer' in resp.text
+    assert "no-referrer" in resp.text
 
 
 def test_login_page_includes_oauth_providers_slot(client):

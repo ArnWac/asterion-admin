@@ -67,7 +67,10 @@ def _bearer(token: str) -> dict[str, str]:
 
 def _issue(user: User) -> str:
     return create_access_token(
-        user.id, secret_key=SECRET, algorithm=ALG, expires_minutes=5,
+        user.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=5,
         token_version=user.token_version,
     )
 
@@ -92,9 +95,7 @@ def test_logout_requires_authentication(app_with_user):
 
 def test_logout_rejects_invalid_token(app_with_user):
     app, _, _ = app_with_user
-    assert _client(app).post(
-        "/api/v1/auth/logout", headers=_bearer("nope")
-    ).status_code == 401
+    assert _client(app).post("/api/v1/auth/logout", headers=_bearer("nope")).status_code == 401
 
 
 # --- single-token revocation ---
@@ -153,8 +154,10 @@ def test_logout_writes_audit_row(app_with_user):
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
             rows = (
-                await session.execute(select(AuditLog).where(AuditLog.action == LOGOUT))
-            ).scalars().all()
+                (await session.execute(select(AuditLog).where(AuditLog.action == LOGOUT)))
+                .scalars()
+                .all()
+            )
             return list(rows)
 
     rows = asyncio.run(_go())
@@ -191,7 +194,5 @@ def test_logout_all_still_works_alongside_single_logout(app_with_user):
     app, runtime, user = app_with_user
     token = _issue(user)
     # logout-all bumps tkv → token rejected by tkv mismatch.
-    assert _client(app).post(
-        "/api/v1/auth/logout-all", headers=_bearer(token)
-    ).status_code == 200
+    assert _client(app).post("/api/v1/auth/logout-all", headers=_bearer(token)).status_code == 200
     assert _client(app).get("/api/v1/auth/me", headers=_bearer(token)).status_code == 401

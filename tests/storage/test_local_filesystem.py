@@ -138,9 +138,7 @@ async def test_dotdot_escape_is_rejected(storage):
     """The whole point of containment: ``../../etc/passwd`` cannot
     write outside the storage root."""
     with pytest.raises(StorageRejected):
-        await storage.put(
-            "../../etc/passwd", b"x", content_type="text/plain"
-        )
+        await storage.put("../../etc/passwd", b"x", content_type="text/plain")
 
 
 @pytest.mark.asyncio

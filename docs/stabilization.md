@@ -23,6 +23,7 @@ absichert. Reihenfolge nach Risiko × Nutzen.
 | **P3** | [Custom-Component-Injektion](#p3-custom-component-injektionspunkt) | ⏸️ aufgeschoben (bei Bedarf) |
 | **—** | [Release-/Versionspolitik](#release--versionspolitik) | ✅ festgelegt (siehe unten) |
 | **Follow-up** | [mypy aufs Gesamtpaket](#follow-up-mypy-aufs-gesamtpaket) | offen, kein 1.0-Blocker |
+| **Follow-up** | [ruff Lint/Format-Drift](#follow-up-ruff-lintformat-drift-ci-lint-vorbestehend-rot) | ✅ erledigt (gepinnt + bereinigt) |
 
 ---
 
@@ -161,9 +162,17 @@ mit Begründung), dann `[tool.mypy] files` aufs Paket erweitern.
 
 ---
 
-## Follow-up — ruff Lint/Format-Drift (CI-Lint vorbestehend rot)
+## Follow-up — ruff Lint/Format-Drift (CI-Lint vorbestehend rot) ✅ erledigt
 
-**Befund:** Die ruff-Config selektiert `RUF059` (erst ab ruff ≥ 0.11), aber
+**Erledigt:** ruff auf `>=0.15,<0.16` gepinnt; `ruff check . --fix` (94
+Autofixes) + `ruff format .` (70 Dateien); `RUF012` auch für
+`adminfoundry/admin/**` ignoriert (deklaratives `InlineAdmin`-Muster);
+`UP042` an `FieldPermission(str, Enum)` per begründetem `# noqa` belassen
+(StrEnum würde `str()`-Semantik ändern); `RUF002` (`×`→`x`), `B904`
+(`raise … from exc`) und ein `F841` in Tests gefixt. `ruff check` +
+`ruff format --check` grün; volle Suite (1390) weiterhin grün.
+
+**Ursprünglicher Befund:** Die ruff-Config selektiert `RUF059` (erst ab ruff ≥ 0.11), aber
 das Paket ist unter keiner RUF059-fähigen Version sauber: ruff 0.11.13
 meldet ~110 Lint-Treffer (überwiegend `UP037` Quotes-in-Annotations, `F401`,
 `I001`, `E402`, `RUF012`), und der 0.15-Formatter würde ~70 Dateien

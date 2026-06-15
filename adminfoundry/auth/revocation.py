@@ -30,9 +30,7 @@ async def is_token_revoked(session: AsyncSession, jti: str) -> bool:
     if not jti:
         return False
     found = (
-        await session.execute(
-            select(RevokedToken.id).where(RevokedToken.jti == jti).limit(1)
-        )
+        await session.execute(select(RevokedToken.id).where(RevokedToken.jti == jti).limit(1))
     ).first()
     return found is not None
 

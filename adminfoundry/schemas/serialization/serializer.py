@@ -51,7 +51,7 @@ def _calculated_value(fn, obj) -> Any:
 async def _hidden_fields_via_policy(
     obj: object,
     model_admin: ModelAdmin,
-    ctx: "AdminContext | None",
+    ctx: AdminContext | None,
 ) -> set[str]:
     """Compute the per-caller HIDDEN field set.
 
@@ -99,7 +99,7 @@ class Serializer:
         model_admin: ModelAdmin,
         *,
         hidden_extra: set[str] | None = None,
-        ctx: "AdminContext | None" = None,
+        ctx: AdminContext | None = None,
     ) -> dict:
         excluded = model_admin.all_protected
         if hidden_extra:
@@ -134,11 +134,10 @@ class Serializer:
         model_admin: ModelAdmin,
         *,
         hidden_extra: set[str] | None = None,
-        ctx: "AdminContext | None" = None,
+        ctx: AdminContext | None = None,
     ) -> list[dict]:
         return [
-            self.serialize(obj, model_admin, hidden_extra=hidden_extra, ctx=ctx)
-            for obj in objs
+            self.serialize(obj, model_admin, hidden_extra=hidden_extra, ctx=ctx) for obj in objs
         ]
 
 
@@ -167,7 +166,7 @@ def serialize_records(
 async def serialize_record_with_policy(
     obj,
     model_admin: ModelAdmin,
-    ctx: "AdminContext | None" = None,
+    ctx: AdminContext | None = None,
 ) -> dict:
     """Convenience entry-point used by the CRUD service path.
 
@@ -182,13 +181,13 @@ async def serialize_record_with_policy(
 async def serialize_records_with_policy(
     objs: list,
     model_admin: ModelAdmin,
-    ctx: "AdminContext | None" = None,
+    ctx: AdminContext | None = None,
 ) -> list[dict]:
     """List-equivalent of :func:`serialize_record_with_policy`.
 
     Computes the HIDDEN set against the first row only when at least
     one row is present. Per-row HIDDEN decisions are deliberately not
-    supported here — that would require an N×K policy call and break
+    supported here — that would require an NxK policy call and break
     the wire format ("some rows have field X, others don't"). Apps
     that want per-row hiding should use ``can_view_object`` on those
     rows instead.

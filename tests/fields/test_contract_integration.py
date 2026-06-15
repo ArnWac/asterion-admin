@@ -140,10 +140,7 @@ def test_extension_supplied_adapter_propagates_to_contract():
         name = "uppercase_title"
 
         def supports(self, model_attr):
-            return (
-                isinstance(model_attr, Column)
-                and model_attr.name == "title"
-            )
+            return isinstance(model_attr, Column) and model_attr.name == "title"
 
         def build_contract(self, model_attr, ctx=None):
             from adminfoundry.fields.base import FieldContract

@@ -28,7 +28,6 @@ from adminfoundry.models.base import GlobalModel
 from adminfoundry.models.user import User
 from adminfoundry.providers.auth import BuiltinJWTAuthProvider
 from adminfoundry.providers.base import (
-    AuthIdentity,
     AuthProvider,
     AuthSession,
     CredentialAuthProvider,
@@ -157,9 +156,7 @@ def test_builtin_login_inactive_raises_inactive_user(app):
     with pytest.raises(LoginError) as exc:
         asyncio.run(
             provider.login(
-                LoginCredentials(
-                    email="inactive@example.com", password="correct-horse-battery"
-                ),
+                LoginCredentials(email="inactive@example.com", password="correct-horse-battery"),
                 request=_FakeRequest(app),
             )
         )

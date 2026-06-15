@@ -167,18 +167,10 @@ async def test_filter_by_bad_boolean_raises_422(db_session):
 @pytest.mark.anyio
 async def test_filters_compose_as_and(db_session):
     admin = _ItemAdmin()
-    await create_record(
-        db_session, admin, {"name": "a", "color": "red", "count": 1}
-    )
-    await create_record(
-        db_session, admin, {"name": "b", "color": "red", "count": 2}
-    )
-    await create_record(
-        db_session, admin, {"name": "c", "color": "blue", "count": 1}
-    )
-    result = await list_records(
-        db_session, admin, filters={"color": "red", "count": "2"}
-    )
+    await create_record(db_session, admin, {"name": "a", "color": "red", "count": 1})
+    await create_record(db_session, admin, {"name": "b", "color": "red", "count": 2})
+    await create_record(db_session, admin, {"name": "c", "color": "blue", "count": 1})
+    result = await list_records(db_session, admin, filters={"color": "red", "count": "2"})
     assert result["total"] == 1
     assert result["items"][0]["name"] == "b"
 
@@ -188,9 +180,7 @@ async def test_filters_compose_with_search(db_session):
     admin = _ItemAdmin()
     await create_record(db_session, admin, {"name": "Alice", "color": "red"})
     await create_record(db_session, admin, {"name": "Bob", "color": "red"})
-    result = await list_records(
-        db_session, admin, filters={"color": "red"}, search="Alic"
-    )
+    result = await list_records(db_session, admin, filters={"color": "red"}, search="Alic")
     assert result["total"] == 1
     assert result["items"][0]["name"] == "Alice"
 

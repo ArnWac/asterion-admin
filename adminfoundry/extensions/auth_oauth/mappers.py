@@ -68,9 +68,7 @@ class GoogleOIDCClaimMapper(OIDCClaimMapper):
     def __call__(self, claims: Mapping[str, Any]) -> ExternalIdentityData:
         sub = claims.get("sub")
         if not sub or not isinstance(sub, str):
-            raise InvalidClaimsError(
-                "Google OIDC claims are missing the required 'sub' field"
-            )
+            raise InvalidClaimsError("Google OIDC claims are missing the required 'sub' field")
 
         email_verified_raw = claims.get("email_verified")
         # Google sends booleans, but be defensive — string "true" surfaces

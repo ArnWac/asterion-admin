@@ -55,7 +55,7 @@ class AdminAction:
     label: str = ""
     confirm: bool = False
     bulk: bool = True
-    input_schema: "type[BaseModel] | None" = None
+    input_schema: type[BaseModel] | None = None
 
     async def execute(
         self,
@@ -77,7 +77,7 @@ class AdminAction:
         self,
         objects: list[Any],
         data: Any,
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> dict[str, Any]:
         """Typed entry point introduced in C3.
 
@@ -99,7 +99,7 @@ class AdminAction:
         # Pull the session out of ctx.request for backward compat —
         # legacy execute() expects (records, session, user). Custom
         # run() implementations don't need this branch.
-        from adminfoundry.db.dependencies import get_async_session  # noqa: F401
+        from adminfoundry.db.dependencies import get_async_session
 
         # ctx-less call path: action is being invoked outside an HTTP
         # request and the caller provided neither a session nor a

@@ -70,10 +70,14 @@ def _generate_keypair() -> tuple[str, dict]:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("ascii")
-    public_pem = key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode("ascii")
+    public_pem = (
+        key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("ascii")
+    )
     public_jwk = jose_jwk.construct(public_pem, algorithm="RS256").to_dict()
     public_jwk["kid"] = _KID
     public_jwk["alg"] = "RS256"
@@ -167,8 +171,9 @@ def _patch_http(ext: OAuthExtension, handler):
         jwks._owns_client = False
 
 
-def _seal_cookie(app, *, state: str, nonce: str, code_verifier: str,
-                 return_to: str = "/admin/dashboard") -> str:
+def _seal_cookie(
+    app, *, state: str, nonce: str, code_verifier: str, return_to: str = "/admin/dashboard"
+) -> str:
     payload = OAuthFlowState(
         state=state,
         code_verifier=code_verifier,
@@ -231,17 +236,18 @@ def test_callback_happy_path_mints_jwt_and_redirects_with_fragment(tmp_path):
     nonce = "test-nonce"
     code_verifier = "test-verifier"
     id_token = _mint_id_token(priv, nonce=nonce)
-    cookie = _seal_cookie(
-        app, state=state, nonce=nonce, code_verifier=code_verifier
-    )
+    cookie = _seal_cookie(app, state=state, nonce=nonce, code_verifier=code_verifier)
 
     def handler(request: httpx.Request) -> httpx.Response:
         if "oauth2.googleapis.com/token" in str(request.url):
-            return httpx.Response(200, json={
-                "id_token": id_token,
-                "access_token": "ignored",
-                "token_type": "Bearer",
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "id_token": id_token,
+                    "access_token": "ignored",
+                    "token_type": "Bearer",
+                },
+            )
         if "googleapis.com/oauth2/v3/certs" in str(request.url):
             return httpx.Response(200, json={"keys": [pub]})
         return httpx.Response(404)
@@ -265,6 +271,7 @@ def test_callback_happy_path_mints_jwt_and_redirects_with_fragment(tmp_path):
     # Pluck the JWT out and round-trip it through the framework decoder.
     token_part = location.split("#token=", 1)[1].split("&", 1)[0]
     from urllib.parse import unquote
+
     jwt_str = unquote(token_part)
     decoded = decode_access_token(
         jwt_str,
@@ -280,9 +287,7 @@ def test_callback_happy_path_mints_jwt_and_redirects_with_fragment(tmp_path):
 
 def test_callback_state_query_mismatch_rejected(tmp_path):
     app, ext, _prov = _build_app(tmp_path)
-    cookie = _seal_cookie(
-        app, state="real-state", nonce="n", code_verifier="v"
-    )
+    cookie = _seal_cookie(app, state="real-state", nonce="n", code_verifier="v")
     with TestClient(app, raise_server_exceptions=False) as c:
         c.cookies.set("adminfoundry_oauth_state", cookie)
         resp = c.get(
@@ -366,7 +371,9 @@ def test_callback_unverified_email_rejected_when_auto_create(tmp_path):
     priv, pub = _generate_keypair()
     cookie = _seal_cookie(app, state="s", nonce="n", code_verifier="v")
     id_token = _mint_id_token(
-        priv, nonce="n", claims_override={"email_verified": False},
+        priv,
+        nonce="n",
+        claims_override={"email_verified": False},
     )
 
     def handler(request: httpx.Request) -> httpx.Response:

@@ -102,9 +102,7 @@ class AdminRuntime:
     #: ``tests/security/test_protected_field_registry.py``. Extension
     #: ``register_protected_fields`` hooks write into it before
     #: ``create_admin`` freezes it for the duration of the request lifecycle.
-    protected_fields: ProtectedFieldRegistry = field(
-        default_factory=get_protected_field_registry
-    )
+    protected_fields: ProtectedFieldRegistry = field(default_factory=get_protected_field_registry)
     #: Extension contributions live in these four registries; populated
     #: during the Phase-5 lifecycle and frozen before the first request.
     extensions: ExtensionRegistry = field(default_factory=ExtensionRegistry)

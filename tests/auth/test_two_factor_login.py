@@ -76,9 +76,7 @@ def _client(app):
 
 
 def _login(app, email: str = "alice@example.com"):
-    return _client(app).post(
-        "/api/v1/auth/login", json={"email": email, "password": PASSWORD}
-    )
+    return _client(app).post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
 
 
 # ---------------------------------------------------------------------------
@@ -131,10 +129,14 @@ def test_login_for_non_2fa_user_returns_token_pair_unchanged(tmp_path):
     app = _build_app(tmp_path, db_name="non2fa.db")
     runtime = app.state.adminfoundry
     _enroll_user(runtime, "bob@example.com", enabled=False)
-    body = _client(app).post(
-        "/api/v1/auth/login",
-        json={"email": "bob@example.com", "password": PASSWORD},
-    ).json()
+    body = (
+        _client(app)
+        .post(
+            "/api/v1/auth/login",
+            json={"email": "bob@example.com", "password": PASSWORD},
+        )
+        .json()
+    )
     assert body["access_token"]
     assert body["refresh_token"]
     assert body["mfa_required"] is False
@@ -166,10 +168,14 @@ def test_2fa_login_minted_access_token_authenticates(app_with_2fa_user):
     app, _, _, secret = app_with_2fa_user
     body = _login(app).json()
     code = pyotp.TOTP(secret).now()
-    new = _client(app).post(
-        "/api/v1/auth/2fa/login",
-        json={"mfa_token": body["mfa_token"], "code": code},
-    ).json()
+    new = (
+        _client(app)
+        .post(
+            "/api/v1/auth/2fa/login",
+            json={"mfa_token": body["mfa_token"], "code": code},
+        )
+        .json()
+    )
     me = _client(app).get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {new['access_token']}"},
@@ -211,7 +217,10 @@ def test_2fa_login_rejects_access_token_as_challenge(app_with_2fa_user):
     type=mfa_challenge is accepted)."""
     app, _, user_id, _ = app_with_2fa_user
     access = create_access_token(
-        user_id, secret_key=SECRET, algorithm=ALG, expires_minutes=10,
+        user_id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=10,
         token_version=0,
     )
     resp = _client(app).post(
@@ -225,9 +234,7 @@ def test_2fa_login_requires_exactly_one_of_code_or_backup(app_with_2fa_user):
     app, _, _, _ = app_with_2fa_user
     body = _login(app).json()
     # neither
-    resp = _client(app).post(
-        "/api/v1/auth/2fa/login", json={"mfa_token": body["mfa_token"]}
-    )
+    resp = _client(app).post("/api/v1/auth/2fa/login", json={"mfa_token": body["mfa_token"]})
     assert resp.status_code == 400
     # both
     resp = _client(app).post(
@@ -249,10 +256,14 @@ def test_challenge_rejected_after_logout_all(app_with_2fa_user):
 
     # First do a real login to get an access token, then logout-all.
     code = pyotp.TOTP(secret).now()
-    pair = _client(app).post(
-        "/api/v1/auth/2fa/login",
-        json={"mfa_token": body["mfa_token"], "code": code},
-    ).json()
+    pair = (
+        _client(app)
+        .post(
+            "/api/v1/auth/2fa/login",
+            json={"mfa_token": body["mfa_token"], "code": code},
+        )
+        .json()
+    )
     _client(app).post(
         "/api/v1/auth/logout-all",
         headers={"Authorization": f"Bearer {pair['access_token']}"},
@@ -295,7 +306,7 @@ def test_2fa_login_accepts_backup_code(tmp_path):
             await session.refresh(u)
             return u
 
-    user = asyncio.run(_setup())
+    asyncio.run(_setup())
 
     # Log in (no 2FA yet) → access token.
     body = _login(app).json()
@@ -305,9 +316,11 @@ def test_2fa_login_accepts_backup_code(tmp_path):
     # Enroll + enable 2FA via the real flow so backup codes are minted.
     secret = _client(app).post("/api/v1/auth/2fa/setup", headers=headers).json()["secret"]
     code = pyotp.TOTP(secret).now()
-    backup_codes = _client(app).post(
-        "/api/v1/auth/2fa/enable", headers=headers, json={"code": code}
-    ).json()["backup_codes"]
+    backup_codes = (
+        _client(app)
+        .post("/api/v1/auth/2fa/enable", headers=headers, json={"code": code})
+        .json()["backup_codes"]
+    )
 
     # Re-login → challenge now required (totp_enabled=True).
     body = _login(app).json()

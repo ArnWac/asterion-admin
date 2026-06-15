@@ -20,7 +20,6 @@ import pytest
 
 from adminfoundry import create_admin
 from adminfoundry.core.config import CoreAdminConfig
-from adminfoundry.providers.base import AuthIdentity
 
 
 def _cfg(**kwargs) -> CoreAdminConfig:

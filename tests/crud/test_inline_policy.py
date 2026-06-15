@@ -100,8 +100,10 @@ async def test_inline_without_policy_allows_writes(db_session):
         ctx=_ctx(),
     )
     rows = (
-        await db_session.execute(select(_Line).where(_Line.order_id == result["id"]))
-    ).scalars().all()
+        (await db_session.execute(select(_Line).where(_Line.order_id == result["id"])))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
 
 
@@ -156,8 +158,10 @@ async def test_inline_create_allowed_for_privileged_role(db_session):
         ctx=_ctx("manager"),
     )
     rows = (
-        await db_session.execute(select(_Line).where(_Line.order_id == result["id"]))
-    ).scalars().all()
+        (await db_session.execute(select(_Line).where(_Line.order_id == result["id"])))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
 
 
@@ -253,9 +257,7 @@ async def test_inline_update_allowed_for_unlocked_row(db_session):
         {"inlines": {"ip_lines": [{"id": line_id, "sku": "EDITED"}]}},
         ctx=_ctx(),
     )
-    line = (
-        await db_session.execute(select(_Line).where(_Line.id == line_id))
-    ).scalars().one()
+    line = (await db_session.execute(select(_Line).where(_Line.id == line_id))).scalars().one()
     assert line.sku == "EDITED"
 
 
@@ -285,9 +287,7 @@ async def test_inline_delete_allowed_for_unlocked_row(db_session):
         {"inlines": {"ip_lines": [{"id": line_id, "_delete": True}]}},
         ctx=_ctx(),
     )
-    remaining = (
-        await db_session.execute(select(_Line).where(_Line.id == line_id))
-    ).scalars().all()
+    remaining = (await db_session.execute(select(_Line).where(_Line.id == line_id))).scalars().all()
     assert remaining == []
 
 
@@ -311,6 +311,8 @@ async def test_ctx_none_skips_inline_policy(db_session):
         {"customer": "Job", "inlines": {"ip_lines": [{"sku": "X", "locked": 0}]}},
     )
     rows = (
-        await db_session.execute(select(_Line).where(_Line.order_id == result["id"]))
-    ).scalars().all()
+        (await db_session.execute(select(_Line).where(_Line.order_id == result["id"])))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1

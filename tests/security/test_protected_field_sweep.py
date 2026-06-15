@@ -26,7 +26,7 @@ import json
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import Column, ForeignKey, Integer, String, select
+from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -40,7 +40,6 @@ from adminfoundry.crud.services import (
     update_record,
 )
 from adminfoundry.registry import ModelAdmin
-
 
 PROTECTED_VALUE = "T0PSECRET-not-supposed-to-leak"
 PROTECTED_FIELD_PER_ADMIN = "api_secret"
@@ -103,12 +102,8 @@ def _assert_no_leak(payload, *, field: str, value: str) -> None:
     name (as a JSON key) nor the secret value appears anywhere."""
     blob = json.dumps(payload, default=str)
     # JSON-encoded key: "<field>":
-    assert f'"{field}":' not in blob, (
-        f"Field {field!r} appeared as a key in payload: {blob[:300]}"
-    )
-    assert value not in blob, (
-        f"Secret value {value!r} appeared somewhere in payload: {blob[:300]}"
-    )
+    assert f'"{field}":' not in blob, f"Field {field!r} appeared as a key in payload: {blob[:300]}"
+    assert value not in blob, f"Secret value {value!r} appeared somewhere in payload: {blob[:300]}"
 
 
 # ---------------------------------------------------------------------------
@@ -185,9 +180,7 @@ async def test_detail_response_filters_protected_fields(session):
 async def test_update_response_filters_protected_fields(session):
     admin = _ProjectAdmin()
     project = await _seed_project_with_secrets(session)
-    updated = await update_record(
-        session, admin, str(project.id), {"name": "P2"}
-    )
+    updated = await update_record(session, admin, str(project.id), {"name": "P2"})
     _assert_no_leak(updated, field=PROTECTED_FIELD_PER_ADMIN, value=PROTECTED_VALUE)
     _assert_no_leak(updated, field="hashed_password", value=PROTECTED_VALUE)
 
@@ -215,9 +208,7 @@ async def test_inline_children_filter_globally_protected_field(session):
     # model doesn't have a hashed_password column, so we test by
     # giving the api_secret column a known-non-secret value and
     # verifying that the global filter at least doesn't fail open.
-    task = _Task(
-        project_id=project.id, title="T1", api_secret="visible-on-purpose"
-    )
+    task = _Task(project_id=project.id, title="T1", api_secret="visible-on-purpose")
     session.add(task)
     await session.flush()
 

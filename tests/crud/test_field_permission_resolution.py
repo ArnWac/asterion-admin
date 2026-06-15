@@ -19,7 +19,6 @@ from sqlalchemy.orm import DeclarativeBase
 from adminfoundry.admin.policy import FieldPermission, static_field_permission
 from adminfoundry.registry import ModelAdmin
 
-
 # ---------------------------------------------------------------------------
 # FieldPermission.strictest
 # ---------------------------------------------------------------------------
@@ -80,16 +79,11 @@ def test_static_protected_field_is_hidden():
 
 def test_static_globally_protected_field_is_hidden():
     # hashed_password is in the global DEFAULT_PROTECTED_FIELDS seed.
-    assert (
-        static_field_permission(_DocAdmin(), "hashed_password")
-        is FieldPermission.HIDDEN
-    )
+    assert static_field_permission(_DocAdmin(), "hashed_password") is FieldPermission.HIDDEN
 
 
 def test_static_readonly_field_is_read():
-    assert (
-        static_field_permission(_DocAdmin(), "locked_field") is FieldPermission.READ
-    )
+    assert static_field_permission(_DocAdmin(), "locked_field") is FieldPermission.READ
 
 
 def test_static_auto_column_is_read():
@@ -100,9 +94,7 @@ def test_static_auto_column_is_read():
 
 
 def test_static_calculated_field_is_read():
-    assert (
-        static_field_permission(_DocAdmin(), "display_name") is FieldPermission.READ
-    )
+    assert static_field_permission(_DocAdmin(), "display_name") is FieldPermission.READ
 
 
 def test_static_plain_writable_field_is_write():
@@ -118,6 +110,4 @@ def test_static_protected_beats_readonly():
         protected_fields = ["locked_field"]
         readonly_fields = ["locked_field"]
 
-    assert (
-        static_field_permission(_Admin(), "locked_field") is FieldPermission.HIDDEN
-    )
+    assert static_field_permission(_Admin(), "locked_field") is FieldPermission.HIDDEN

@@ -12,9 +12,6 @@ Covers:
 
 from __future__ import annotations
 
-import io
-
-import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker

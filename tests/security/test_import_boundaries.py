@@ -30,6 +30,7 @@ import pytest
 PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "adminfoundry"
 EXTENSIONS_ROOT = PACKAGE_ROOT / "extensions"
 
+
 #: Submodule names directly under ``adminfoundry.extensions/`` count as
 #: concrete extensions. Discovered at test time so new extensions are
 #: covered automatically.
@@ -147,12 +148,14 @@ def test_no_import_of_extensions_in_router_layer():
     if not concrete:
         pytest.skip("no concrete extensions installed")
 
-    router_paths = list((PACKAGE_ROOT / "crud").rglob("*.py")) + \
-                   list((PACKAGE_ROOT / "contract").rglob("*.py")) + \
-                   list((PACKAGE_ROOT / "actions").rglob("*.py")) + \
-                   list((PACKAGE_ROOT / "auth").rglob("*.py")) + \
-                   list((PACKAGE_ROOT / "root").rglob("*.py")) + \
-                   list((PACKAGE_ROOT / "ui").rglob("*.py"))
+    router_paths = (
+        list((PACKAGE_ROOT / "crud").rglob("*.py"))
+        + list((PACKAGE_ROOT / "contract").rglob("*.py"))
+        + list((PACKAGE_ROOT / "actions").rglob("*.py"))
+        + list((PACKAGE_ROOT / "auth").rglob("*.py"))
+        + list((PACKAGE_ROOT / "root").rglob("*.py"))
+        + list((PACKAGE_ROOT / "ui").rglob("*.py"))
+    )
 
     offenders: list[str] = []
     for path in router_paths:
@@ -163,4 +166,6 @@ def test_no_import_of_extensions_in_router_layer():
             if _is_forbidden(target, concrete):
                 offenders.append(f"{rel}:{lineno}: imports {target!r}")
 
-    assert not offenders, "Router layer must not import concrete extensions:\n" + "\n".join(offenders)
+    assert not offenders, "Router layer must not import concrete extensions:\n" + "\n".join(
+        offenders
+    )

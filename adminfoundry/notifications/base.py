@@ -85,9 +85,7 @@ class NotifierRegistry:
         silently warn.
         """
         if not isinstance(notifier, protocol_type):
-            raise TypeError(
-                f"{type(notifier).__name__} does not satisfy {protocol_type.__name__}"
-            )
+            raise TypeError(f"{type(notifier).__name__} does not satisfy {protocol_type.__name__}")
         self._by_type[protocol_type] = notifier
 
     def get(self, protocol_type: type[T]) -> T | None:

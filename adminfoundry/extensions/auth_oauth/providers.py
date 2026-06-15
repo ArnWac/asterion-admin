@@ -71,9 +71,7 @@ class GoogleOIDCProvider(OAuthProvider):
         extra_authorize_params: dict[str, str] | None = None,
     ) -> None:
         if not client_id or not client_secret:
-            raise ValueError(
-                "GoogleOIDCProvider requires non-empty client_id and client_secret"
-            )
+            raise ValueError("GoogleOIDCProvider requires non-empty client_id and client_secret")
         self.config = OAuthProviderConfig(id=id, label=label)
         self.claim_mapper: OIDCClaimMapper = GoogleOIDCClaimMapper()
         # Stored privately — never serialized, never logged, never
@@ -84,15 +82,11 @@ class GoogleOIDCProvider(OAuthProvider):
         #: OIDC scopes — ``openid`` is REQUIRED to receive an ID token;
         #: ``email`` and ``profile`` populate the claims the mapper
         #: consumes.
-        self._scopes: tuple[str, ...] = tuple(
-            scopes or ("openid", "email", "profile")
-        )
+        self._scopes: tuple[str, ...] = tuple(scopes or ("openid", "email", "profile"))
         #: Pass-through bag for advanced flags Google supports —
         #: ``hd=acme.example`` to restrict to a Workspace domain,
         #: ``prompt=consent`` to force the consent screen, etc.
-        self._extra_authorize_params: dict[str, str] = dict(
-            extra_authorize_params or {}
-        )
+        self._extra_authorize_params: dict[str, str] = dict(extra_authorize_params or {})
 
     def __repr__(self) -> str:
         # Don't include client_secret. ``client_id`` is generally public,
@@ -179,9 +173,7 @@ class GoogleOIDCProvider(OAuthProvider):
             # Google returns a JSON body with ``error`` and
             # ``error_description``. Don't echo it back to the user —
             # leak the request_id via logs instead.
-            raise TokenExchangeError(
-                f"token endpoint returned HTTP {resp.status_code}"
-            )
+            raise TokenExchangeError(f"token endpoint returned HTTP {resp.status_code}")
 
         try:
             payload = resp.json()

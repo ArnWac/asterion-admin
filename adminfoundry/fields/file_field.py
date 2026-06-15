@@ -66,14 +66,9 @@ class FileFieldAdapter:
     name = "file"
 
     def supports(self, model_attr: Any) -> bool:
-        return (
-            isinstance(model_attr, Column)
-            and isinstance(model_attr.type, FileFieldType)
-        )
+        return isinstance(model_attr, Column) and isinstance(model_attr.type, FileFieldType)
 
-    def build_contract(
-        self, model_attr: Column, ctx: Any | None = None
-    ) -> FieldContract:
+    def build_contract(self, model_attr: Column, ctx: Any | None = None) -> FieldContract:
         return FieldContract(
             name=model_attr.name,
             type="file",

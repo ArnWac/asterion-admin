@@ -158,7 +158,7 @@ def parse_filter_query(
     for key, raw_value in items:
         if not key.startswith(FILTER_PARAM_PREFIX):
             continue
-        field_name = key[len(FILTER_PARAM_PREFIX):]
+        field_name = key[len(FILTER_PARAM_PREFIX) :]
         if field_name not in allowed:
             unknown.append(field_name)
             continue

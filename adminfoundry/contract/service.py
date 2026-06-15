@@ -59,9 +59,7 @@ def resolve_date_hierarchy(model_admin: ModelAdmin) -> str | None:
     return field if isinstance(column.type, (Date, DateTime)) else None
 
 
-def build_list_editable(
-    model_admin: ModelAdmin, field_metas: list[FieldMeta]
-) -> list[str]:
+def build_list_editable(model_admin: ModelAdmin, field_metas: list[FieldMeta]) -> list[str]:
     """Resolve ``ModelAdmin.list_editable`` for the wire (Roadmap 5.5).
 
     Keeps only names that are in ``list_display`` AND correspond to a
@@ -345,7 +343,9 @@ def _column_help_text(col) -> str | None:
     return None
 
 
-def _split_widget_and_validation(metadata: dict[str, Any]) -> tuple[str | None, dict[str, Any], dict[str, Any]]:
+def _split_widget_and_validation(
+    metadata: dict[str, Any],
+) -> tuple[str | None, dict[str, Any], dict[str, Any]]:
     """Separate the adapter metadata into promoted top-level fields and
     the leftover ``metadata`` dict.
 
@@ -415,9 +415,7 @@ def _field_meta_from_adapter(
         name=contract.name,
         type=contract.type,
         primary_key=contract.primary_key,
-        read_only=contract.read_only
-        or contract.name in readonly_set
-        or field_permission == "read",
+        read_only=contract.read_only or contract.name in readonly_set or field_permission == "read",
         hidden=contract.hidden,
         nullable=contract.nullable,
         calculated=contract.calculated,
@@ -431,9 +429,7 @@ def _field_meta_from_adapter(
     )
 
 
-def _normalize_condition(
-    raw: Any, valid_names: set[str]
-) -> dict[str, Any] | None:
+def _normalize_condition(raw: Any, valid_names: set[str]) -> dict[str, Any] | None:
     """Validate a single conditional-visibility rule (Roadmap 5.4).
 
     Returns the normalized ``{"field", "equals"|"in"}`` dict, or ``None``
@@ -457,9 +453,7 @@ def _normalize_condition(
     return {"field": ref, "in": list(raw["in"])}
 
 
-def _normalize_dependency(
-    raw: Any, valid_names: set[str]
-) -> dict[str, Any] | None:
+def _normalize_dependency(raw: Any, valid_names: set[str]) -> dict[str, Any] | None:
     """Validate a dependent-choice rule (Roadmap 5.4).
 
     Shape: ``{"field": <controlling>, "options": {value: [allowed, …]}}``.
@@ -881,7 +875,7 @@ def _secondary_name(rel) -> str | None:
 def build_relation_metadata(
     model_admin: ModelAdmin,
     *,
-    admin_registry: "AdminRegistry | None" = None,
+    admin_registry: AdminRegistry | None = None,
 ) -> list[RelationMeta]:
     """Introspect the model's relationships and return wire-format DTOs.
 
@@ -925,7 +919,7 @@ def build_model_contract(
     *,
     registry: FieldRegistry | None = None,
     permissions: Collection[str] | None = None,
-    admin_registry: "AdminRegistry | None" = None,
+    admin_registry: AdminRegistry | None = None,
     field_permissions: dict[str, str] | None = None,
 ) -> ModelContractMeta:
     """Render the contract for one admin.

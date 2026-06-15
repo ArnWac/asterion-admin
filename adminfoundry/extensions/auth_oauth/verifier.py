@@ -117,8 +117,7 @@ async def verify_id_token(
         # closes the algorithm-confusion and unsigned-token attack
         # surfaces in one check.
         raise IDTokenSignatureError(
-            f"ID-token algorithm {alg!r} not allowed (expected one of "
-            f"{list(_ALLOWED_ALGORITHMS)})"
+            f"ID-token algorithm {alg!r} not allowed (expected one of {list(_ALLOWED_ALGORITHMS)})"
         )
 
     kid = header.get("kid")

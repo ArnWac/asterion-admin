@@ -67,7 +67,10 @@ def _client(app):
 
 def _token(user: User) -> str:
     return create_access_token(
-        user.id, secret_key=SECRET, algorithm=ALG, expires_minutes=10,
+        user.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=10,
         token_version=user.token_version,
     )
 
@@ -90,12 +93,14 @@ def _count_backup_codes(runtime, user_id) -> int:
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
             rows = (
-                await session.execute(
-                    select(TwoFactorBackupCode).where(
-                        TwoFactorBackupCode.user_id == user_id
+                (
+                    await session.execute(
+                        select(TwoFactorBackupCode).where(TwoFactorBackupCode.user_id == user_id)
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return len(rows)
 
     return asyncio.run(_go())
@@ -132,6 +137,7 @@ def test_setup_returns_secret_and_uri(app_with_user):
 
 def test_setup_rejected_when_already_enabled(app_with_user):
     app, runtime, user = app_with_user
+
     # Force-enable in DB.
     async def _enable():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -153,14 +159,10 @@ def test_setup_rejected_when_already_enabled(app_with_user):
 
 def test_enable_with_valid_code_activates_and_returns_backup_codes(app_with_user):
     app, runtime, user = app_with_user
-    secret = _client(app).post(
-        "/api/v1/auth/2fa/setup", headers=_auth(user)
-    ).json()["secret"]
+    secret = _client(app).post("/api/v1/auth/2fa/setup", headers=_auth(user)).json()["secret"]
 
     code = pyotp.TOTP(secret).now()
-    resp = _client(app).post(
-        "/api/v1/auth/2fa/enable", headers=_auth(user), json={"code": code}
-    )
+    resp = _client(app).post("/api/v1/auth/2fa/enable", headers=_auth(user), json={"code": code})
     assert resp.status_code == 200, resp.text
     codes = resp.json()["backup_codes"]
     assert len(codes) == 10
@@ -195,13 +197,9 @@ def test_enable_without_setup_is_400(app_with_user):
 
 def _enroll(app, user) -> str:
     """Setup + enable, return the secret."""
-    secret = _client(app).post(
-        "/api/v1/auth/2fa/setup", headers=_auth(user)
-    ).json()["secret"]
+    secret = _client(app).post("/api/v1/auth/2fa/setup", headers=_auth(user)).json()["secret"]
     code = pyotp.TOTP(secret).now()
-    _client(app).post(
-        "/api/v1/auth/2fa/enable", headers=_auth(user), json={"code": code}
-    )
+    _client(app).post("/api/v1/auth/2fa/enable", headers=_auth(user), json={"code": code})
     return secret
 
 
@@ -210,9 +208,7 @@ def test_disable_with_valid_code_clears_2fa(app_with_user):
     secret = _enroll(app, user)
 
     code = pyotp.TOTP(secret).now()
-    resp = _client(app).post(
-        "/api/v1/auth/2fa/disable", headers=_auth(user), json={"code": code}
-    )
+    resp = _client(app).post("/api/v1/auth/2fa/disable", headers=_auth(user), json={"code": code})
     assert resp.status_code == 200
 
     refreshed = _read_user(runtime, user.id)
@@ -247,24 +243,28 @@ def test_backup_codes_are_hashed_not_plaintext(app_with_user):
     """The DB must store only hashes — a leaked snapshot can't be used
     as backup codes."""
     app, runtime, user = app_with_user
-    plaintext = _client(app).post(
-        "/api/v1/auth/2fa/setup", headers=_auth(user)
-    ).json()["secret"]
+    plaintext = _client(app).post("/api/v1/auth/2fa/setup", headers=_auth(user)).json()["secret"]
     code = pyotp.TOTP(plaintext).now()
-    backup = _client(app).post(
-        "/api/v1/auth/2fa/enable", headers=_auth(user), json={"code": code}
-    ).json()["backup_codes"]
+    backup = (
+        _client(app)
+        .post("/api/v1/auth/2fa/enable", headers=_auth(user), json={"code": code})
+        .json()["backup_codes"]
+    )
 
     async def _stored_hashes():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
             rows = (
-                await session.execute(
-                    select(TwoFactorBackupCode.code_hash).where(
-                        TwoFactorBackupCode.user_id == user.id
+                (
+                    await session.execute(
+                        select(TwoFactorBackupCode.code_hash).where(
+                            TwoFactorBackupCode.user_id == user.id
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return set(rows)
 
     hashes = asyncio.run(_stored_hashes())

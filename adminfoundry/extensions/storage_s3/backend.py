@@ -181,9 +181,7 @@ class S3StorageBackend:
 
     async def get(self, key: str) -> bytes:
         try:
-            resp = await asyncio.to_thread(
-                self._client.get_object, Bucket=self._bucket, Key=key
-            )
+            resp = await asyncio.to_thread(self._client.get_object, Bucket=self._bucket, Key=key)
         except Exception as exc:
             if self._is_not_found(exc):
                 raise ObjectNotFound(key) from exc
@@ -199,9 +197,7 @@ class S3StorageBackend:
         # exists. To mirror LocalFileStorage's "True if removed,
         # False if missing" contract we head_object first.
         try:
-            await asyncio.to_thread(
-                self._client.head_object, Bucket=self._bucket, Key=key
-            )
+            await asyncio.to_thread(self._client.head_object, Bucket=self._bucket, Key=key)
         except Exception as exc:
             if self._is_not_found(exc):
                 return False
@@ -210,9 +206,7 @@ class S3StorageBackend:
             raise
 
         try:
-            await asyncio.to_thread(
-                self._client.delete_object, Bucket=self._bucket, Key=key
-            )
+            await asyncio.to_thread(self._client.delete_object, Bucket=self._bucket, Key=key)
         except Exception as exc:
             if isinstance(exc, self._client_error):
                 raise self._wrap(exc) from exc
@@ -221,9 +215,7 @@ class S3StorageBackend:
 
     async def exists(self, key: str) -> bool:
         try:
-            await asyncio.to_thread(
-                self._client.head_object, Bucket=self._bucket, Key=key
-            )
+            await asyncio.to_thread(self._client.head_object, Bucket=self._bucket, Key=key)
             return True
         except Exception as exc:
             if self._is_not_found(exc):
@@ -234,9 +226,7 @@ class S3StorageBackend:
 
     async def stat(self, key: str) -> StoredObject:
         try:
-            resp = await asyncio.to_thread(
-                self._client.head_object, Bucket=self._bucket, Key=key
-            )
+            resp = await asyncio.to_thread(self._client.head_object, Bucket=self._bucket, Key=key)
         except Exception as exc:
             if self._is_not_found(exc):
                 raise ObjectNotFound(key) from exc
@@ -247,9 +237,7 @@ class S3StorageBackend:
         return StoredObject(
             key=key,
             size=int(resp.get("ContentLength", 0)),
-            content_type=str(
-                resp.get("ContentType") or _DEFAULT_CONTENT_TYPE
-            ),
+            content_type=str(resp.get("ContentType") or _DEFAULT_CONTENT_TYPE),
             etag=(resp.get("ETag") or "").strip('"') or None,
             metadata=dict(resp.get("Metadata") or {}),
         )

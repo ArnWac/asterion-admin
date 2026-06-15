@@ -95,11 +95,7 @@ class BuiltinSQLAlchemyUserProvider:
                 await session.execute(select(func.count()).select_from(base.subquery()))
             ).scalar_one()
             rows = (
-                (
-                    await session.execute(
-                        base.order_by(User.email).limit(limit).offset(offset)
-                    )
-                )
+                (await session.execute(base.order_by(User.email).limit(limit).offset(offset)))
                 .scalars()
                 .all()
             )

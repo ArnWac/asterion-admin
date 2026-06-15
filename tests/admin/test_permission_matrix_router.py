@@ -12,10 +12,8 @@ Covers GET + PUT semantics:
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 
-import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -31,7 +29,6 @@ from adminfoundry.models.base import GLOBAL_METADATA, TenantBase
 from adminfoundry.models.permission_catalog import PermissionCatalog
 from adminfoundry.models.tenant_rbac import TenantRole, TenantRolePermission
 from adminfoundry.providers.base import AdminPrincipal
-
 
 SECRET = "x" * 64
 
@@ -152,9 +149,7 @@ def test_get_returns_roles_permissions_and_assignments(matrix_app):
     # Permissions: sorted by (category, key) — pin so the UI can
     # group reliably.
     perm_keys = [p["key"] for p in body["permissions"]]
-    assert perm_keys == sorted(
-        perm_keys, key=lambda k: (k.split(".")[1], k)
-    )
+    assert perm_keys == sorted(perm_keys, key=lambda k: (k.split(".")[1], k))
 
     assignments = body["assignments"]
     assert assignments[str(role_ids["editor"])] == ["admin.posts.list"]
@@ -168,12 +163,8 @@ def test_get_requires_admin_tenant_roles_list(matrix_app):
     """The endpoint advertises ``admin.tenant_roles.list``. A caller
     with only some unrelated permission must get 403."""
     client, app, _ = matrix_app
-    app.dependency_overrides[build_admin_context] = _ctx_factory(
-        {"admin.posts.list"}
-    )
-    app.dependency_overrides[require_admin_context] = _ctx_factory(
-        {"admin.posts.list"}
-    )
+    app.dependency_overrides[build_admin_context] = _ctx_factory({"admin.posts.list"})
+    app.dependency_overrides[require_admin_context] = _ctx_factory({"admin.posts.list"})
     resp = client.get("/api/v1/admin/_permission_matrix")
     assert resp.status_code == 403
 
@@ -224,9 +215,7 @@ def test_put_diffs_adds_and_removes_in_one_call(matrix_app):
     client, _, role_ids = matrix_app
     resp = client.put(
         "/api/v1/admin/_permission_matrix",
-        json={
-            "assignments": {str(role_ids["editor"]): ["admin.posts.create"]}
-        },
+        json={"assignments": {str(role_ids["editor"]): ["admin.posts.create"]}},
     )
     assert resp.status_code == 200, resp.text
     assignments = resp.json()["assignments"]
@@ -240,16 +229,12 @@ def test_put_only_touches_listed_roles(matrix_app):
     # Pre-set viewer to have one perm so we can prove it survives.
     client.put(
         "/api/v1/admin/_permission_matrix",
-        json={
-            "assignments": {str(role_ids["viewer"]): ["admin.users.read"]}
-        },
+        json={"assignments": {str(role_ids["viewer"]): ["admin.users.read"]}},
     )
     # Now PUT only editor.
     client.put(
         "/api/v1/admin/_permission_matrix",
-        json={
-            "assignments": {str(role_ids["editor"]): ["admin.posts.delete"]}
-        },
+        json={"assignments": {str(role_ids["editor"]): ["admin.posts.delete"]}},
     )
     # Viewer survived untouched.
     resp = client.get("/api/v1/admin/_permission_matrix")
@@ -288,11 +273,7 @@ def test_put_rejects_unknown_permission_key(matrix_app):
     client, _, role_ids = matrix_app
     resp = client.put(
         "/api/v1/admin/_permission_matrix",
-        json={
-            "assignments": {
-                str(role_ids["editor"]): ["admin.posts.list", "admin.bogus.thing"]
-            }
-        },
+        json={"assignments": {str(role_ids["editor"]): ["admin.posts.list", "admin.bogus.thing"]}},
     )
     assert resp.status_code == 400
     assert "admin.bogus.thing" in resp.json()["error"]["message"]
@@ -302,9 +283,7 @@ def test_put_rejects_invalid_permission_key_shape(matrix_app):
     client, _, role_ids = matrix_app
     resp = client.put(
         "/api/v1/admin/_permission_matrix",
-        json={
-            "assignments": {str(role_ids["editor"]): ["NOT A VALID KEY"]}
-        },
+        json={"assignments": {str(role_ids["editor"]): ["NOT A VALID KEY"]}},
     )
     assert resp.status_code == 400
 
@@ -316,9 +295,7 @@ def test_put_refuses_to_edit_system_role(matrix_app):
     client, _, role_ids = matrix_app
     resp = client.put(
         "/api/v1/admin/_permission_matrix",
-        json={
-            "assignments": {str(role_ids["owner"]): ["admin.posts.list"]}
-        },
+        json={"assignments": {str(role_ids["owner"]): ["admin.posts.list"]}},
     )
     assert resp.status_code == 403
 
@@ -327,17 +304,11 @@ def test_put_requires_admin_tenant_role_permissions_update(matrix_app):
     """PUT advertises ``admin.tenant_role_permissions.update`` — a
     caller with only the GET key gets 403."""
     client, app, role_ids = matrix_app
-    app.dependency_overrides[build_admin_context] = _ctx_factory(
-        {"admin.tenant_roles.list"}
-    )
-    app.dependency_overrides[require_admin_context] = _ctx_factory(
-        {"admin.tenant_roles.list"}
-    )
+    app.dependency_overrides[build_admin_context] = _ctx_factory({"admin.tenant_roles.list"})
+    app.dependency_overrides[require_admin_context] = _ctx_factory({"admin.tenant_roles.list"})
     resp = client.put(
         "/api/v1/admin/_permission_matrix",
-        json={
-            "assignments": {str(role_ids["editor"]): ["admin.posts.create"]}
-        },
+        json={"assignments": {str(role_ids["editor"]): ["admin.posts.create"]}},
     )
     assert resp.status_code == 403
 
@@ -364,7 +335,5 @@ def test_put_is_atomic_under_validation_failure(matrix_app):
     assert resp.status_code == 403  # owner is system
 
     # Editor's pre-existing single assignment must still be the only one.
-    assignments = client.get("/api/v1/admin/_permission_matrix").json()[
-        "assignments"
-    ]
+    assignments = client.get("/api/v1/admin/_permission_matrix").json()["assignments"]
     assert assignments[str(role_ids["editor"])] == ["admin.posts.list"]

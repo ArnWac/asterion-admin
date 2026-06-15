@@ -132,7 +132,10 @@ def app_state(tmp_path):
 def _su_headers(state) -> dict:
     su = state["superadmin"]
     token = create_access_token(
-        su.id, secret_key=SECRET, algorithm="HS256", expires_minutes=10,
+        su.id,
+        secret_key=SECRET,
+        algorithm="HS256",
+        expires_minutes=10,
         token_version=su.token_version,
     )
     return {"Authorization": f"Bearer {token}"}
@@ -150,18 +153,14 @@ def test_root_users_list_includes_inactive(app_state):
     assert "inactive@example.com" in emails
     assert "active@example.com" in emails
     # The inactive flag round-trips so the UI can show + toggle it.
-    inactive = next(
-        u for u in resp.json()["items"] if u["email"] == "inactive@example.com"
-    )
+    inactive = next(u for u in resp.json()["items"] if u["email"] == "inactive@example.com")
     assert inactive["is_active"] is False
 
 
 def test_root_users_list_search_filters(app_state):
     app, state = app_state
     client = TestClient(app, raise_server_exceptions=False)
-    resp = client.get(
-        "/api/v1/root/users", params={"search": "Annie"}, headers=_su_headers(state)
-    )
+    resp = client.get("/api/v1/root/users", params={"search": "Annie"}, headers=_su_headers(state))
     assert resp.status_code == 200
     emails = {u["email"] for u in resp.json()["items"]}
     assert emails == {"active@example.com"}
@@ -254,13 +253,14 @@ def test_root_users_list_returns_501_when_provider_cannot_list(tmp_path):
     asyncio.run(_setup())
 
     token = create_access_token(
-        su_holder["su"].id, secret_key=SECRET, algorithm="HS256",
-        expires_minutes=10, token_version=su_holder["su"].token_version,
+        su_holder["su"].id,
+        secret_key=SECRET,
+        algorithm="HS256",
+        expires_minutes=10,
+        token_version=su_holder["su"].token_version,
     )
     client = TestClient(app, raise_server_exceptions=False)
-    resp = client.get(
-        "/api/v1/root/users", headers={"Authorization": f"Bearer {token}"}
-    )
+    resp = client.get("/api/v1/root/users", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 501
     asyncio.run(runtime.db.dispose())
 

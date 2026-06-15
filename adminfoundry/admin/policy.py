@@ -29,7 +29,10 @@ if TYPE_CHECKING:
     from adminfoundry.admin.context import AdminContext
 
 
-class FieldPermission(str, Enum):
+# The ``str`` mix-in is intentional and load-bearing: members serialize as
+# their value and compare equal to plain strings across the contract/UI.
+# Switching to StrEnum (UP042) would change ``str(member)`` semantics.
+class FieldPermission(str, Enum):  # noqa: UP042
     """How the current caller may interact with one field.
 
     * ``WRITE`` — full read + write access (the default).
@@ -55,7 +58,7 @@ class FieldPermission(str, Enum):
         return {"write": 0, "read": 1, "hidden": 2}[self.value]
 
     @classmethod
-    def strictest(cls, *perms: "FieldPermission") -> "FieldPermission":
+    def strictest(cls, *perms: FieldPermission) -> FieldPermission:
         """Combine several field-permission decisions, keeping the most
         restrictive (Roadmap 2.1).
 
@@ -86,28 +89,28 @@ class AdminPolicy:
     backward-compatible.
     """
 
-    async def can_view_model(self, ctx: "AdminContext") -> bool:
+    async def can_view_model(self, ctx: AdminContext) -> bool:
         """Gate the entire admin (list + read + write). Use for
         resource-level visibility ("hide the Orders admin from
         non-staff users entirely")."""
         return True
 
-    async def can_create(self, ctx: "AdminContext") -> bool:
+    async def can_create(self, ctx: AdminContext) -> bool:
         """Per-resource create gate. Runs before payload validation —
         useful for "no new orders during freeze week" style rules."""
         return True
 
-    async def can_view_object(self, obj: Any, ctx: "AdminContext") -> bool:
+    async def can_view_object(self, obj: Any, ctx: AdminContext) -> bool:
         """Per-object read gate. Runs after the row has been fetched,
         before the response is built."""
         return True
 
-    async def can_update_object(self, obj: Any, ctx: "AdminContext") -> bool:
+    async def can_update_object(self, obj: Any, ctx: AdminContext) -> bool:
         """Per-object update gate. Runs after fetch, before
         ``validate_update`` / ``before_update``."""
         return True
 
-    async def can_delete_object(self, obj: Any, ctx: "AdminContext") -> bool:
+    async def can_delete_object(self, obj: Any, ctx: AdminContext) -> bool:
         """Per-object delete gate. Runs after fetch, before
         ``before_delete``."""
         return True
@@ -116,7 +119,7 @@ class AdminPolicy:
         self,
         field: str,
         obj: Any,
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> FieldPermission:
         """Per-field decision for one caller.
 
@@ -150,13 +153,13 @@ class ReadOnlyPolicy(AdminPolicy):
     or set ``readonly_fields`` on the admin.
     """
 
-    async def can_create(self, ctx: "AdminContext") -> bool:
+    async def can_create(self, ctx: AdminContext) -> bool:
         return False
 
-    async def can_update_object(self, obj: Any, ctx: "AdminContext") -> bool:
+    async def can_update_object(self, obj: Any, ctx: AdminContext) -> bool:
         return False
 
-    async def can_delete_object(self, obj: Any, ctx: "AdminContext") -> bool:
+    async def can_delete_object(self, obj: Any, ctx: AdminContext) -> bool:
         return False
 
 

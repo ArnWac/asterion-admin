@@ -14,9 +14,7 @@ even when the caller has the admin.* permission.
 from __future__ import annotations
 
 import asyncio
-import uuid
 
-import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -33,7 +31,6 @@ from adminfoundry.db.dependencies import get_async_session
 from adminfoundry.models.audit_log import AuditLog
 from adminfoundry.models.base import GLOBAL_METADATA
 from adminfoundry.providers.base import AdminPrincipal
-
 
 SECRET = "x" * 64
 

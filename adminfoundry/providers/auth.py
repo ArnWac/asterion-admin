@@ -22,6 +22,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from adminfoundry.auth.password import verify_password
 from adminfoundry.auth.revocation import is_token_revoked
 from adminfoundry.auth.tokens import (
     TokenError,
@@ -32,7 +33,6 @@ from adminfoundry.auth.tokens import (
     get_token_jti,
     get_token_version,
 )
-from adminfoundry.auth.password import verify_password
 from adminfoundry.models.user import User
 from adminfoundry.providers.base import (
     AuthIdentity,
@@ -89,9 +89,7 @@ class BuiltinJWTAuthProvider:
             if await is_token_revoked(session, jti):
                 raise _unauthorized("Token has been revoked.")
             stored_version = (
-                await session.execute(
-                    select(User.token_version).where(User.id == user_id)
-                )
+                await session.execute(select(User.token_version).where(User.id == user_id))
             ).scalar_one_or_none()
 
         if stored_version is None:
@@ -129,9 +127,7 @@ class BuiltinJWTAuthProvider:
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
             user = (
-                await session.execute(
-                    select(User).where(User.email == credentials.email)
-                )
+                await session.execute(select(User).where(User.email == credentials.email))
             ).scalar_one_or_none()
 
         if user is None or not verify_password(credentials.password, user.hashed_password):

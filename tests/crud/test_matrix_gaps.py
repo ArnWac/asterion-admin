@@ -161,15 +161,11 @@ async def test_validate_update_rejection_leaves_row_untouched(session):
     so it can decide based on current state — but if it rejects, the
     SQL UPDATE must not happen."""
     admin = _RejectingAdmin()
-    created = await create_record(
-        session, admin, {"sku": "OK", "name": "before"}
-    )
+    created = await create_record(session, admin, {"sku": "OK", "name": "before"})
     rid = str(created["id"])
 
     with pytest.raises(ValueError, match="deny list"):
-        await update_record(
-            session, admin, rid, {"name": "FORBIDDEN"}, ctx=_ctx()
-        )
+        await update_record(session, admin, rid, {"name": "FORBIDDEN"}, ctx=_ctx())
 
     reread = await read_record(session, admin, rid)
     assert reread["name"] == "before"

@@ -235,9 +235,7 @@ async def export_records(
         if len(ids) > MAX_EXPORT_ROWS:
             raise HTTPException(
                 status_code=413,
-                detail=(
-                    f"Too many ids: {len(ids)} (cap: {MAX_EXPORT_ROWS})."
-                ),
+                detail=(f"Too many ids: {len(ids)} (cap: {MAX_EXPORT_ROWS})."),
             )
         pk_col = primary_key_column(admin.model)
         try:
@@ -270,9 +268,7 @@ async def export_records(
         filename = f"{admin.model_name}.csv"
     else:  # xlsx — may raise 501 if openpyxl missing
         body = _build_xlsx(rows, columns)
-        media_type = (
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         filename = f"{admin.model_name}.xlsx"
 
     try:
@@ -302,7 +298,9 @@ async def export_records(
     except Exception:
         logger.warning(
             "export audit hook failed for resource=%s format=%s",
-            admin.model_name, format, exc_info=True,
+            admin.model_name,
+            format,
+            exc_info=True,
         )
 
     return Response(
@@ -336,9 +334,7 @@ def _detect_import_format(filename: str) -> str:
         return "xlsx"
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=(
-            "Unsupported import file extension. Upload a .csv or .xlsx file."
-        ),
+        detail=("Unsupported import file extension. Upload a .csv or .xlsx file."),
     )
 
 
@@ -519,7 +515,9 @@ async def import_records(
     except Exception:
         logger.warning(
             "import audit hook failed for resource=%s format=%s",
-            admin.model_name, fmt, exc_info=True,
+            admin.model_name,
+            fmt,
+            exc_info=True,
         )
 
     return {
@@ -529,5 +527,3 @@ async def import_records(
         "total": created + failed,
         "errors": errors,
     }
-
-

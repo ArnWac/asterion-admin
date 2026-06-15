@@ -54,9 +54,7 @@ def app(tmp_path):
             enable_builtin_admins=False,
         ),
         extensions=[
-            OAuthExtension(
-                providers=[GoogleOIDCProvider(client_id="x", client_secret="y")]
-            )
+            OAuthExtension(providers=[GoogleOIDCProvider(client_id="x", client_secret="y")])
         ],
     )
 
@@ -97,9 +95,7 @@ def test_create_all_actually_creates_the_table(app):
             # information_schema; SQLite uses sqlite_master.
             from sqlalchemy import text
 
-            result = await conn.execute(
-                text("SELECT name FROM sqlite_master WHERE type='table'")
-            )
+            result = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
             return {row[0] for row in result}
 
     tables = asyncio.run(_probe())
@@ -188,17 +184,19 @@ def test_one_user_can_link_multiple_providers(app):
             )
             s.add(u)
             await s.flush()
-            s.add_all([
-                ExternalIdentity(provider="google", provider_subject="g1", user_id=u.id),
-                ExternalIdentity(provider="google", provider_subject="g2", user_id=u.id),
-                ExternalIdentity(provider="github", provider_subject="h1", user_id=u.id),
-            ])
+            s.add_all(
+                [
+                    ExternalIdentity(provider="google", provider_subject="g1", user_id=u.id),
+                    ExternalIdentity(provider="google", provider_subject="g2", user_id=u.id),
+                    ExternalIdentity(provider="github", provider_subject="h1", user_id=u.id),
+                ]
+            )
         async with factory() as s:
             rows = (
-                await s.execute(
-                    select(ExternalIdentity).where(ExternalIdentity.user_id == u.id)
-                )
-            ).scalars().all()
+                (await s.execute(select(ExternalIdentity).where(ExternalIdentity.user_id == u.id)))
+                .scalars()
+                .all()
+            )
             return sorted(f"{r.provider}:{r.provider_subject}" for r in rows)
 
     assert asyncio.run(_run()) == ["github:h1", "google:g1", "google:g2"]
@@ -226,9 +224,7 @@ def test_optional_fields_default_to_none(app):
             s.add(row)
         async with factory() as s:
             return (
-                await s.execute(
-                    select(ExternalIdentity).where(ExternalIdentity.user_id == u.id)
-                )
+                await s.execute(select(ExternalIdentity).where(ExternalIdentity.user_id == u.id))
             ).scalar_one()
 
     out = asyncio.run(_run())
