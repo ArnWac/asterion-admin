@@ -459,6 +459,25 @@ form .form-actions {
   border-top: 1px solid var(--border);
 }
 
+/* --- form fieldsets (Roadmap 5.4) --- */
+form .fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem 0.75rem;
+  margin: 0 0 1rem;
+}
+form .fieldset > .fieldset-legend {
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0;
+  list-style: revert; /* keep the native disclosure triangle */
+}
+form .fieldset > .fieldset-description {
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+  margin: 0.1rem 0 0.6rem;
+}
+
 /* Card-wrapped forms get internal padding */
 .card > form { padding: 1.25rem 1.5rem; }
 .card > .detail-grid { padding: 1rem 1.5rem; }

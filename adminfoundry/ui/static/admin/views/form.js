@@ -38,6 +38,8 @@ export async function mountForm(root, resource, mode, recordId) {
   const form = el("form", { class: "admin-form", novalidate: true });
   const inputs = new Map();
   const errorBoxes = new Map();
+  const fieldDivs = new Map(); // field name -> rendered .field block
+  const renderedOrder = []; // field names actually rendered, in contract order
 
   for (const field of editableFields) {
     const disabled = isEdit ? field.read_only : field.read_only && !field.primary_key;
@@ -55,7 +57,8 @@ export async function mountForm(root, resource, mode, recordId) {
     const errorBox = el("p", { class: "field-error", id: `${id}-error`, hidden: true });
     errorBoxes.set(field.name, errorBox);
 
-    form.appendChild(
+    fieldDivs.set(
+      field.name,
       el("div", { class: "field" }, [
         el("label", { for: id }, prettify(field.name) + (field.nullable ? "" : " *")),
         input,
@@ -66,6 +69,14 @@ export async function mountForm(root, resource, mode, recordId) {
         errorBox,
       ])
     );
+    renderedOrder.push(field.name);
+  }
+
+  // Lay the rendered fields out: grouped into sections when the contract
+  // declares fieldsets (Roadmap 5.4), flat otherwise. Fields not named in
+  // any fieldset are appended after the sections so nothing is dropped.
+  for (const node of buildFormBody(contract.fieldsets || [], fieldDivs, renderedOrder)) {
+    form.appendChild(node);
   }
 
   const summary = el("p", { class: "form-error", role: "alert", hidden: true });
@@ -119,6 +130,48 @@ export async function mountForm(root, resource, mode, recordId) {
     ]),
     el("div", { class: "card" }, form)
   );
+}
+
+function buildFormBody(fieldsets, fieldDivs, renderedOrder) {
+  // No fieldsets declared → flat list in contract order (legacy layout).
+  if (!fieldsets.length) {
+    return renderedOrder.map((name) => fieldDivs.get(name)).filter(Boolean);
+  }
+
+  const nodes = [];
+  const placed = new Set();
+
+  for (const fs of fieldsets) {
+    const fieldNodes = (fs.fields || [])
+      .filter((name) => fieldDivs.has(name) && !placed.has(name))
+      .map((name) => {
+        placed.add(name);
+        return fieldDivs.get(name);
+      });
+    // Skip a section that ended up empty (every field filtered/hidden) so
+    // we don't render a bare header.
+    if (fieldNodes.length === 0) continue;
+    nodes.push(buildSection(fs.label, fs.description, !!fs.collapsed, fieldNodes));
+  }
+
+  // Anything not claimed by a fieldset still has to render — append it in
+  // contract order so a misconfigured (partial) fieldset list never hides
+  // an editable field.
+  const leftovers = renderedOrder
+    .filter((name) => !placed.has(name))
+    .map((name) => fieldDivs.get(name))
+    .filter(Boolean);
+  nodes.push(...leftovers);
+
+  return nodes;
+}
+
+function buildSection(label, description, collapsed, fieldNodes) {
+  // <details> gives a native collapse affordance; open unless collapsed.
+  const children = [el("summary", { class: "fieldset-legend" }, label)];
+  if (description) children.push(el("p", { class: "fieldset-description" }, description));
+  children.push(...fieldNodes);
+  return el("details", { class: "fieldset", open: !collapsed }, children);
 }
 
 function buildInput(field, id, initial, disabled) {
