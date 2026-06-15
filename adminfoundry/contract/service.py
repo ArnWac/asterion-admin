@@ -203,6 +203,10 @@ class ModelContractMeta(BaseModel):
     capabilities: CapabilitiesMeta
     relations: list[RelationMeta] = []
     fieldsets: list[FieldsetMeta] = []
+    #: How the UI should lay out ``fieldsets`` (Roadmap 5.4): ``"sections"``
+    #: (collapsible blocks) or ``"tabs"`` (a tab bar). ``"sections"`` is the
+    #: safe default for clients that don't special-case tabs.
+    form_layout: str = "sections"
     inlines: list[InlineMeta] = []
     filters: list[FilterMeta] = []
     list_display: list[str]
@@ -813,6 +817,9 @@ def build_model_contract(
         capabilities=_build_capabilities(model_admin, permissions=permissions),
         relations=build_relation_metadata(model_admin, admin_registry=admin_registry),
         fieldsets=build_fieldset_metadata(model_admin),
+        form_layout=(
+            "tabs" if getattr(model_admin, "form_layout", "sections") == "tabs" else "sections"
+        ),
         inlines=build_inline_metadata(model_admin),
         filters=build_filter_metadata(model_admin, registry=registry),
         list_display=list(model_admin.list_display),

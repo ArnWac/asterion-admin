@@ -75,7 +75,12 @@ export async function mountForm(root, resource, mode, recordId) {
   // Lay the rendered fields out: grouped into sections when the contract
   // declares fieldsets (Roadmap 5.4), flat otherwise. Fields not named in
   // any fieldset are appended after the sections so nothing is dropped.
-  for (const node of buildFormBody(contract.fieldsets || [], fieldDivs, renderedOrder)) {
+  for (const node of buildFormBody(
+    contract.fieldsets || [],
+    fieldDivs,
+    renderedOrder,
+    contract.form_layout || "sections"
+  )) {
     form.appendChild(node);
   }
 
@@ -165,15 +170,16 @@ export async function mountForm(root, resource, mode, recordId) {
   );
 }
 
-function buildFormBody(fieldsets, fieldDivs, renderedOrder) {
+function buildFormBody(fieldsets, fieldDivs, renderedOrder, layout) {
   // No fieldsets declared → flat list in contract order (legacy layout).
   if (!fieldsets.length) {
     return renderedOrder.map((name) => fieldDivs.get(name)).filter(Boolean);
   }
 
-  const nodes = [];
+  // Collect each fieldset's rendered nodes once, tracking what's placed so
+  // leftovers (fields in no fieldset) can be appended without duplication.
+  const groups = []; // { label, description, collapsed, nodes }
   const placed = new Set();
-
   for (const fs of fieldsets) {
     const fieldNodes = (fs.fields || [])
       .filter((name) => fieldDivs.has(name) && !placed.has(name))
@@ -181,22 +187,72 @@ function buildFormBody(fieldsets, fieldDivs, renderedOrder) {
         placed.add(name);
         return fieldDivs.get(name);
       });
-    // Skip a section that ended up empty (every field filtered/hidden) so
-    // we don't render a bare header.
-    if (fieldNodes.length === 0) continue;
-    nodes.push(buildSection(fs.label, fs.description, !!fs.collapsed, fieldNodes));
+    if (fieldNodes.length === 0) continue; // skip empty section
+    groups.push({
+      label: fs.label,
+      description: fs.description,
+      collapsed: !!fs.collapsed,
+      nodes: fieldNodes,
+    });
   }
 
-  // Anything not claimed by a fieldset still has to render — append it in
-  // contract order so a misconfigured (partial) fieldset list never hides
-  // an editable field.
   const leftovers = renderedOrder
     .filter((name) => !placed.has(name))
     .map((name) => fieldDivs.get(name))
     .filter(Boolean);
-  nodes.push(...leftovers);
 
+  if (layout === "tabs") {
+    return buildTabs(groups, leftovers);
+  }
+
+  // "sections" (default): collapsible <details> blocks + loose leftovers.
+  const nodes = groups.map((g) => buildSection(g.label, g.description, g.collapsed, g.nodes));
+  nodes.push(...leftovers);
   return nodes;
+}
+
+function buildTabs(groups, leftovers) {
+  const tabs = groups.map((g) => {
+    const panelChildren = [];
+    if (g.description) panelChildren.push(el("p", { class: "fieldset-description" }, g.description));
+    panelChildren.push(...g.nodes);
+    return { label: g.label, panel: el("div", { class: "tab-panel" }, panelChildren) };
+  });
+  if (leftovers.length) {
+    tabs.push({ label: "Other", panel: el("div", { class: "tab-panel" }, leftovers) });
+  }
+  if (!tabs.length) return [];
+
+  const tablist = el("div", { class: "tabs", role: "tablist" });
+  const panelsWrap = el("div", { class: "tab-panels" });
+
+  tabs.forEach((t, i) => {
+    const btn = el(
+      "button",
+      {
+        type: "button",
+        class: "tab" + (i === 0 ? " active" : ""),
+        role: "tab",
+        "aria-selected": i === 0 ? "true" : "false",
+      },
+      t.label
+    );
+    t.panel.hidden = i !== 0;
+    btn.addEventListener("click", () => {
+      for (const b of tablist.children) {
+        b.classList.remove("active");
+        b.setAttribute("aria-selected", "false");
+      }
+      for (const p of panelsWrap.children) p.hidden = true;
+      btn.classList.add("active");
+      btn.setAttribute("aria-selected", "true");
+      t.panel.hidden = false;
+    });
+    tablist.appendChild(btn);
+    panelsWrap.appendChild(t.panel);
+  });
+
+  return [tablist, panelsWrap];
 }
 
 function buildSection(label, description, collapsed, fieldNodes) {

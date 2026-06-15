@@ -313,6 +313,34 @@ def test_malformed_condition_dropped(bad):
 
 
 # ---------------------------------------------------------------------------
+# form_layout (Roadmap 5.4)
+# ---------------------------------------------------------------------------
+
+
+def test_form_layout_defaults_to_sections():
+    contract = build_model_contract(_PostAdmin())
+    assert contract.form_layout == "sections"
+
+
+def test_form_layout_tabs_emitted():
+    class _TabsAdmin(ModelAdmin):
+        model = _Post
+        form_layout = "tabs"
+
+    contract = build_model_contract(_TabsAdmin())
+    assert contract.form_layout == "tabs"
+
+
+def test_form_layout_unknown_falls_back_to_sections():
+    class _WeirdAdmin(ModelAdmin):
+        model = _Post
+        form_layout = "carousel"
+
+    contract = build_model_contract(_WeirdAdmin())
+    assert contract.form_layout == "sections"
+
+
+# ---------------------------------------------------------------------------
 # validation hints
 # ---------------------------------------------------------------------------
 

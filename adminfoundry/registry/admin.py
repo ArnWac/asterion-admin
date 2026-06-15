@@ -62,6 +62,13 @@ class ModelAdmin:
     #: for the per-section structure and validation rules.
     fieldsets: list["Fieldset"] = []
 
+    #: How the built-in form lays out :attr:`fieldsets` (Roadmap 5.4):
+    #: ``"sections"`` (default — collapsible blocks) or ``"tabs"`` (a tab
+    #: bar, one tab per fieldset). Ignored when no fieldsets are declared.
+    #: Surfaced on ``ModelContractMeta.form_layout``; an unrecognized
+    #: value falls back to ``"sections"`` in the contract builder.
+    form_layout: str = "sections"
+
     #: Optional per-field placeholder text (Roadmap 5.4). Maps a field
     #: name to the placeholder string the form input should show when
     #: empty. Surfaced on ``FieldMeta.placeholder`` in the contract;
