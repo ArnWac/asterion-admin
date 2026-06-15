@@ -59,6 +59,7 @@ export async function mountForm(root, resource, mode, recordId) {
       el("div", { class: "field" }, [
         el("label", { for: id }, prettify(field.name) + (field.nullable ? "" : " *")),
         input,
+        field.help_text ? el("p", { class: "field-hint" }, field.help_text) : null,
         field.read_only
           ? el("p", { class: "field-hint" }, "Read-only — managed by the server.")
           : null,
@@ -123,6 +124,9 @@ export async function mountForm(root, resource, mode, recordId) {
 function buildInput(field, id, initial, disabled) {
   const type = field.type;
   const baseAttrs = { id, name: field.name, disabled: disabled || false };
+  // Placeholder (Roadmap 5.4) — harmless on input types that ignore it
+  // (checkbox, datetime-local); only set when the contract supplies one.
+  if (field.placeholder) baseAttrs.placeholder = field.placeholder;
 
   if (type === "boolean") {
     return el("input", {

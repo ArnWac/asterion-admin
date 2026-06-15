@@ -222,6 +222,32 @@ def test_capabilities_respect_global_wildcard():
 
 
 # ---------------------------------------------------------------------------
+# placeholder (Roadmap 5.4)
+# ---------------------------------------------------------------------------
+
+
+class _PlaceholderAdmin(ModelAdmin):
+    model = _Post
+    placeholders = {"title": "e.g. My first post", "summary": "Short teaser"}
+
+
+def test_placeholder_emitted_from_admin_mapping():
+    metas = build_field_metadata(_PlaceholderAdmin())
+    assert _meta_by_name(metas, "title").placeholder == "e.g. My first post"
+    assert _meta_by_name(metas, "summary").placeholder == "Short teaser"
+
+
+def test_placeholder_none_when_not_configured():
+    """Fields without a placeholders entry — and admins that set none —
+    report ``None`` so the renderer shows no placeholder."""
+    metas = build_field_metadata(_PostAdmin())
+    assert _meta_by_name(metas, "title").placeholder is None
+    # Even on the placeholder admin, an unlisted field stays None.
+    metas2 = build_field_metadata(_PlaceholderAdmin())
+    assert _meta_by_name(metas2, "body").placeholder is None
+
+
+# ---------------------------------------------------------------------------
 # validation hints
 # ---------------------------------------------------------------------------
 

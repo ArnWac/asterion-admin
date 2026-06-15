@@ -62,6 +62,13 @@ class ModelAdmin:
     #: for the per-section structure and validation rules.
     fieldsets: list["Fieldset"] = []
 
+    #: Optional per-field placeholder text (Roadmap 5.4). Maps a field
+    #: name to the placeholder string the form input should show when
+    #: empty. Surfaced on ``FieldMeta.placeholder`` in the contract;
+    #: fields without an entry get ``None`` (renderer shows no
+    #: placeholder). Unknown field names are ignored by the builder.
+    placeholders: dict[str, str] = {}
+
     #: Optional :class:`~adminfoundry.admin.policy.AdminPolicy` instance
     #: layered on top of the permission-key checks. ``None`` means
     #: "permission keys alone decide" (legacy / quickstart behavior).
@@ -93,6 +100,8 @@ class ModelAdmin:
                 setattr(cls, attr, [])
         if "calculated_fields" not in cls.__dict__:
             cls.calculated_fields = {}
+        if "placeholders" not in cls.__dict__:
+            cls.placeholders = {}
 
     # ------------------------------------------------------------------
     # Lifecycle hooks (B1)

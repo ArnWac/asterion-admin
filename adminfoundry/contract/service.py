@@ -52,6 +52,10 @@ class FieldMeta(BaseModel):
     #: Human-readable help text. Sourced from SQLAlchemy ``Column.doc``
     #: when available; ``None`` otherwise.
     help_text: str | None = None
+    #: Placeholder text for the form input when empty (Roadmap 5.4).
+    #: Sourced from ``ModelAdmin.placeholders``; ``None`` means the
+    #: renderer shows no placeholder.
+    placeholder: str | None = None
     #: Adapter-supplied or admin-supplied validation hints (e.g.
     #: ``{"min_length": 1, "max_length": 200}``). Empty when the adapter
     #: did not contribute any.
@@ -259,6 +263,7 @@ def _field_meta_from_adapter(
     registry: FieldRegistry,
     readonly_set: set[str],
     field_permission: str = "write",
+    placeholders: dict[str, str] | None = None,
 ) -> FieldMeta:
     """Run a column through the registry and turn the resulting
     :class:`FieldContract` into the wire-format :class:`FieldMeta`.
@@ -272,6 +277,7 @@ def _field_meta_from_adapter(
     :meth:`AdminPolicy.field_permission` (Roadmap 2.4). Defaults to
     ``"write"`` for the legacy / no-policy path.
     """
+    placeholders = placeholders or {}
     adapter = registry.find_adapter(col)
     if adapter is None:
         # build_default_registry includes StringAdapter as the universal
@@ -292,6 +298,7 @@ def _field_meta_from_adapter(
             widget=None,
             required=_column_is_required(col, readonly_set=readonly_set),
             help_text=_column_help_text(col),
+            placeholder=placeholders.get(col.name),
             validation={},
             metadata={},
             field_permission=field_permission,
@@ -313,6 +320,7 @@ def _field_meta_from_adapter(
         widget=widget,
         required=_column_is_required(col, readonly_set=readonly_set),
         help_text=_column_help_text(col),
+        placeholder=placeholders.get(contract.name),
         validation=validation,
         metadata=leftover_metadata,
         field_permission=field_permission,
@@ -349,6 +357,7 @@ def build_field_metadata(
     mapper = sa_inspect(model_admin.model)
     protected = model_admin.all_protected
     readonly_set = set(model_admin.readonly_fields)
+    placeholders = dict(getattr(model_admin, "placeholders", {}) or {})
 
     fields: list[FieldMeta] = []
 
@@ -364,6 +373,7 @@ def build_field_metadata(
                 registry=registry,
                 readonly_set=readonly_set,
                 field_permission=perm,
+                placeholders=placeholders,
             )
         )
 
@@ -383,6 +393,7 @@ def build_field_metadata(
                 widget=None,
                 required=False,
                 help_text=None,
+                placeholder=placeholders.get(fname),
                 validation={},
                 metadata={},
                 field_permission="read",  # calculated fields are inherently read-only
