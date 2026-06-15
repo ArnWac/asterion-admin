@@ -11,9 +11,11 @@ The lifecycle, in order, called by ``create_admin()``:
 2. ``register_permissions(ctx.permissions)``
 3. ``register_protected_fields(ctx.protected_fields)``
 4. ``register_contract_contributions(ctx.contract)``
-5. ``register_navigation(ctx.navigation)``
-6. ``register_routes(app, ctx)`` — only step that gets ``app``.
-7. **Framework freezes all registries.**
+5. ``register_admin_pages(ctx.admin_pages)``
+6. ``register_navigation(ctx.navigation)``
+7. Framework mirrors permission-bearing admin pages into navigation.
+8. ``register_routes(app, ctx)`` — only step that gets ``app``.
+9. **Framework freezes all registries.**
 8. Lifespan starts: ``startup(app)`` called per extension, in
    registration order.
 9. Requests served.
@@ -76,6 +78,15 @@ class AdminExtension:
 
     def register_navigation(self, registry) -> None:
         """Add permission-gated nav items to the admin UI."""
+
+    def register_admin_pages(self, registry) -> None:
+        """Register custom :class:`~adminfoundry.ui.admin_pages.AdminPage`
+        entries (Roadmap 5.6) — pluggable pages outside the CRUD schema.
+
+        The framework mirrors every registered page that declares a
+        ``permission`` into the navigation registry, so a page usually
+        does not need a separate ``register_navigation`` call.
+        """
 
     def register_models(self) -> Iterable[type[Any]]:
         """Declare ORM model classes this extension contributes.

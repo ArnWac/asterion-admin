@@ -146,8 +146,13 @@ def create_admin(
         contract=runtime.contract_contributions,
         navigation=runtime.navigation,
         protected_fields=runtime.protected_fields,
+        admin_pages=runtime.admin_pages,
         logger=logging.getLogger("adminfoundry.extensions"),
     )
+    # run_setup_phase walks every extension through its hooks (including
+    # register_admin_pages), mirrors permission-bearing admin pages into
+    # navigation, and freezes the extension-side registries — navigation
+    # and admin_pages included. See adminfoundry/extensions/lifecycle.py.
     runtime.extension_models = run_setup_phase(runtime.extensions, ctx, app)
 
     # Freeze the admin registry now that every setup-time contributor

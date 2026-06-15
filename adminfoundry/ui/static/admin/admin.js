@@ -32,6 +32,8 @@ const viewLoaders = {
   settings: (root) => import("./views/settings.js").then((m) => m.mountSettings(root)),
   permissions: (root) =>
     import("./views/permission_matrix.js").then((m) => m.mountPermissionMatrix(root)),
+  page: (root) =>
+    import("./views/page.js").then((m) => m.mountPage(root, cfg.pageModule, cfg.pageId)),
 };
 
 async function main() {

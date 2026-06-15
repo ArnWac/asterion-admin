@@ -10,6 +10,7 @@
   data-view="{{ view }}"
   {% if resource %}data-resource="{{ resource }}"{% endif %}
   {% if record_id %}data-record-id="{{ record_id }}"{% endif %}
+  {% if page_id %}data-page-id="{{ page_id }}"{% endif %}
 >
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
@@ -57,6 +58,8 @@
       view: {{ view | tojson }},
       resource: {{ resource | tojson }},
       recordId: {{ record_id | tojson }},
+      pageId: {{ page_id | tojson }},
+      pageModule: {{ page_module | tojson }},
     };
   </script>
   <script type="module" src="{{ admin_ui_path }}/static/admin.js"></script>

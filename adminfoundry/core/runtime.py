@@ -23,6 +23,7 @@ from adminfoundry.security.protected_fields import (
 from adminfoundry.security.protected_fields import (
     get_registry as get_protected_field_registry,
 )
+from adminfoundry.ui.admin_pages import AdminPageRegistry
 from adminfoundry.ui.navigation import NavigationRegistry
 
 
@@ -112,6 +113,11 @@ class AdminRuntime:
         default_factory=ContractContributionRegistry
     )
     navigation: NavigationRegistry = field(default_factory=NavigationRegistry)
+    #: Pluggable admin pages (Roadmap 5.6). Apps + extensions register
+    #: ``AdminPage`` entries; the framework mounts a UI route per page
+    #: and mirrors them into ``navigation`` so they show up in the
+    #: sidebar (gated by the page's optional ``permission``).
+    admin_pages: AdminPageRegistry = field(default_factory=AdminPageRegistry)
     #: ORM model classes contributed by extensions (populated during
     #: ``register_models``). Tooling can iterate this to answer "which
     #: extension owns table X". Table registration itself happens at

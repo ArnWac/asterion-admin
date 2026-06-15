@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from adminfoundry.contract.contributions import ContractContributionRegistry
     from adminfoundry.core.config import CoreAdminConfig
     from adminfoundry.security.protected_fields import ProtectedFieldRegistry
+    from adminfoundry.ui.admin_pages import AdminPageRegistry
     from adminfoundry.ui.navigation import NavigationRegistry
 
 
@@ -45,4 +46,5 @@ class ExtensionContext:
     contract: ContractContributionRegistry
     navigation: NavigationRegistry
     protected_fields: ProtectedFieldRegistry
+    admin_pages: AdminPageRegistry
     logger: logging.Logger
