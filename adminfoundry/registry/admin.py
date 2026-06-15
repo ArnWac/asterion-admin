@@ -76,6 +76,21 @@ class ModelAdmin:
     #: placeholder). Unknown field names are ignored by the builder.
     placeholders: dict[str, str] = {}
 
+    #: Optional list-view badge styling (Roadmap 5.5). Maps a column
+    #: name to a ``{value: style}`` table; the list view renders matching
+    #: cell values as a colored badge instead of plain text::
+    #:
+    #:     list_badges = {
+    #:         "status": {"published": "success", "draft": "neutral",
+    #:                    "archived": "danger"},
+    #:     }
+    #:
+    #: ``style`` must be one of the fixed vocabulary
+    #: (``neutral``/``success``/``warning``/``danger``/``info``); unknown
+    #: styles are dropped by the contract builder. Values are matched by
+    #: their stringified form, so ints / bools / enums work too.
+    list_badges: dict[str, dict] = {}
+
     #: Optional conditional-visibility rules (Roadmap 5.4). Maps a
     #: *dependent* field name to a rule that references another field::
     #:
@@ -129,6 +144,8 @@ class ModelAdmin:
             cls.placeholders = {}
         if "field_conditions" not in cls.__dict__:
             cls.field_conditions = {}
+        if "list_badges" not in cls.__dict__:
+            cls.list_badges = {}
 
     # ------------------------------------------------------------------
     # Lifecycle hooks (B1)

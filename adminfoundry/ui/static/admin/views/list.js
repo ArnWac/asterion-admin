@@ -21,11 +21,25 @@ export async function mountList(root, resource) {
     ? contract.list_display
     : contract.fields.map((f) => f.name).slice(0, 5));
 
+  // Per-user list preferences (Roadmap 5.5): density + hidden columns,
+  // persisted in localStorage keyed by resource.
+  const prefs = listPrefs(resource);
+  const hiddenCols = new Set(prefs.getHiddenColumns().filter((c) => columns.includes(c)));
+  const visibleColumns = () => columns.filter((c) => !hiddenCols.has(c));
+  let density = prefs.getDensity();
+
   const state = {
     offset: 0,
     search: "",
     selectedIds: new Set(),
+    items: [],
+    // Active sort, e.g. "title" / "-created_at" / null (server default).
+    ordering: prefs.getOrdering(),
   };
+  // A column is sortable when it maps to a real (non-calculated) field.
+  const fieldsByNameAll = Object.fromEntries(contract.fields.map((f) => [f.name, f]));
+  const isSortable = (colName) =>
+    !!fieldsByNameAll[colName] && !fieldsByNameAll[colName].calculated;
 
   const searchInput = el("input", {
     type: "search",
@@ -106,6 +120,51 @@ export async function mountList(root, resource) {
     if (exportXlsxBtn) exportXlsxBtn.textContent = `Export XLSX${suffix}`;
   }
 
+  // --- list display controls (Roadmap 5.5): density + column visibility ---
+  const table = el("table", { class: density === "compact" ? "compact-table" : "" }, [
+    tableHead,
+    tableBody,
+  ]);
+
+  const densityBtn = el("button", { type: "button", class: "btn btn-sm" });
+  function syncDensityBtn() {
+    densityBtn.textContent = density === "compact" ? "Comfortable" : "Compact";
+    densityBtn.setAttribute("aria-pressed", density === "compact" ? "true" : "false");
+  }
+  syncDensityBtn();
+  densityBtn.addEventListener("click", () => {
+    density = density === "compact" ? "comfortable" : "compact";
+    table.classList.toggle("compact-table", density === "compact");
+    prefs.setDensity(density);
+    syncDensityBtn();
+  });
+
+  const columnsMenu = el("details", { class: "columns-menu" }, [
+    el("summary", { class: "btn btn-sm" }, "Columns"),
+    el(
+      "div",
+      { class: "columns-menu-panel" },
+      columns.map((colName) =>
+        el("label", { class: "columns-menu-item" }, [
+          el("input", {
+            type: "checkbox",
+            checked: !hiddenCols.has(colName),
+            onChange: (e) => {
+              if (e.target.checked) hiddenCols.delete(colName);
+              else hiddenCols.add(colName);
+              prefs.setHiddenColumns(Array.from(hiddenCols));
+              renderHead();
+              renderRows(state.items);
+            },
+          }),
+          el("span", {}, prettify(colName)),
+        ])
+      )
+    ),
+  ]);
+
+  const displayControls = el("div", { class: "list-controls" }, [densityBtn, columnsMenu]);
+
   const layout = el("div", {}, [
     el("div", { class: "page-header" }, [
       el("h1", {}, contract.label_plural),
@@ -123,8 +182,9 @@ export async function mountList(root, resource) {
               selectedCount,
             ])
           : null,
+        displayControls,
       ]),
-      el("div", { style: "overflow-x:auto" }, el("table", {}, [tableHead, tableBody])),
+      el("div", { style: "overflow-x:auto" }, table),
       paginationBar,
     ]),
   ]);
@@ -134,26 +194,60 @@ export async function mountList(root, resource) {
   // --- rendering ---
 
   function renderHead() {
+    const cols = visibleColumns();
     const ths = [el("th", { class: "checkbox-cell" }, [
       el("input", { type: "checkbox", "aria-label": "Select all on this page", onChange: toggleAll }),
     ])];
-    for (const colName of columns) {
-      ths.push(el("th", {}, prettify(colName)));
+    for (const colName of cols) {
+      if (isSortable(colName)) {
+        const asc = state.ordering === colName;
+        const desc = state.ordering === `-${colName}`;
+        const indicator = asc ? " ▲" : desc ? " ▼" : "";
+        ths.push(
+          el("th", {}, [
+            el(
+              "button",
+              {
+                type: "button",
+                class: "th-sort" + (asc || desc ? " active" : ""),
+                "aria-label": `Sort by ${prettify(colName)}`,
+                onClick: () => toggleSort(colName),
+              },
+              prettify(colName) + indicator
+            ),
+          ])
+        );
+      } else {
+        ths.push(el("th", {}, prettify(colName)));
+      }
     }
     ths.push(el("th", { class: "actions" }, ""));
     clear(tableHead);
     tableHead.appendChild(el("tr", {}, ths));
   }
 
+  function toggleSort(colName) {
+    // Cycle per column: ascending → descending → off (server default).
+    if (state.ordering === colName) state.ordering = `-${colName}`;
+    else if (state.ordering === `-${colName}`) state.ordering = null;
+    else state.ordering = colName;
+    prefs.setOrdering(state.ordering);
+    state.offset = 0;
+    load();
+  }
+
   function renderRows(items) {
+    state.items = items;
+    const cols = visibleColumns();
     clear(tableBody);
     if (items.length === 0) {
       tableBody.appendChild(
-        el("tr", {}, el("td", { colspan: columns.length + 2, class: "placeholder" }, "No records."))
+        el("tr", {}, el("td", { colspan: cols.length + 2, class: "placeholder" }, "No records."))
       );
       return;
     }
     const fieldsByName = Object.fromEntries(contract.fields.map((f) => [f.name, f]));
+    const badges = contract.list_badges || {};
     for (const item of items) {
       const id = String(item[pkField.name]);
       const checkbox = el("input", {
@@ -163,7 +257,21 @@ export async function mountList(root, resource) {
         onChange: (e) => toggleOne(id, e.target.checked),
       });
       const cells = [el("td", { class: "checkbox-cell" }, [checkbox])];
-      for (const colName of columns) {
+      for (const colName of cols) {
+        // Badge styling (Roadmap 5.5): a configured value renders as a
+        // colored chip instead of plain formatted text.
+        const badgeStyle =
+          item[colName] != null && badges[colName]
+            ? badges[colName][String(item[colName])]
+            : undefined;
+        if (badgeStyle) {
+          cells.push(
+            el("td", {}, [
+              el("span", { class: `badge badge-${badgeStyle}` }, String(item[colName])),
+            ])
+          );
+          continue;
+        }
         const formatted = formatValue(item[colName], fieldsByName[colName]);
         const td = el("td", { class: formatted.muted ? "muted" : "" }, formatted.text);
         if (formatted.mono) td.style.fontFamily = "ui-monospace, SFMono-Regular, monospace";
@@ -257,6 +365,7 @@ export async function mountList(root, resource) {
         limit: PAGE_SIZE,
         offset: state.offset,
         search: state.search,
+        ordering: state.ordering || "",
       });
       renderHead();
       renderRows(data.items || []);
@@ -307,4 +416,40 @@ export async function mountList(root, resource) {
 
 function prettify(name) {
   return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Per-user list preferences (Roadmap 5.5), persisted in localStorage and
+// scoped by resource. All access is wrapped in try/catch so a disabled or
+// full localStorage degrades to in-memory defaults rather than throwing.
+function listPrefs(resource) {
+  const key = (k) => `af:list:${resource}:${k}`;
+  const read = (k, fallback) => {
+    try {
+      const v = localStorage.getItem(key(k));
+      return v == null ? fallback : JSON.parse(v);
+    } catch {
+      return fallback;
+    }
+  };
+  const write = (k, v) => {
+    try {
+      localStorage.setItem(key(k), JSON.stringify(v));
+    } catch {
+      /* ignore — preferences are best-effort */
+    }
+  };
+  return {
+    getDensity: () => (read("density", "comfortable") === "compact" ? "compact" : "comfortable"),
+    setDensity: (d) => write("density", d),
+    getHiddenColumns: () => {
+      const v = read("hiddenCols", []);
+      return Array.isArray(v) ? v : [];
+    },
+    setHiddenColumns: (arr) => write("hiddenCols", arr),
+    getOrdering: () => {
+      const v = read("ordering", null);
+      return typeof v === "string" && v ? v : null;
+    },
+    setOrdering: (v) => write("ordering", v),
+  };
 }

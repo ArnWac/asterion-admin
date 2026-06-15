@@ -150,6 +150,7 @@ async def list_records(
     offset: int = 0,
     search: str | None = None,
     filters: dict[str, Any] | None = None,
+    ordering: str | None = None,
     ctx: "AdminContext | None" = None,
 ) -> dict[str, Any]:
     model = admin_class.model
@@ -170,7 +171,7 @@ async def list_records(
 
     total = (await session.execute(count_statement_for(base_stmt))).scalar_one()
 
-    list_stmt = apply_ordering(base_stmt, admin_class)
+    list_stmt = apply_ordering(base_stmt, admin_class, ordering)
     list_stmt = list_stmt.limit(normalized_limit).offset(normalized_offset)
 
     result = await session.execute(list_stmt)

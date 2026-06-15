@@ -313,6 +313,55 @@ def test_malformed_condition_dropped(bad):
 
 
 # ---------------------------------------------------------------------------
+# list_badges (Roadmap 5.5)
+# ---------------------------------------------------------------------------
+
+
+def test_list_badges_emitted_and_stringified():
+    class _BadgeAdmin(ModelAdmin):
+        model = _Post
+        list_badges = {"status": {"published": "success", "draft": "neutral"}}
+
+    contract = build_model_contract(_BadgeAdmin())
+    assert contract.list_badges == {
+        "status": {"published": "success", "draft": "neutral"}
+    }
+
+
+def test_list_badges_drops_unknown_styles():
+    class _BadgeAdmin(ModelAdmin):
+        model = _Post
+        list_badges = {"status": {"published": "success", "draft": "rainbow"}}
+
+    contract = build_model_contract(_BadgeAdmin())
+    # "rainbow" isn't in the allowed vocabulary → dropped; column kept.
+    assert contract.list_badges == {"status": {"published": "success"}}
+
+
+def test_list_badges_column_dropped_when_all_styles_invalid():
+    class _BadgeAdmin(ModelAdmin):
+        model = _Post
+        list_badges = {"status": {"published": "rainbow"}}
+
+    contract = build_model_contract(_BadgeAdmin())
+    assert contract.list_badges == {}
+
+
+def test_list_badges_stringifies_non_string_values():
+    class _BadgeAdmin(ModelAdmin):
+        model = _Post
+        list_badges = {"id": {1: "info", 2: "danger"}}
+
+    contract = build_model_contract(_BadgeAdmin())
+    assert contract.list_badges == {"id": {"1": "info", "2": "danger"}}
+
+
+def test_list_badges_default_empty():
+    contract = build_model_contract(_PostAdmin())
+    assert contract.list_badges == {}
+
+
+# ---------------------------------------------------------------------------
 # form_layout (Roadmap 5.4)
 # ---------------------------------------------------------------------------
 

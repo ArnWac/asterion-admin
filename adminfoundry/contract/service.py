@@ -32,6 +32,35 @@ CONTRACT_VERSION = "2"
 
 CRUD_ACTIONS: tuple[str, ...] = ("list", "read", "create", "update", "delete")
 
+#: Fixed badge-style vocabulary for ``ModelAdmin.list_badges`` (Roadmap
+#: 5.5). Bounded so the built-in UI ships a known set of CSS classes;
+#: styles outside this set are dropped by the contract builder.
+ALLOWED_BADGE_STYLES: frozenset[str] = frozenset(
+    {"neutral", "success", "warning", "danger", "info"}
+)
+
+
+def build_list_badges(model_admin: ModelAdmin) -> dict[str, dict[str, str]]:
+    """Normalize ``ModelAdmin.list_badges`` for the wire (Roadmap 5.5).
+
+    Stringifies every value key (so ints / bools / enums match the
+    rendered cell text) and drops any mapping whose style isn't in
+    :data:`ALLOWED_BADGE_STYLES`. Columns that end up empty are omitted.
+    """
+    raw = getattr(model_admin, "list_badges", {}) or {}
+    out: dict[str, dict[str, str]] = {}
+    for column, value_map in raw.items():
+        if not isinstance(value_map, dict):
+            continue
+        normalized = {
+            str(value): style
+            for value, style in value_map.items()
+            if isinstance(style, str) and style in ALLOWED_BADGE_STYLES
+        }
+        if normalized:
+            out[column] = normalized
+    return out
+
 
 class FieldMeta(BaseModel):
     name: str
@@ -209,6 +238,10 @@ class ModelContractMeta(BaseModel):
     form_layout: str = "sections"
     inlines: list[InlineMeta] = []
     filters: list[FilterMeta] = []
+    #: List-view badge styling (Roadmap 5.5): ``{column: {value: style}}``
+    #: where ``style`` is one of :data:`ALLOWED_BADGE_STYLES`. Values are
+    #: stringified so the UI can match them against rendered cell text.
+    list_badges: dict[str, dict[str, str]] = {}
     list_display: list[str]
     search_fields: list[str]
     ordering: list[str]
@@ -822,6 +855,7 @@ def build_model_contract(
         ),
         inlines=build_inline_metadata(model_admin),
         filters=build_filter_metadata(model_admin, registry=registry),
+        list_badges=build_list_badges(model_admin),
         list_display=list(model_admin.list_display),
         search_fields=list(model_admin.search_fields),
         ordering=list(model_admin.ordering),

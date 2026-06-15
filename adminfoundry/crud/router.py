@@ -117,6 +117,7 @@ async def crud_list(
     limit: int = 100,
     offset: int = 0,
     search: str | None = None,
+    ordering: str | None = None,
     session: AsyncSession = Depends(get_async_session),
     ctx: AdminContext = Depends(require_admin_context),
 ) -> dict[str, Any]:
@@ -132,6 +133,7 @@ async def crud_list(
         offset=offset,
         search=search,
         filters=filters,
+        ordering=ordering,
         ctx=ctx,
     )
 

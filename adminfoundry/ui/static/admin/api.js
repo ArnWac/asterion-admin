@@ -98,9 +98,10 @@ export const admin = {
   // Returns { items: [{id, label, path}, ...] }. Extension-contributed.
   navigation: () => request("GET", `${cfg.adminPrefix}/_navigation`),
 
-  list: (resource, { limit = 25, offset = 0, search = "" } = {}) => {
+  list: (resource, { limit = 25, offset = 0, search = "", ordering = "" } = {}) => {
     const qs = new URLSearchParams({ limit, offset });
     if (search) qs.set("search", search);
+    if (ordering) qs.set("ordering", ordering);
     return request("GET", `${cfg.adminPrefix}/${resource}?${qs}`);
   },
   read: (resource, id) => request("GET", `${cfg.adminPrefix}/${resource}/${encodeURIComponent(id)}`),

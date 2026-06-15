@@ -97,3 +97,41 @@ def test_apply_ordering_uses_admin_ordering():
     stmt = select(Product)
     result = apply_ordering(stmt, ProductAdmin())
     assert "ORDER BY" in str(result).upper()
+
+
+def _order_clause(stmt) -> str:
+    return str(stmt).upper().split("ORDER BY", 1)[1]
+
+
+def test_apply_ordering_request_asc_adds_pk_tiebreaker():
+    from sqlalchemy import select
+
+    result = apply_ordering(select(Product), ProductAdmin(), "sku")
+    clause = _order_clause(result)
+    assert "PRODUCTS.SKU ASC" in clause
+    assert clause.strip().endswith("PRODUCTS.ID ASC")
+
+
+def test_apply_ordering_request_desc():
+    from sqlalchemy import select
+
+    clause = _order_clause(apply_ordering(select(Product), ProductAdmin(), "-sku"))
+    assert "PRODUCTS.SKU DESC" in clause
+    assert "PRODUCTS.ID ASC" in clause  # stable tiebreaker
+
+
+def test_apply_ordering_request_by_pk_has_no_duplicate_tiebreaker():
+    from sqlalchemy import select
+
+    clause = _order_clause(apply_ordering(select(Product), ProductAdmin(), "-id"))
+    assert "PRODUCTS.ID DESC" in clause
+    assert clause.count("PRODUCTS.ID") == 1  # not appended twice
+
+
+def test_apply_ordering_unknown_request_field_falls_back_to_default():
+    from sqlalchemy import select
+
+    clause = _order_clause(apply_ordering(select(Product), ProductAdmin(), "nonexistent"))
+    # Falls back to admin.ordering = ["name"]; no request column, no tiebreaker.
+    assert "PRODUCTS.NAME ASC" in clause
+    assert "PRODUCTS.SKU" not in clause

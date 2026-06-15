@@ -88,19 +88,36 @@ def get_model_column(model: type[Any], field_name: str):
 def apply_ordering(
     stmt: Select,
     admin_class: type[ModelAdmin],
+    ordering: str | None = None,
 ) -> Select:
     model = admin_class.model
-
-    ordering = tuple(getattr(admin_class, "ordering", ()) or ())
-
-    if not ordering:
-        return stmt.order_by(primary_key_column(model).asc())
-
     known_columns = model_column_names(model)
+    pk = primary_key_column(model)
+
+    # Request-supplied single-column ordering (Roadmap 5.5) overrides the
+    # admin's static default. A ``-`` prefix means descending. An unknown
+    # field name falls back to the static default rather than erroring, so
+    # a stale client or hand-edited URL degrades gracefully.
+    if ordering:
+        descending = ordering.startswith("-")
+        field_name = ordering[1:] if descending else ordering
+        if field_name in known_columns:
+            column = get_model_column(model, field_name)
+            primary = column.desc() if descending else column.asc()
+            # Append the PK as a stable tiebreaker so pagination is
+            # deterministic when the sort column has duplicate values.
+            if field_name == pk.name:
+                return stmt.order_by(primary)
+            return stmt.order_by(primary, pk.asc())
+
+    ordering_cfg = tuple(getattr(admin_class, "ordering", ()) or ())
+
+    if not ordering_cfg:
+        return stmt.order_by(pk.asc())
 
     order_clauses = []
 
-    for item in ordering:
+    for item in ordering_cfg:
         descending = item.startswith("-")
         field_name = item[1:] if descending else item
 
