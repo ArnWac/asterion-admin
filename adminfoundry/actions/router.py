@@ -139,7 +139,7 @@ async def _dispatch_action(
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail={"message": "Invalid action input.", "error": str(exc)},
-                )
+                ) from exc
         result = await action_instance.run(records, data, ctx)
     else:
         result = await action_instance.execute(records, session, ctx.principal)

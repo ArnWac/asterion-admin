@@ -63,10 +63,14 @@ def _generate_keypair() -> tuple[str, dict]:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("ascii")
-    public_pem = key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode("ascii")
+    public_pem = (
+        key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("ascii")
+    )
     public_jwk = jose_jwk.construct(public_pem, algorithm="RS256").to_dict()
     # jose.jwk.construct strips down to the wire-format fields; restore
     # the metadata the JWKS document carries.
@@ -135,13 +139,15 @@ def _run(coro):
 def test_verifies_well_formed_token_and_returns_claims():
     priv, pub = _generate_keypair()
     token = _mint_token(priv)
-    claims = _run(verify_id_token(
-        token,
-        jwks_client=_client_with_key(pub),
-        issuer=_ISSUER,
-        audience=_AUDIENCE,
-        nonce=_NONCE,
-    ))
+    claims = _run(
+        verify_id_token(
+            token,
+            jwks_client=_client_with_key(pub),
+            issuer=_ISSUER,
+            audience=_AUDIENCE,
+            nonce=_NONCE,
+        )
+    )
     assert claims["sub"] == "user-abc"
     assert claims["email"] == "alice@example.com"
     assert claims["nonce"] == _NONCE
@@ -154,13 +160,15 @@ def test_multi_audience_with_correct_azp_passes():
         priv,
         claims={"aud": [_AUDIENCE, "other-app"], "azp": _AUDIENCE},
     )
-    claims = _run(verify_id_token(
-        token,
-        jwks_client=_client_with_key(pub),
-        issuer=_ISSUER,
-        audience=_AUDIENCE,
-        nonce=_NONCE,
-    ))
+    claims = _run(
+        verify_id_token(
+            token,
+            jwks_client=_client_with_key(pub),
+            issuer=_ISSUER,
+            audience=_AUDIENCE,
+            nonce=_NONCE,
+        )
+    )
     assert claims["azp"] == _AUDIENCE
 
 
@@ -176,23 +184,30 @@ def test_alg_none_rejected():
     import base64
     import json
 
-    header = base64.urlsafe_b64encode(
-        json.dumps({"alg": "none", "kid": _KID}).encode()
-    ).rstrip(b"=").decode()
-    payload = base64.urlsafe_b64encode(
-        json.dumps({"iss": _ISSUER, "aud": _AUDIENCE, "sub": "x",
-                    "nonce": _NONCE}).encode()
-    ).rstrip(b"=").decode()
+    header = (
+        base64.urlsafe_b64encode(json.dumps({"alg": "none", "kid": _KID}).encode())
+        .rstrip(b"=")
+        .decode()
+    )
+    payload = (
+        base64.urlsafe_b64encode(
+            json.dumps({"iss": _ISSUER, "aud": _AUDIENCE, "sub": "x", "nonce": _NONCE}).encode()
+        )
+        .rstrip(b"=")
+        .decode()
+    )
     forged = f"{header}.{payload}."
 
     with pytest.raises(IDTokenSignatureError, match="not allowed"):
-        _run(verify_id_token(
-            forged,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                forged,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_hs256_algorithm_rejected_even_with_valid_hmac():
@@ -205,20 +220,28 @@ def test_hs256_algorithm_rejected_even_with_valid_hmac():
     # HS256 at all, so this never reaches the sig check.
     pub_pem_n = pub["n"]  # any string suffices — we never get to verify
     forged = jose_jwt.encode(
-        {"iss": _ISSUER, "aud": _AUDIENCE, "sub": "x", "nonce": _NONCE,
-         "exp": int(time.time()) + 600, "iat": int(time.time())},
+        {
+            "iss": _ISSUER,
+            "aud": _AUDIENCE,
+            "sub": "x",
+            "nonce": _NONCE,
+            "exp": int(time.time()) + 600,
+            "iat": int(time.time()),
+        },
         pub_pem_n,
         algorithm="HS256",
         headers={"kid": _KID},
     )
     with pytest.raises(IDTokenSignatureError, match="not allowed"):
-        _run(verify_id_token(
-            forged,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                forged,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_kid_not_in_jwks_rejected():
@@ -229,13 +252,15 @@ def test_kid_not_in_jwks_rejected():
     other_pub["kid"] = "different-kid"
     token = _mint_token(priv)  # signed by the original; kid=test-kid-1
     with pytest.raises(IDTokenSignatureError, match="resolve signing key"):
-        _run(verify_id_token(
-            token,
-            jwks_client=_StubJWKSClient({"different-kid": other_pub}),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_StubJWKSClient({"different-kid": other_pub}),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_missing_kid_in_header_rejected():
@@ -248,15 +273,23 @@ def test_missing_kid_in_header_rejected():
     import base64
     import json
 
-    header = base64.urlsafe_b64encode(
-        json.dumps({"alg": "RS256"}).encode()
-    ).rstrip(b"=").decode()
-    payload = base64.urlsafe_b64encode(
-        json.dumps({"iss": _ISSUER, "aud": _AUDIENCE, "sub": "x",
+    header = base64.urlsafe_b64encode(json.dumps({"alg": "RS256"}).encode()).rstrip(b"=").decode()
+    payload = (
+        base64.urlsafe_b64encode(
+            json.dumps(
+                {
+                    "iss": _ISSUER,
+                    "aud": _AUDIENCE,
+                    "sub": "x",
                     "nonce": _NONCE,
                     "exp": int(time.time()) + 600,
-                    "iat": int(time.time())}).encode()
-    ).rstrip(b"=").decode()
+                    "iat": int(time.time()),
+                }
+            ).encode()
+        )
+        .rstrip(b"=")
+        .decode()
+    )
     # Sign manually with python-jose's low-level interface.
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
@@ -265,20 +298,20 @@ def test_missing_kid_in_header_rejected():
 
     signing_input = f"{header}.{payload}".encode()
     key_obj = load_pem_private_key(priv.encode(), password=None)
-    signature = key_obj.sign(
-        signing_input, padding.PKCS1v15(), hashes.SHA256()
-    )
+    signature = key_obj.sign(signing_input, padding.PKCS1v15(), hashes.SHA256())
     sig_b64 = base64url_encode(signature).decode().rstrip("=")
     token = f"{header}.{payload}.{sig_b64}"
 
     with pytest.raises(IDTokenSignatureError, match="missing 'kid'"):
-        _run(verify_id_token(
-            token,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_tampered_signature_rejected():
@@ -295,13 +328,15 @@ def test_tampered_signature_rejected():
     swapped = sig[:mid] + ("A" if sig[mid] != "A" else "B") + sig[mid + 1 :]
     tampered = f"{head}.{payload}.{swapped}"
     with pytest.raises(IDTokenSignatureError):
-        _run(verify_id_token(
-            tampered,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                tampered,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 # ---- claim attacks ----
@@ -311,26 +346,30 @@ def test_wrong_issuer_rejected():
     priv, pub = _generate_keypair()
     token = _mint_token(priv, claims={"iss": "https://attacker.example.com"})
     with pytest.raises(IDTokenIssuerError):
-        _run(verify_id_token(
-            token,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_wrong_audience_rejected():
     priv, pub = _generate_keypair()
     token = _mint_token(priv, claims={"aud": "different-client"})
     with pytest.raises(IDTokenAudienceError):
-        _run(verify_id_token(
-            token,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_multi_audience_without_azp_rejected():
@@ -338,13 +377,15 @@ def test_multi_audience_without_azp_rejected():
     # aud is a list; azp is missing entirely.
     token = _mint_token(priv, claims={"aud": [_AUDIENCE, "other-app"]})
     with pytest.raises(IDTokenAudienceError, match="azp"):
-        _run(verify_id_token(
-            token,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_multi_audience_with_wrong_azp_rejected():
@@ -354,13 +395,15 @@ def test_multi_audience_with_wrong_azp_rejected():
         claims={"aud": [_AUDIENCE, "other-app"], "azp": "wrong-app"},
     )
     with pytest.raises(IDTokenAudienceError, match="azp"):
-        _run(verify_id_token(
-            token,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 # ---- time-based attacks ----
@@ -371,13 +414,15 @@ def test_expired_token_rejected():
     now = int(time.time())
     token = _mint_token(priv, claims={"exp": now - 3600, "iat": now - 7200})
     with pytest.raises(IDTokenExpiredError):
-        _run(verify_id_token(
-            token,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_small_clock_skew_within_leeway_accepted():
@@ -385,13 +430,15 @@ def test_small_clock_skew_within_leeway_accepted():
     priv, pub = _generate_keypair()
     now = int(time.time())
     token = _mint_token(priv, claims={"iat": now + 30, "exp": now + 630})
-    claims = _run(verify_id_token(
-        token,
-        jwks_client=_client_with_key(pub),
-        issuer=_ISSUER,
-        audience=_AUDIENCE,
-        nonce=_NONCE,
-    ))
+    claims = _run(
+        verify_id_token(
+            token,
+            jwks_client=_client_with_key(pub),
+            issuer=_ISSUER,
+            audience=_AUDIENCE,
+            nonce=_NONCE,
+        )
+    )
     assert claims["sub"] == "user-abc"
 
 
@@ -402,13 +449,15 @@ def test_wrong_nonce_rejected():
     priv, pub = _generate_keypair()
     token = _mint_token(priv, claims={"nonce": "replayed-nonce"})
     with pytest.raises(IDTokenNonceError):
-        _run(verify_id_token(
-            token,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_missing_nonce_rejected():
@@ -419,20 +468,21 @@ def test_missing_nonce_rejected():
     # Easier: re-encode with a claim set that drops nonce.
     now = int(time.time())
     token = jose_jwt.encode(
-        {"iss": _ISSUER, "aud": _AUDIENCE, "sub": "x",
-         "exp": now + 600, "iat": now},  # no nonce!
+        {"iss": _ISSUER, "aud": _AUDIENCE, "sub": "x", "exp": now + 600, "iat": now},  # no nonce!
         priv,
         algorithm="RS256",
         headers={"kid": _KID},
     )
     with pytest.raises(IDTokenNonceError):
-        _run(verify_id_token(
-            token,
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                token,
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 # ---- malformed ----
@@ -441,25 +491,29 @@ def test_missing_nonce_rejected():
 def test_garbage_string_rejected():
     _, pub = _generate_keypair()
     with pytest.raises(IDTokenMalformedError):
-        _run(verify_id_token(
-            "not.even.a-jwt",
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                "not.even.a-jwt",
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 def test_empty_string_rejected():
     _, pub = _generate_keypair()
     with pytest.raises(IDTokenMalformedError):
-        _run(verify_id_token(
-            "",
-            jwks_client=_client_with_key(pub),
-            issuer=_ISSUER,
-            audience=_AUDIENCE,
-            nonce=_NONCE,
-        ))
+        _run(
+            verify_id_token(
+                "",
+                jwks_client=_client_with_key(pub),
+                issuer=_ISSUER,
+                audience=_AUDIENCE,
+                nonce=_NONCE,
+            )
+        )
 
 
 # ---- integration: real JWKSClient ----

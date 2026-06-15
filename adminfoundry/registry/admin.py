@@ -60,7 +60,7 @@ class ModelAdmin:
     #: Optional form-layout grouping. Empty list means "render the
     #: form flat" — see :class:`adminfoundry.admin.fieldset.Fieldset`
     #: for the per-section structure and validation rules.
-    fieldsets: list["Fieldset"] = []
+    fieldsets: list[Fieldset] = []
 
     #: How the built-in form lays out :attr:`fieldsets` (Roadmap 5.4):
     #: ``"sections"`` (default — collapsible blocks) or ``"tabs"`` (a tab
@@ -155,13 +155,13 @@ class ModelAdmin:
     #: layered on top of the permission-key checks. ``None`` means
     #: "permission keys alone decide" (legacy / quickstart behavior).
     #: Set on subclasses to enforce object-level rules.
-    policy: "AdminPolicy | None" = None
+    policy: AdminPolicy | None = None
 
     #: Child models to edit inline with the parent record. Each entry
     #: is an :class:`~adminfoundry.admin.inline.InlineAdmin` subclass
     #: or instance. C1 exposes them through the contract; C2 will add
     #: the transactional parent/child CRUD plumbing.
-    inlines: list["type[InlineAdmin] | InlineAdmin"] = []
+    inlines: list[type[InlineAdmin] | InlineAdmin] = []
 
     calculated_fields: dict[str, Callable[[Any], Any]] = {}
 
@@ -211,7 +211,7 @@ class ModelAdmin:
     async def before_validate(
         self,
         data: dict[str, Any],
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> dict[str, Any]:
         """Pre-validation data tweak hook.
 
@@ -224,7 +224,7 @@ class ModelAdmin:
     async def validate_create(
         self,
         data: dict[str, Any],
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> None:
         """Raise to reject the create payload. Default: accept anything
         the schema already validated. Custom checks (uniqueness scoped
@@ -234,7 +234,7 @@ class ModelAdmin:
     async def before_create(
         self,
         data: dict[str, Any],
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> dict[str, Any]:
         """Last chance to mutate the payload before the row is built.
 
@@ -248,7 +248,7 @@ class ModelAdmin:
     async def after_create(
         self,
         obj: Any,
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> None:
         """Post-commit hook. The row exists in the DB; ``obj`` is
         attached to the session. Use for side effects: outbound
@@ -260,7 +260,7 @@ class ModelAdmin:
         self,
         obj: Any,
         data: dict[str, Any],
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> None:
         """Update-only validation. ``obj`` is the persisted row;
         ``data`` is the patch. Raise to reject. Use for transitions
@@ -272,7 +272,7 @@ class ModelAdmin:
         self,
         obj: Any,
         data: dict[str, Any],
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> dict[str, Any]:
         """Last chance to mutate the patch before it is applied to
         ``obj``."""
@@ -282,7 +282,7 @@ class ModelAdmin:
         self,
         obj: Any,
         changes: dict[str, Any],
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> None:
         """Post-commit hook for updates. ``changes`` is the diff that
         was applied (keys → new values)."""
@@ -291,7 +291,7 @@ class ModelAdmin:
     async def before_delete(
         self,
         obj: Any,
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> None:
         """Pre-delete hook. Raise to refuse deletion (e.g. soft-delete
         only, or "cannot delete with active children")."""
@@ -300,7 +300,7 @@ class ModelAdmin:
     async def after_delete(
         self,
         obj: Any,
-        ctx: "AdminContext",
+        ctx: AdminContext,
     ) -> None:
         """Post-delete hook. ``obj`` is the (now-detached) row that
         was just removed; useful for cascade-style cleanup of external

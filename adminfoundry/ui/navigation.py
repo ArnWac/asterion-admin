@@ -56,9 +56,7 @@ class NavigationRegistry:
                 f"Navigation item {id!r} must declare a permission "
                 "(unfiltered admin navigation is a security smell)"
             )
-        self._items.append(
-            NavigationItem(id=id, label=label, path=path, permission=permission)
-        )
+        self._items.append(NavigationItem(id=id, label=label, path=path, permission=permission))
         self._seen_ids.add(id)
 
     def freeze(self) -> None:

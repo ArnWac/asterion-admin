@@ -35,10 +35,7 @@ def _jwks_document(*kids: str) -> dict:
     """Minimal valid JWKS shape — `kty`/`n`/`e` content doesn't matter
     for cache tests; only `kid` is used by the lookup."""
     return {
-        "keys": [
-            {"kid": k, "kty": "RSA", "alg": "RS256", "n": "stub-n", "e": "AQAB"}
-            for k in kids
-        ]
+        "keys": [{"kid": k, "kty": "RSA", "alg": "RS256", "n": "stub-n", "e": "AQAB"} for k in kids]
     }
 
 
@@ -227,11 +224,17 @@ def test_keys_without_kid_are_ignored():
     """JWKS entries missing the 'kid' field can't be looked up. The
     client filters them out — but if ALL entries lack a kid, that's a
     hard error rather than a silent empty cache."""
+
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"keys": [
-            {"kty": "RSA", "n": "x", "e": "y"},  # no kid — ignored
-            {"kid": "valid", "kty": "RSA", "n": "n", "e": "AQAB"},
-        ]})
+        return httpx.Response(
+            200,
+            json={
+                "keys": [
+                    {"kty": "RSA", "n": "x", "e": "y"},  # no kid — ignored
+                    {"kid": "valid", "kty": "RSA", "n": "n", "e": "AQAB"},
+                ]
+            },
+        )
 
     async def _go():
         c = _client_with(handler)
@@ -246,10 +249,15 @@ def test_keys_without_kid_are_ignored():
 
 def test_response_with_only_kidless_keys_raises():
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"keys": [
-            {"kty": "RSA", "n": "x", "e": "y"},
-            {"kty": "RSA", "n": "z", "e": "w"},
-        ]})
+        return httpx.Response(
+            200,
+            json={
+                "keys": [
+                    {"kty": "RSA", "n": "x", "e": "y"},
+                    {"kty": "RSA", "n": "z", "e": "w"},
+                ]
+            },
+        )
 
     async def _go():
         c = _client_with(handler)
@@ -362,6 +370,7 @@ def test_concurrent_cold_cache_calls_coalesce_to_one_fetch():
 
 def test_aclose_closes_owned_http_client():
     """When the client constructs its own httpx, aclose must release it."""
+
     async def _go():
         c = JWKSClient(_URI)
         assert not c._http_client.is_closed
@@ -373,10 +382,13 @@ def test_aclose_closes_owned_http_client():
 
 def test_aclose_does_not_close_injected_http_client():
     """Injected clients are owned by the caller — aclose must NOT touch them."""
+
     async def _go():
-        http = httpx.AsyncClient(transport=_mock_transport(
-            lambda request: httpx.Response(200, json=_jwks_document("k1"))
-        ))
+        http = httpx.AsyncClient(
+            transport=_mock_transport(
+                lambda request: httpx.Response(200, json=_jwks_document("k1"))
+            )
+        )
         c = JWKSClient(_URI, http_client=http)
         await c.aclose()
         # Caller's client should still be usable.

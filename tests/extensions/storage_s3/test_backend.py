@@ -21,15 +21,14 @@ import pytest
 boto3 = pytest.importorskip("boto3")
 moto = pytest.importorskip("moto")
 
-from moto import mock_aws  # noqa: E402
+from moto import mock_aws
 
-from adminfoundry.extensions.storage_s3 import S3StorageBackend  # noqa: E402
-from adminfoundry.storage import (  # noqa: E402
+from adminfoundry.extensions.storage_s3 import S3StorageBackend
+from adminfoundry.storage import (
     ObjectNotFound,
     StorageBackend,
     StoredObject,
 )
-
 
 _BUCKET = "adminfoundry-test"
 _REGION = "us-east-1"
@@ -62,9 +61,7 @@ def test_s3_backend_default_name_is_s3(s3_backend):
 def test_name_is_overridable():
     with mock_aws():
         boto3.client("s3", region_name=_REGION).create_bucket(Bucket=_BUCKET)
-        backend = S3StorageBackend(
-            bucket=_BUCKET, region_name=_REGION, name="prod-uploads"
-        )
+        backend = S3StorageBackend(bucket=_BUCKET, region_name=_REGION, name="prod-uploads")
         assert backend.name == "prod-uploads"
 
 

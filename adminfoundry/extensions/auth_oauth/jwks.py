@@ -95,9 +95,7 @@ class JWKSClient:
         # Caller may inject a shared httpx client (typical in tests).
         # When they do, we don't own it and must not close it on
         # ``aclose``. When we create our own, we own it.
-        self._http_client = http_client or httpx.AsyncClient(
-            timeout=_FETCH_TIMEOUT_SECONDS
-        )
+        self._http_client = http_client or httpx.AsyncClient(timeout=_FETCH_TIMEOUT_SECONDS)
         self._owns_client = http_client is None
         self._keys: dict[str, dict] = {}
         self._valid_until: float = 0.0
@@ -137,9 +135,7 @@ class JWKSClient:
             # key out entirely. Treat as a hard failure so the verifier
             # surfaces a meaningful 401, rather than e.g. silently
             # falling back to a stale cached key.
-            raise JWKSKeyNotFoundError(
-                f"kid={kid!r} not present in JWKS from {self._jwks_uri}"
-            )
+            raise JWKSKeyNotFoundError(f"kid={kid!r} not present in JWKS from {self._jwks_uri}")
         return self._keys[kid]
 
     async def _refresh_locked(self) -> None:
@@ -147,14 +143,11 @@ class JWKSClient:
         try:
             resp = await self._http_client.get(self._jwks_uri)
         except httpx.HTTPError as exc:
-            raise JWKSFetchError(
-                f"JWKS fetch failed: {exc.__class__.__name__}: {exc}"
-            ) from exc
+            raise JWKSFetchError(f"JWKS fetch failed: {exc.__class__.__name__}: {exc}") from exc
 
         if resp.status_code >= 400:
             raise JWKSFetchError(
-                f"JWKS endpoint returned HTTP {resp.status_code} "
-                f"from {self._jwks_uri}"
+                f"JWKS endpoint returned HTTP {resp.status_code} from {self._jwks_uri}"
             )
 
         # Refuse silently-truncated 1MB+ responses — we cap reads via
@@ -174,9 +167,7 @@ class JWKSClient:
 
         keys = document.get("keys") if isinstance(document, dict) else None
         if not isinstance(keys, list) or not keys:
-            raise JWKSInvalidResponseError(
-                "JWKS response missing or empty 'keys' array"
-            )
+            raise JWKSInvalidResponseError("JWKS response missing or empty 'keys' array")
 
         new_map: dict[str, dict] = {}
         for jwk in keys:
@@ -186,9 +177,7 @@ class JWKSClient:
             if isinstance(kid, str) and kid:
                 new_map[kid] = jwk
         if not new_map:
-            raise JWKSInvalidResponseError(
-                "JWKS contains no keys with a 'kid' field"
-            )
+            raise JWKSInvalidResponseError("JWKS contains no keys with a 'kid' field")
 
         # TTL: prefer the response's Cache-Control max-age, fall back
         # to our configured default. Clamp to a reasonable floor so a

@@ -14,11 +14,10 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
 import pytest_asyncio
 from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry import create_admin
@@ -133,8 +132,6 @@ def _build_app_with_action(action: AdminAction, monkeypatch, session_factory):
     Auth dependencies are overridden to make every request pass the
     permission gate; the production wiring is exercised in
     ``tests/actions/test_router.py`` already."""
-    from fastapi import Depends
-    from fastapi.testclient import TestClient
 
     from adminfoundry.admin.context import (
         AdminContext,

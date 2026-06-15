@@ -132,9 +132,7 @@ def test_upsert_replaces_payload_on_same_name(app_factory):
         "/api/v1/admin/_saved_filters",
         json={"resource": "d2_posts", "name": "drafts", "payload": {"a": 2}},
     )
-    rows = client.get(
-        "/api/v1/admin/_saved_filters", params={"resource": "d2_posts"}
-    ).json()
+    rows = client.get("/api/v1/admin/_saved_filters", params={"resource": "d2_posts"}).json()
     assert len(rows) == 1
     assert rows[0]["payload"] == {"a": 2}
 
@@ -147,9 +145,7 @@ def test_filters_are_scoped_per_user(app_factory):
         json={"resource": "d2_posts", "name": "alice-only", "payload": {}},
     )
     set_user("bob")
-    rows = client.get(
-        "/api/v1/admin/_saved_filters", params={"resource": "d2_posts"}
-    ).json()
+    rows = client.get("/api/v1/admin/_saved_filters", params={"resource": "d2_posts"}).json()
     assert rows == []
 
 
@@ -165,9 +161,7 @@ def test_list_filters_by_resource(app_factory):
         "/api/v1/admin/_saved_filters",
         json={"resource": "d2_posts", "name": "p2", "payload": {}},
     )
-    rows = client.get(
-        "/api/v1/admin/_saved_filters", params={"resource": "d2_posts"}
-    ).json()
+    rows = client.get("/api/v1/admin/_saved_filters", params={"resource": "d2_posts"}).json()
     assert sorted(r["name"] for r in rows) == ["p1", "p2"]
 
 
@@ -179,9 +173,7 @@ def test_delete_owned_filter_returns_204(app_factory):
     ).json()
     resp = client.delete(f"/api/v1/admin/_saved_filters/{created['id']}")
     assert resp.status_code == 204
-    rows = client.get(
-        "/api/v1/admin/_saved_filters", params={"resource": "d2_posts"}
-    ).json()
+    rows = client.get("/api/v1/admin/_saved_filters", params={"resource": "d2_posts"}).json()
     assert rows == []
 
 

@@ -104,9 +104,7 @@ def _attach_login_handler(
         state = generate_state()
         nonce = generate_nonce()
         code_verifier = generate_code_verifier()
-        return_to = (
-            request.query_params.get("return_to") or _DEFAULT_RETURN_TO
-        )
+        return_to = request.query_params.get("return_to") or _DEFAULT_RETURN_TO
         # Refuse open-redirects: only same-site relative paths allowed
         # in return_to. An absolute URL or anything starting with //
         # would let an attacker bounce the user to an arbitrary host
@@ -161,7 +159,9 @@ def _attach_callback_handler(
         def _fail(code: str, reason: str) -> RedirectResponse:
             logger.warning(
                 "oauth callback failed: provider=%s code=%s reason=%s",
-                provider_id, code, reason,
+                provider_id,
+                code,
+                reason,
             )
             resp = RedirectResponse(
                 url=f"{_LOGIN_ERROR_PATH}?{urlencode({'oauth_error': code})}",
@@ -328,9 +328,7 @@ async def _read_token_version(runtime, principal_id) -> int:
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
     async with factory() as session:
         value = (
-            await session.execute(
-                select(User.token_version).where(User.id == user_uuid)
-            )
+            await session.execute(select(User.token_version).where(User.id == user_uuid))
         ).scalar_one_or_none()
     return int(value) if value is not None else 0
 
@@ -352,9 +350,7 @@ def _extension_from(request: Request):
     for ext in runtime.extensions:
         if isinstance(ext, OAuthExtension):
             return ext
-    raise RuntimeError(
-        "build_oauth_router called without a live OAuthExtension on the runtime"
-    )
+    raise RuntimeError("build_oauth_router called without a live OAuthExtension on the runtime")
 
 
 def build_oauth_router(providers: list[GoogleOIDCProvider]) -> APIRouter:

@@ -77,9 +77,7 @@ def _client(app):
 
 
 def _request_reset(app, email: str):
-    return _client(app).post(
-        "/api/v1/auth/password-reset/request", json={"email": email}
-    )
+    return _client(app).post("/api/v1/auth/password-reset/request", json={"email": email})
 
 
 def _read_user(runtime, user_id) -> User:
@@ -188,13 +186,19 @@ def test_confirm_invalidates_existing_sessions(app_with_user):
     behaviour."""
     app, runtime, user, notifier = app_with_user
     stale = create_access_token(
-        user.id, secret_key=SECRET, algorithm=ALG, expires_minutes=10,
+        user.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=10,
         token_version=user.token_version,
     )
     # token works before reset
-    assert _client(app).get(
-        "/api/v1/auth/me", headers={"Authorization": f"Bearer {stale}"}
-    ).status_code == 200
+    assert (
+        _client(app)
+        .get("/api/v1/auth/me", headers={"Authorization": f"Bearer {stale}"})
+        .status_code
+        == 200
+    )
 
     _request_reset(app, "alice@example.com")
     token = notifier.sent[0]["token"]
@@ -204,9 +208,12 @@ def test_confirm_invalidates_existing_sessions(app_with_user):
     )
 
     # stale token now rejected
-    assert _client(app).get(
-        "/api/v1/auth/me", headers={"Authorization": f"Bearer {stale}"}
-    ).status_code == 401
+    assert (
+        _client(app)
+        .get("/api/v1/auth/me", headers={"Authorization": f"Bearer {stale}"})
+        .status_code
+        == 401
+    )
 
 
 def test_confirm_token_is_single_use(app_with_user):
@@ -281,6 +288,4 @@ def test_default_notifier_is_logging(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    assert isinstance(
-        app.state.adminfoundry.password_reset_notifier, LoggingPasswordResetNotifier
-    )
+    assert isinstance(app.state.adminfoundry.password_reset_notifier, LoggingPasswordResetNotifier)

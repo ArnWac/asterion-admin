@@ -144,9 +144,7 @@ class OAuthExtension(AdminExtension):
         seen_ids: set[str] = set()
         for prov in self._providers:
             if prov.config.id in seen_ids:
-                raise ValueError(
-                    f"OAuthExtension: duplicate provider id {prov.config.id!r}"
-                )
+                raise ValueError(f"OAuthExtension: duplicate provider id {prov.config.id!r}")
             seen_ids.add(prov.config.id)
         # Cached during ``configure(config)``. Used by
         # ``register_contract_contributions`` (called immediately after)
@@ -157,9 +155,7 @@ class OAuthExtension(AdminExtension):
         # custom OAuthCapableUserProvider here. Lookup-only by default
         # — auto-create requires an explicit opt-in by the operator
         # (see the dataclass / Phase 8b.6 security defaults).
-        self._user_provider: OAuthCapableUserProvider = (
-            user_provider or BuiltinOAuthUserProvider()
-        )
+        self._user_provider: OAuthCapableUserProvider = user_provider or BuiltinOAuthUserProvider()
         self._auto_create_users: bool = auto_create_users
         # Async resources created in startup, torn down in shutdown.
         # Typed as Optional because they're None until startup runs;

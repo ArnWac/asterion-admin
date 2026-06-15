@@ -23,7 +23,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from jose import jwk as jose_jwk
 from jose import jwt as jose_jwt
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from adminfoundry import CoreAdminConfig, create_admin
@@ -54,10 +53,14 @@ def _generate_keypair() -> tuple[str, dict]:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("ascii")
-    public_pem = key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode("ascii")
+    public_pem = (
+        key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("ascii")
+    )
     public_jwk = jose_jwk.construct(public_pem, algorithm="RS256").to_dict()
     public_jwk["kid"] = _KID
     public_jwk["alg"] = "RS256"
@@ -79,9 +82,7 @@ def _mint_id_token(private_pem: str, *, nonce: str, email: str) -> str:
         "email_verified": True,
         "name": "Alice Anderson",
     }
-    return jose_jwt.encode(
-        claims, private_pem, algorithm="RS256", headers={"kid": _KID}
-    )
+    return jose_jwt.encode(claims, private_pem, algorithm="RS256", headers={"kid": _KID})
 
 
 def _build_app(tmp_path):
@@ -193,10 +194,14 @@ def test_callback_refresh_token_is_valid_refresh_jwt(tmp_path):
     parts = _extract_fragment(location)
 
     access = decode_access_token(
-        parts["token"], secret_key=SECRET, algorithm=ALG,
+        parts["token"],
+        secret_key=SECRET,
+        algorithm=ALG,
     )
     refresh = decode_refresh_token(
-        parts["refresh"], secret_key=SECRET, algorithm=ALG,
+        parts["refresh"],
+        secret_key=SECRET,
+        algorithm=ALG,
     )
     assert access["type"] == "access"
     assert refresh["type"] == "refresh"
@@ -311,9 +316,7 @@ def test_oauth_token_invalidated_by_logout_all(tmp_path):
     # Token works first.
     assert client.get("/api/v1/auth/me", headers=headers).status_code == 200
     # logout-all bumps tkv.
-    assert client.post(
-        "/api/v1/auth/logout-all", headers=headers
-    ).status_code == 200
+    assert client.post("/api/v1/auth/logout-all", headers=headers).status_code == 200
     # OAuth-minted token is now stale (this would have been
     # impossible pre-3.5 — tkv was hardcoded 0 so logout-all couldn't
     # touch it).

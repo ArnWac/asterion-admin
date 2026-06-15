@@ -74,7 +74,7 @@ class Page:
     :meth:`UserProvider.list_users`. ``total`` is the unpaginated count
     so the UI can render pagination controls."""
 
-    items: list["AdminPrincipal"]
+    items: list[AdminPrincipal]
     total: int
     limit: int
     offset: int
@@ -183,10 +183,10 @@ class CredentialAuthProvider(Protocol):
 
     async def login(
         self,
-        credentials: "LoginCredentials",
+        credentials: LoginCredentials,
         *,
         request: Request | None = None,
-    ) -> "AuthSession": ...
+    ) -> AuthSession: ...
 
 
 @runtime_checkable
@@ -231,10 +231,10 @@ class UserListingProvider(Protocol):
 
     async def list_users(
         self,
-        query: "UserQuery",
+        query: UserQuery,
         *,
         request: Request | None = None,
-    ) -> "Page": ...
+    ) -> Page: ...
 
 
 @runtime_checkable

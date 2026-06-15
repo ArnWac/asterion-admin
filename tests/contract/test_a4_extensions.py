@@ -323,9 +323,7 @@ def test_list_badges_emitted_and_stringified():
         list_badges = {"status": {"published": "success", "draft": "neutral"}}
 
     contract = build_model_contract(_BadgeAdmin())
-    assert contract.list_badges == {
-        "status": {"published": "success", "draft": "neutral"}
-    }
+    assert contract.list_badges == {"status": {"published": "success", "draft": "neutral"}}
 
 
 def test_list_badges_drops_unknown_styles():
@@ -369,9 +367,7 @@ def test_list_badges_default_empty():
 def test_dependency_emitted_and_stringified():
     class _A(ModelAdmin):
         model = _Post
-        field_dependencies = {
-            "summary": {"field": "status", "options": {"published": ["a", "b"]}}
-        }
+        field_dependencies = {"summary": {"field": "status", "options": {"published": ["a", "b"]}}}
 
     metas = build_field_metadata(_A())
     assert _meta_by_name(metas, "summary").dependency == {

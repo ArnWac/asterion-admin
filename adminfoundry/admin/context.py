@@ -73,8 +73,10 @@ def _detect_source(request: Request) -> Source:
     """
     path = request.url.path
     ui_path = request.app.state.adminfoundry.config.admin_ui_path
-    if ui_path and path.startswith(ui_path) and not path.startswith(
-        request.app.state.adminfoundry.config.admin_api_prefix
+    if (
+        ui_path
+        and path.startswith(ui_path)
+        and not path.startswith(request.app.state.adminfoundry.config.admin_api_prefix)
     ):
         return "ui"
     return "api"

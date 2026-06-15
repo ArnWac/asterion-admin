@@ -60,9 +60,7 @@ def app(tmp_path):
             enable_builtin_admins=False,
         ),
         extensions=[
-            OAuthExtension(
-                providers=[GoogleOIDCProvider(client_id="x", client_secret="y")]
-            )
+            OAuthExtension(providers=[GoogleOIDCProvider(client_id="x", client_secret="y")])
         ],
     )
     runtime = app.state.adminfoundry
@@ -82,6 +80,7 @@ def _fake_request(app) -> Request:
     The provider only reads ``request.app.state.adminfoundry`` — no
     headers, no body, no path matter.
     """
+
     # Cheapest stub that satisfies the access pattern:
     class _S:
         pass
@@ -126,13 +125,15 @@ def test_lookup_only_refuses_unknown_identity(app):
     provider = BuiltinOAuthUserProvider()
     req = _fake_request(app)
     with pytest.raises(OAuthAutoCreateDisabledError):
-        asyncio.run(provider.find_or_create_by_external_identity(
-            provider="google",
-            provider_subject="never-seen",
-            claims=_claims(),
-            allow_create=False,
-            request=req,
-        ))
+        asyncio.run(
+            provider.find_or_create_by_external_identity(
+                provider="google",
+                provider_subject="never-seen",
+                claims=_claims(),
+                allow_create=False,
+                request=req,
+            )
+        )
 
 
 def test_lookup_finds_existing_link(app):
@@ -149,21 +150,27 @@ def test_lookup_finds_existing_link(app):
             )
             s.add(u)
             await s.flush()
-            s.add(ExternalIdentity(
-                provider="google", provider_subject="bob-sub", user_id=u.id,
-            ))
+            s.add(
+                ExternalIdentity(
+                    provider="google",
+                    provider_subject="bob-sub",
+                    user_id=u.id,
+                )
+            )
             return str(u.id)
 
     user_id = asyncio.run(_seed())
 
     provider = BuiltinOAuthUserProvider()
-    principal = asyncio.run(provider.find_or_create_by_external_identity(
-        provider="google",
-        provider_subject="bob-sub",
-        claims=_claims(email="bob@example.com"),
-        allow_create=False,
-        request=_fake_request(app),
-    ))
+    principal = asyncio.run(
+        provider.find_or_create_by_external_identity(
+            provider="google",
+            provider_subject="bob-sub",
+            claims=_claims(email="bob@example.com"),
+            allow_create=False,
+            request=_fake_request(app),
+        )
+    )
     assert principal.id == user_id
     assert principal.email == "bob@example.com"
 
@@ -183,21 +190,27 @@ def test_inactive_linked_user_raises_inactive_error(app):
             )
             s.add(u)
             await s.flush()
-            s.add(ExternalIdentity(
-                provider="google", provider_subject="dormant-sub", user_id=u.id,
-            ))
+            s.add(
+                ExternalIdentity(
+                    provider="google",
+                    provider_subject="dormant-sub",
+                    user_id=u.id,
+                )
+            )
 
     asyncio.run(_seed())
 
     provider = BuiltinOAuthUserProvider()
     with pytest.raises(OAuthUserInactiveError):
-        asyncio.run(provider.find_or_create_by_external_identity(
-            provider="google",
-            provider_subject="dormant-sub",
-            claims=_claims(),
-            allow_create=False,
-            request=_fake_request(app),
-        ))
+        asyncio.run(
+            provider.find_or_create_by_external_identity(
+                provider="google",
+                provider_subject="dormant-sub",
+                claims=_claims(),
+                allow_create=False,
+                request=_fake_request(app),
+            )
+        )
 
 
 # --- auto-create happy path ---
@@ -205,13 +218,15 @@ def test_inactive_linked_user_raises_inactive_error(app):
 
 def test_auto_create_makes_user_and_identity(app):
     provider = BuiltinOAuthUserProvider()
-    principal = asyncio.run(provider.find_or_create_by_external_identity(
-        provider="google",
-        provider_subject="new-sub",
-        claims=_claims(email="newuser@example.com"),
-        allow_create=True,
-        request=_fake_request(app),
-    ))
+    principal = asyncio.run(
+        provider.find_or_create_by_external_identity(
+            provider="google",
+            provider_subject="new-sub",
+            claims=_claims(email="newuser@example.com"),
+            allow_create=True,
+            request=_fake_request(app),
+        )
+    )
     assert principal.email == "newuser@example.com"
     assert principal.display_name == "Alice"
 
@@ -222,15 +237,21 @@ def test_auto_create_makes_user_and_identity(app):
     async def _check() -> tuple[int, int]:
         async with factory() as s:
             users = (
-                await s.execute(select(User).where(User.email == "newuser@example.com"))
-            ).scalars().all()
+                (await s.execute(select(User).where(User.email == "newuser@example.com")))
+                .scalars()
+                .all()
+            )
             identities = (
-                await s.execute(
-                    select(ExternalIdentity).where(
-                        ExternalIdentity.provider_subject == "new-sub"
+                (
+                    await s.execute(
+                        select(ExternalIdentity).where(
+                            ExternalIdentity.provider_subject == "new-sub"
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return len(users), len(identities)
 
     assert asyncio.run(_check()) == (1, 1)
@@ -249,13 +270,15 @@ def test_auto_create_links_picture_and_domain(app):
         picture_url="https://lh3.googleusercontent.com/a/abc",
         hosted_domain="acme.example",
     )
-    asyncio.run(provider.find_or_create_by_external_identity(
-        provider="google",
-        provider_subject="hd-sub",
-        claims=claims,
-        allow_create=True,
-        request=_fake_request(app),
-    ))
+    asyncio.run(
+        provider.find_or_create_by_external_identity(
+            provider="google",
+            provider_subject="hd-sub",
+            claims=claims,
+            allow_create=True,
+            request=_fake_request(app),
+        )
+    )
 
     runtime = app.state.adminfoundry
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -264,9 +287,7 @@ def test_auto_create_links_picture_and_domain(app):
         async with factory() as s:
             return (
                 await s.execute(
-                    select(ExternalIdentity).where(
-                        ExternalIdentity.provider_subject == "hd-sub"
-                    )
+                    select(ExternalIdentity).where(ExternalIdentity.provider_subject == "hd-sub")
                 )
             ).scalar_one()
 
@@ -283,13 +304,15 @@ def test_auto_create_refuses_unverified_email(app):
     trustworthy enough to bootstrap an account from."""
     provider = BuiltinOAuthUserProvider()
     with pytest.raises(OAuthEmailNotVerifiedError):
-        asyncio.run(provider.find_or_create_by_external_identity(
-            provider="google",
-            provider_subject="unverified-sub",
-            claims=_claims(email_verified=False),
-            allow_create=True,
-            request=_fake_request(app),
-        ))
+        asyncio.run(
+            provider.find_or_create_by_external_identity(
+                provider="google",
+                provider_subject="unverified-sub",
+                claims=_claims(email_verified=False),
+                allow_create=True,
+                request=_fake_request(app),
+            )
+        )
 
 
 def test_auto_create_refuses_missing_email(app):
@@ -297,13 +320,15 @@ def test_auto_create_refuses_missing_email(app):
     can't receive password resets."""
     provider = BuiltinOAuthUserProvider()
     with pytest.raises(OAuthEmailNotVerifiedError):
-        asyncio.run(provider.find_or_create_by_external_identity(
-            provider="google",
-            provider_subject="no-email-sub",
-            claims=_claims(email=None),
-            allow_create=True,
-            request=_fake_request(app),
-        ))
+        asyncio.run(
+            provider.find_or_create_by_external_identity(
+                provider="google",
+                provider_subject="no-email-sub",
+                claims=_claims(email=None),
+                allow_create=True,
+                request=_fake_request(app),
+            )
+        )
 
 
 def test_auto_create_refuses_email_already_taken(app):
@@ -318,23 +343,27 @@ def test_auto_create_refuses_email_already_taken(app):
 
     async def _seed():
         async with factory() as s, s.begin():
-            s.add(User(
-                email="victim@example.com",
-                hashed_password=hash_password("hunter2-strong"),
-                is_active=True,
-            ))
+            s.add(
+                User(
+                    email="victim@example.com",
+                    hashed_password=hash_password("hunter2-strong"),
+                    is_active=True,
+                )
+            )
 
     asyncio.run(_seed())
 
     provider = BuiltinOAuthUserProvider()
     with pytest.raises(OAuthEmailCollisionError):
-        asyncio.run(provider.find_or_create_by_external_identity(
-            provider="google",
-            provider_subject="attacker-sub",
-            claims=_claims(email="victim@example.com"),
-            allow_create=True,
-            request=_fake_request(app),
-        ))
+        asyncio.run(
+            provider.find_or_create_by_external_identity(
+                provider="google",
+                provider_subject="attacker-sub",
+                claims=_claims(email="victim@example.com"),
+                allow_create=True,
+                request=_fake_request(app),
+            )
+        )
 
 
 def test_auto_create_disabled_path_does_not_check_email(app):
@@ -344,22 +373,22 @@ def test_auto_create_disabled_path_does_not_check_email(app):
     more specific errors)."""
     provider = BuiltinOAuthUserProvider()
     with pytest.raises(OAuthAutoCreateDisabledError):
-        asyncio.run(provider.find_or_create_by_external_identity(
-            provider="google",
-            provider_subject="never-seen",
-            claims=_claims(email_verified=False, email=None),
-            allow_create=False,
-            request=_fake_request(app),
-        ))
+        asyncio.run(
+            provider.find_or_create_by_external_identity(
+                provider="google",
+                provider_subject="never-seen",
+                claims=_claims(email_verified=False, email=None),
+                allow_create=False,
+                request=_fake_request(app),
+            )
+        )
 
 
 # --- extension wiring ---
 
 
 def test_extension_defaults_to_builtin_oauth_user_provider():
-    ext = OAuthExtension(
-        providers=[GoogleOIDCProvider(client_id="x", client_secret="y")]
-    )
+    ext = OAuthExtension(providers=[GoogleOIDCProvider(client_id="x", client_secret="y")])
     assert isinstance(ext.user_provider, BuiltinOAuthUserProvider)
     assert ext.auto_create_users is False  # safe default
 

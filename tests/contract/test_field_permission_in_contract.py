@@ -18,7 +18,6 @@ stamps the resulting map into the FieldMeta entries.
 
 from __future__ import annotations
 
-import pytest
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
@@ -116,9 +115,7 @@ def test_hidden_field_dropped_from_contract():
 
 def test_hidden_field_dropped_from_model_contract():
     """End-to-end through ``build_model_contract``."""
-    contract = build_model_contract(
-        _HideSalaryAdmin(), field_permissions={"salary": "hidden"}
-    )
+    contract = build_model_contract(_HideSalaryAdmin(), field_permissions={"salary": "hidden"})
     names = [f.name for f in contract.fields]
     assert "salary" not in names
 
@@ -132,9 +129,7 @@ def test_read_permission_flips_read_only_and_field_permission():
     """``READ`` keeps the field in the wire but locks editing. The
     UI uses both flags: ``field_permission`` to label the field,
     ``read_only`` to actually disable the input."""
-    metas = build_field_metadata(
-        _BareAdmin(), field_permissions={"private_note": "read"}
-    )
+    metas = build_field_metadata(_BareAdmin(), field_permissions={"private_note": "read"})
     note = _by_name(metas, "private_note")
     assert note.field_permission == "read"
     assert note.read_only is True
@@ -143,9 +138,7 @@ def test_read_permission_flips_read_only_and_field_permission():
 def test_read_permission_does_not_force_other_fields_readonly():
     """Per-field decisions are independent — pinning only the named
     field flips, the rest stay write."""
-    metas = build_field_metadata(
-        _BareAdmin(), field_permissions={"private_note": "read"}
-    )
+    metas = build_field_metadata(_BareAdmin(), field_permissions={"private_note": "read"})
     title = _by_name(metas, "title")
     assert title.field_permission == "write"
     assert title.read_only is False
@@ -193,9 +186,7 @@ def test_calculated_field_default_permission_is_read():
 
 
 def test_calculated_field_can_be_hidden_per_caller():
-    metas = build_field_metadata(
-        _WithCalculated(), field_permissions={"display_name": "hidden"}
-    )
+    metas = build_field_metadata(_WithCalculated(), field_permissions={"display_name": "hidden"})
     names = [m.name for m in metas]
     assert "display_name" not in names
 
@@ -210,9 +201,7 @@ def test_compute_field_permissions_runs_policy_for_each_column():
     column, async, and returns the string-valued map."""
     import asyncio
 
-    perms = asyncio.run(
-        compute_field_permissions(_HideSalaryAdmin(), _ctx("user"))
-    )
+    perms = asyncio.run(compute_field_permissions(_HideSalaryAdmin(), _ctx("user")))
     assert perms["salary"] == "hidden"
     assert perms["title"] == "write"
 

@@ -125,8 +125,7 @@ async def upload(
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=(
-                f"Upload exceeds storage_max_upload_bytes "
-                f"({cfg.storage_max_upload_bytes} bytes)."
+                f"Upload exceeds storage_max_upload_bytes ({cfg.storage_max_upload_bytes} bytes)."
             ),
         )
 

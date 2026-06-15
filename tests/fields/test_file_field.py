@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 from sqlalchemy import Column, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -23,10 +22,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from adminfoundry.fields import (
     FileFieldAdapter,
     FileFieldType,
-    StringAdapter,
     build_default_registry,
 )
-
 
 # ---------------------------------------------------------------------------
 # Adapter selection
@@ -143,15 +140,11 @@ def test_file_field_roundtrips_through_sqlite(tmp_path):
         factory = async_sessionmaker(engine, expire_on_commit=False)
         async with factory() as session:
             async with session.begin():
-                session.add(
-                    _Doc(title="Hello", attachment="articles/2026/cover.png")
-                )
+                session.add(_Doc(title="Hello", attachment="articles/2026/cover.png"))
                 session.add(_Doc(title="Empty", attachment=None))
 
         async with factory() as session:
-            rows = (
-                await session.execute(sa.select(_Doc).order_by(_Doc.id))
-            ).scalars().all()
+            rows = (await session.execute(sa.select(_Doc).order_by(_Doc.id))).scalars().all()
             return [(r.title, r.attachment) for r in rows]
 
     result = asyncio.run(_go())

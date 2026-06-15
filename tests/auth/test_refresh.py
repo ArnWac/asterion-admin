@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from adminfoundry import CoreAdminConfig, create_admin
 from adminfoundry.auth.password import hash_password
 from adminfoundry.auth.tokens import (
-    create_access_token,
     create_refresh_token,
     decode_token,
 )
@@ -106,9 +105,7 @@ def test_login_access_and_refresh_have_distinct_types(app_with_user):
 def test_refresh_returns_new_pair(app_with_user):
     app, _, _ = app_with_user
     body = _login(app)
-    resp = _client(app).post(
-        "/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]}
-    )
+    resp = _client(app).post("/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]})
     assert resp.status_code == 200, resp.text
     new = resp.json()
     assert new["access_token"]
@@ -121,9 +118,11 @@ def test_refresh_returns_new_pair(app_with_user):
 def test_refreshed_access_token_authenticates(app_with_user):
     app, _, _ = app_with_user
     body = _login(app)
-    new = _client(app).post(
-        "/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]}
-    ).json()
+    new = (
+        _client(app)
+        .post("/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]})
+        .json()
+    )
     me = _client(app).get("/api/v1/auth/me", headers=_bearer(new["access_token"]))
     assert me.status_code == 200
     assert me.json()["email"] == "alice@example.com"
@@ -134,9 +133,7 @@ def test_old_refresh_token_rejected_after_rotation(app_with_user):
     it after a successful refresh must 401 (its jti is revoked)."""
     app, _, _ = app_with_user
     body = _login(app)
-    first = _client(app).post(
-        "/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]}
-    )
+    first = _client(app).post("/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]})
     assert first.status_code == 200
     replay = _client(app).post(
         "/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]}
@@ -147,9 +144,7 @@ def test_old_refresh_token_rejected_after_rotation(app_with_user):
 def test_rotation_writes_revoked_row(app_with_user):
     app, runtime, _ = app_with_user
     body = _login(app)
-    _client(app).post(
-        "/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]}
-    )
+    _client(app).post("/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]})
 
     async def _go():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -172,17 +167,13 @@ def test_refresh_rejects_access_token(app_with_user):
     type=refresh is accepted."""
     app, _, _ = app_with_user
     body = _login(app)
-    resp = _client(app).post(
-        "/api/v1/auth/refresh", json={"refresh_token": body["access_token"]}
-    )
+    resp = _client(app).post("/api/v1/auth/refresh", json={"refresh_token": body["access_token"]})
     assert resp.status_code == 401
 
 
 def test_refresh_rejects_garbage(app_with_user):
     app, _, _ = app_with_user
-    resp = _client(app).post(
-        "/api/v1/auth/refresh", json={"refresh_token": "not-a-jwt"}
-    )
+    resp = _client(app).post("/api/v1/auth/refresh", json={"refresh_token": "not-a-jwt"})
     assert resp.status_code == 401
 
 
@@ -193,12 +184,13 @@ def test_refresh_rejected_after_logout_all(app_with_user):
     app, _, user = app_with_user
     body = _login(app)
     # bump tkv via logout-all using the access token
-    assert _client(app).post(
-        "/api/v1/auth/logout-all", headers=_bearer(body["access_token"])
-    ).status_code == 200
-    resp = _client(app).post(
-        "/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]}
+    assert (
+        _client(app)
+        .post("/api/v1/auth/logout-all", headers=_bearer(body["access_token"]))
+        .status_code
+        == 200
     )
+    resp = _client(app).post("/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]})
     assert resp.status_code == 401
 
 
@@ -214,9 +206,7 @@ def test_refresh_rejected_for_inactive_user(app_with_user):
                 fresh.is_active = False
 
     asyncio.run(_deactivate())
-    resp = _client(app).post(
-        "/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]}
-    )
+    resp = _client(app).post("/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]})
     assert resp.status_code == 401
 
 

@@ -83,19 +83,13 @@ class AdminPageRegistry:
                 "admin pages during register_routes() (or earlier)."
             )
         if not _ID_PATTERN.match(page.id):
-            raise ValueError(
-                f"AdminPage id {page.id!r} must match {_ID_PATTERN.pattern}"
-            )
+            raise ValueError(f"AdminPage id {page.id!r} must match {_ID_PATTERN.pattern}")
         if page.id in self._pages:
-            raise ValueError(
-                f"AdminPage id {page.id!r} is already registered."
-            )
+            raise ValueError(f"AdminPage id {page.id!r} is already registered.")
         if not page.label:
             raise ValueError(f"AdminPage {page.id!r} must declare a label.")
         if not page.js_module:
-            raise ValueError(
-                f"AdminPage {page.id!r} must declare a js_module URL."
-            )
+            raise ValueError(f"AdminPage {page.id!r} must declare a js_module URL.")
         self._pages[page.id] = page
 
     def freeze(self) -> None:
@@ -120,7 +114,7 @@ class AdminPageRegistry:
 
 def mirror_pages_into_navigation(
     pages: AdminPageRegistry,
-    navigation: "NavigationRegistry",
+    navigation: NavigationRegistry,
     *,
     ui_path: str,
 ) -> None:

@@ -160,9 +160,7 @@ def test_multi_tenant_example_uses_only_supported_admin_attrs():
         declared = {n for n in vars(obj).keys() if not n.startswith("_")}
         extras = declared - supported
         extras.discard("model")
-        assert not extras, (
-            f"{name} sets attrs not present on ModelAdmin: {sorted(extras)}."
-        )
+        assert not extras, f"{name} sets attrs not present on ModelAdmin: {sorted(extras)}."
 
 
 def test_multi_tenant_example_registers_against_real_registry():

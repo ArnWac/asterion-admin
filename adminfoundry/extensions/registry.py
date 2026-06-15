@@ -31,9 +31,7 @@ class ExtensionRegistry:
                 "create_admin(extensions=[...]) before the app starts serving."
             )
         if not isinstance(extension, AdminExtension):
-            raise TypeError(
-                f"Expected an AdminExtension instance, got {type(extension).__name__}"
-            )
+            raise TypeError(f"Expected an AdminExtension instance, got {type(extension).__name__}")
         name = getattr(extension, "name", "")
         if not name or not isinstance(name, str):
             raise ValueError(

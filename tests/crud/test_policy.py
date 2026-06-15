@@ -135,9 +135,7 @@ class _NoCreateAdmin(ModelAdmin):
 async def test_can_create_denial_raises_403(db_session):
     admin = _NoCreateAdmin()
     with pytest.raises(HTTPException) as exc:
-        await create_record(
-            db_session, admin, {"title": "x", "owner_id": "u"}, ctx=_ctx()
-        )
+        await create_record(db_session, admin, {"title": "x", "owner_id": "u"}, ctx=_ctx())
     assert exc.value.status_code == 403
 
 
@@ -147,9 +145,7 @@ async def test_can_create_denial_writes_no_row(db_session):
     policy check runs BEFORE the INSERT / hooks."""
     admin = _NoCreateAdmin()
     with pytest.raises(HTTPException):
-        await create_record(
-            db_session, admin, {"title": "x", "owner_id": "u"}, ctx=_ctx()
-        )
+        await create_record(db_session, admin, {"title": "x", "owner_id": "u"}, ctx=_ctx())
     # Use the underlying session to count rows directly — we can't
     # use list_records because that itself goes through can_view_model.
     from sqlalchemy import select
@@ -211,9 +207,7 @@ async def test_non_owner_blocked_from_updating(db_session):
         db_session, admin, {"title": "x", "owner_id": "alice"}, ctx=_ctx("alice")
     )
     with pytest.raises(HTTPException) as exc:
-        await update_record(
-            db_session, admin, str(created["id"]), {"title": "y"}, ctx=_ctx("bob")
-        )
+        await update_record(db_session, admin, str(created["id"]), {"title": "y"}, ctx=_ctx("bob"))
     assert exc.value.status_code == 403
 
 
@@ -326,18 +320,14 @@ async def test_async_policy_can_query_database(db_session):
         policy = _DbAwarePolicy(db_session)
 
     admin = _DbAwareAdmin()
-    created = await create_record(
-        db_session, admin, {"title": "x", "owner_id": "alice"}
-    )
+    created = await create_record(db_session, admin, {"title": "x", "owner_id": "alice"})
     result = await update_record(
         db_session, admin, str(created["id"]), {"title": "y"}, ctx=_ctx("alice")
     )
     assert result["title"] == "y"
 
     with pytest.raises(HTTPException) as exc:
-        await update_record(
-            db_session, admin, str(created["id"]), {"title": "z"}, ctx=_ctx("bob")
-        )
+        await update_record(db_session, admin, str(created["id"]), {"title": "z"}, ctx=_ctx("bob"))
     assert exc.value.status_code == 403
 
 
@@ -351,7 +341,5 @@ async def test_legacy_caller_without_ctx_skips_policy(db_session):
     """A test or background job that passes no ctx must not have its
     create blocked by a denying policy — the policy stays opt-in."""
     admin = _NoCreateAdmin()
-    result = await create_record(
-        db_session, admin, {"title": "x", "owner_id": "u"}
-    )
+    result = await create_record(db_session, admin, {"title": "x", "owner_id": "u"})
     assert result["title"] == "x"

@@ -15,7 +15,6 @@ import pytest
 from adminfoundry import CoreAdminConfig, create_admin
 from adminfoundry.storage import LocalFileStorage, StorageBackend
 
-
 SECRET = "test-storage-wiring-secret"
 
 

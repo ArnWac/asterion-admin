@@ -257,9 +257,7 @@ async def refresh(
             detail="Refresh token has been revoked.",
         )
 
-    user = (
-        await session.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -407,9 +405,7 @@ async def password_reset_request(
         )
         notifier = runtime.password_reset_notifier
         if notifier is not None:
-            await notifier.send_reset(
-                email=payload.email, token=raw_token, request=request
-            )
+            await notifier.send_reset(email=payload.email, token=raw_token, request=request)
         issued = True
 
     await record_audit_in_session(
@@ -440,9 +436,7 @@ async def password_reset_confirm(
     config = request.app.state.adminfoundry.config
 
     try:
-        validate_password_strength(
-            payload.new_password, min_length=config.password_min_length
-        )
+        validate_password_strength(payload.new_password, min_length=config.password_min_length)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

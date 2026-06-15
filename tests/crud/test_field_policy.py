@@ -17,7 +17,7 @@ import pytest
 import pytest_asyncio
 from fastapi import HTTPException
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry.admin.context import AdminContext
@@ -155,9 +155,7 @@ async def test_hidden_field_rejected_in_update(db_session):
     rid = str(created["id"])
 
     with pytest.raises(HTTPException) as exc:
-        await update_record(
-            db_session, admin, rid, {"salary": 99999}, ctx=_ctx("user")
-        )
+        await update_record(db_session, admin, rid, {"salary": 99999}, ctx=_ctx("user"))
     assert exc.value.status_code == 422
 
 
@@ -234,13 +232,9 @@ async def test_default_field_permission_is_write(db_session):
     """Stock AdminPolicy returns WRITE for every field — no behavior
     change vs. an admin without a policy."""
     admin = _DefaultPolicyAdmin()
-    created = await create_record(
-        db_session, admin, {"name": "Carol", "salary": 1}, ctx=_ctx()
-    )
+    created = await create_record(db_session, admin, {"name": "Carol", "salary": 1}, ctx=_ctx())
     rid = str(created["id"])
-    updated = await update_record(
-        db_session, admin, rid, {"salary": 2}, ctx=_ctx()
-    )
+    updated = await update_record(db_session, admin, rid, {"salary": 2}, ctx=_ctx())
     assert updated["salary"] == 2
     assert "salary" in updated  # not hidden
 
@@ -294,9 +288,7 @@ async def test_field_policy_sees_row_on_update(db_session):
     admin = _Admin()
     created = await create_record(db_session, admin, {"name": "Eve"}, ctx=_ctx())
     pol.saw.clear()
-    await update_record(
-        db_session, admin, str(created["id"]), {"name": "Eve2"}, ctx=_ctx()
-    )
+    await update_record(db_session, admin, str(created["id"]), {"name": "Eve2"}, ctx=_ctx())
     # Every field call during update-schema-shaping passed a _Person row.
     assert pol.saw
     assert all(observed is _Person for _f, observed in pol.saw)
@@ -313,7 +305,5 @@ async def test_legacy_ctx_none_path_ignores_field_policy(db_session):
     matches the contract that policy is opt-in via the route layer."""
     admin = _HideSalaryAdmin()
     # No ctx → field policy never consulted, salary may be written.
-    result = await create_record(
-        db_session, admin, {"name": "Alice", "salary": 1}
-    )
+    result = await create_record(db_session, admin, {"name": "Alice", "salary": 1})
     assert result["salary"] == 1

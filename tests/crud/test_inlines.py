@@ -18,7 +18,7 @@ import pytest
 import pytest_asyncio
 from fastapi import HTTPException
 from sqlalchemy import Column, ForeignKey, Integer, String, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry.admin import InlineAdmin
@@ -105,8 +105,8 @@ async def test_create_with_inline_rows_stamps_fk(db_session):
     )
     order_id = result["id"]
     rows = (
-        await db_session.execute(select(_Line).where(_Line.order_id == order_id))
-    ).scalars().all()
+        (await db_session.execute(select(_Line).where(_Line.order_id == order_id))).scalars().all()
+    )
     assert len(rows) == 2
     assert {r.sku for r in rows} == {"A1", "B2"}
     # Response now carries the created inline rows back so the client
@@ -156,9 +156,7 @@ async def test_create_inline_failure_rolls_back_parent(db_session):
 @pytest.mark.anyio
 async def test_update_inline_creates_new_row(db_session):
     admin = _OrderAdmin()
-    created = await create_record(
-        db_session, admin, {"customer": "Bob"}, ctx=_ctx()
-    )
+    created = await create_record(db_session, admin, {"customer": "Bob"}, ctx=_ctx())
     await update_record(
         db_session,
         admin,
@@ -171,10 +169,10 @@ async def test_update_inline_creates_new_row(db_session):
         ctx=_ctx(),
     )
     rows = (
-        await db_session.execute(
-            select(_Line).where(_Line.order_id == created["id"])
-        )
-    ).scalars().all()
+        (await db_session.execute(select(_Line).where(_Line.order_id == created["id"])))
+        .scalars()
+        .all()
+    )
     assert {r.sku for r in rows} == {"NEW"}
 
 
@@ -191,10 +189,10 @@ async def test_update_inline_with_id_updates_row(db_session):
         ctx=_ctx(),
     )
     line = (
-        await db_session.execute(
-            select(_Line).where(_Line.order_id == created["id"])
-        )
-    ).scalars().one()
+        (await db_session.execute(select(_Line).where(_Line.order_id == created["id"])))
+        .scalars()
+        .one()
+    )
 
     await update_record(
         db_session,
@@ -225,9 +223,7 @@ async def test_update_inline_delete_marker_removes_row(db_session):
         },
         ctx=_ctx(),
     )
-    drop_line = (
-        await db_session.execute(select(_Line).where(_Line.sku == "drop"))
-    ).scalars().one()
+    drop_line = (await db_session.execute(select(_Line).where(_Line.sku == "drop"))).scalars().one()
 
     await update_record(
         db_session,
@@ -238,10 +234,10 @@ async def test_update_inline_delete_marker_removes_row(db_session):
     )
 
     remaining = (
-        await db_session.execute(
-            select(_Line).where(_Line.order_id == created["id"])
-        )
-    ).scalars().all()
+        (await db_session.execute(select(_Line).where(_Line.order_id == created["id"])))
+        .scalars()
+        .all()
+    )
     assert {r.sku for r in remaining} == {"keep"}
 
 
@@ -402,8 +398,8 @@ async def test_legacy_ctx_none_path_still_handles_inlines(db_session):
         },
     )
     rows = (
-        await db_session.execute(
-            select(_Line).where(_Line.order_id == result["id"])
-        )
-    ).scalars().all()
+        (await db_session.execute(select(_Line).where(_Line.order_id == result["id"])))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1

@@ -26,7 +26,6 @@ from adminfoundry.auth.password_reset import (
 )
 from adminfoundry.notifications import Notifier, NotifierRegistry
 
-
 SECRET = "x" * 64
 
 

@@ -28,6 +28,4 @@ class SavedFilter(GlobalModel):
     name: str = Column(String(200), nullable=False)
     payload = Column(JSON, nullable=False, default=dict)
 
-    __table_args__ = (
-        Index("ix_saved_filters_owner", "user_id", "resource"),
-    )
+    __table_args__ = (Index("ix_saved_filters_owner", "user_id", "resource"),)

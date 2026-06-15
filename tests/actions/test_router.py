@@ -112,7 +112,9 @@ def app(tmp_path):
     # Default: an authenticated user, no tenant, no permissions. Auth-only
     # endpoints (contract) pass; permission-gated endpoints (CRUD/actions)
     # 403 unless a test overrides with _grant().
-    override_admin_context(app=application, principal=make_admin_principal(email="user@example.com"))
+    override_admin_context(
+        app=application, principal=make_admin_principal(email="user@example.com")
+    )
 
     yield application
 

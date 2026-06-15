@@ -14,16 +14,15 @@ import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
 
 from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
 from adminfoundry.auth.password import hash_password
 from adminfoundry.auth.tokens import create_access_token, decode_token, get_token_jti
 from adminfoundry.models.base import GlobalModel
 from adminfoundry.models.user import User
-
-from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import DeclarativeBase
 
 SECRET = "test-revocation-provider-secret"
 ALG = "HS256"
@@ -92,7 +91,10 @@ def _bearer(token: str) -> dict[str, str]:
 
 def _issue(user: User) -> str:
     return create_access_token(
-        user.id, secret_key=SECRET, algorithm=ALG, expires_minutes=5,
+        user.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=5,
         token_version=user.token_version,
     )
 
@@ -137,9 +139,9 @@ def test_distinct_token_unaffected_on_provider_path(app_with_user):
 
     _client(app).post("/api/v1/auth/logout", headers=_bearer(token_a))
 
-    assert _client(app).get(
-        "/api/v1/admin/rev_widgets", headers=_bearer(token_a)
-    ).status_code == 401
-    assert _client(app).get(
-        "/api/v1/admin/rev_widgets", headers=_bearer(token_b)
-    ).status_code == 200
+    assert (
+        _client(app).get("/api/v1/admin/rev_widgets", headers=_bearer(token_a)).status_code == 401
+    )
+    assert (
+        _client(app).get("/api/v1/admin/rev_widgets", headers=_bearer(token_b)).status_code == 200
+    )

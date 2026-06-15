@@ -14,8 +14,6 @@ own MFA at the IdP, so these endpoints operate directly on the builtin
 
 from __future__ import annotations
 
-import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -193,9 +191,7 @@ async def _audit_mfa_login(
         changes["reason"] = reason
     if factor is not None:
         changes["factor"] = factor
-    actor = (
-        AdminPrincipal(id=str(user.id), email=user.email) if user is not None else None
-    )
+    actor = AdminPrincipal(id=str(user.id), email=user.email) if user is not None else None
     await record_audit(
         request.app.state.adminfoundry.db,
         action=action,
@@ -260,9 +256,7 @@ async def two_factor_login(
         )
         raise _bad_challenge()
 
-    user = (
-        await session.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if user is None or not user.is_active:
         raise _bad_challenge()
     if user.token_version != token_version:
@@ -291,9 +285,7 @@ async def two_factor_login(
             )
         factor = "totp"
     else:
-        ok = await consume_backup_code(
-            session, user_id=user.id, raw_code=payload.backup_code or ""
-        )
+        ok = await consume_backup_code(session, user_id=user.id, raw_code=payload.backup_code or "")
         if not ok:
             await _audit_mfa_login(
                 request,

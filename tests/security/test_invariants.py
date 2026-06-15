@@ -52,6 +52,7 @@ ALG = "HS256"
 
 # --- shared schema + fixtures ---
 
+
 class _Base(DeclarativeBase):
     pass
 
@@ -130,10 +131,15 @@ def _grant(app, email: str, keys: set[str]) -> None:
 
 # --- S5.1: hidden fields never serialized ---
 
+
 def test_s5_hidden_fields_never_serialized():
     """Per-admin ``protected_fields`` must never appear in serializer output."""
     obj = _StubAccount(
-        id=1, email="a@b.c", hashed_password=None, api_secret="topsecret", is_system=False,
+        id=1,
+        email="a@b.c",
+        hashed_password=None,
+        api_secret="topsecret",
+        is_system=False,
     )
     out = serialize_record(obj, AccountAdmin())
     assert "api_secret" not in out, "protected_fields leaked into serializer output"
@@ -141,16 +147,22 @@ def test_s5_hidden_fields_never_serialized():
 
 # --- S5.2: hashed_password never serialized ---
 
+
 def test_s5_hashed_password_never_serialized():
     """``hashed_password`` is in ``GLOBALLY_PROTECTED`` and must never leak."""
     obj = _StubAccount(
-        id=1, email="a@b.c", hashed_password="$2b$leak", api_secret=None, is_system=False,
+        id=1,
+        email="a@b.c",
+        hashed_password="$2b$leak",
+        api_secret=None,
+        is_system=False,
     )
     out = serialize_record(obj, AccountAdmin())
     assert "hashed_password" not in out, "GLOBALLY_PROTECTED field leaked"
 
 
 # --- S5.3: readonly fields not writable ---
+
 
 def test_s5_readonly_fields_not_writable():
     """Write payloads naming a read-only field must be rejected with 422."""
@@ -162,11 +174,15 @@ def test_s5_readonly_fields_not_writable():
 
 # --- S5.4: inactive user rejected ---
 
+
 def test_s5_inactive_user_rejected(app_with_user):
     """A valid token for a deactivated user must fail authentication."""
     app, runtime, user = app_with_user
     token = create_access_token(
-        user.id, secret_key=SECRET, algorithm=ALG, expires_minutes=5,
+        user.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=5,
         token_version=user.token_version,
     )
 
@@ -181,9 +197,7 @@ def test_s5_inactive_user_rejected(app_with_user):
 
     # Hit any authenticated route — the contract endpoint is enough.
     with TestClient(app, raise_server_exceptions=False) as client:
-        resp = client.get(
-            "/api/v1/admin/_contract", headers={"Authorization": f"Bearer {token}"}
-        )
+        resp = client.get("/api/v1/admin/_contract", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code in (401, 403), (
         f"Inactive user must not pass authentication, got {resp.status_code}"
     )
@@ -191,11 +205,15 @@ def test_s5_inactive_user_rejected(app_with_user):
 
 # --- S5.5: token_version mismatch rejected ---
 
+
 def test_s5_token_version_mismatch_rejected(app_with_user):
     """Bumping User.token_version invalidates every previously-issued JWT."""
     app, runtime, user = app_with_user
     token = create_access_token(
-        user.id, secret_key=SECRET, algorithm=ALG, expires_minutes=5,
+        user.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=5,
         token_version=user.token_version,
     )
 
@@ -209,15 +227,14 @@ def test_s5_token_version_mismatch_rejected(app_with_user):
     asyncio.run(_bump())
 
     with TestClient(app, raise_server_exceptions=False) as client:
-        resp = client.get(
-            "/api/v1/admin/_contract", headers={"Authorization": f"Bearer {token}"}
-        )
+        resp = client.get("/api/v1/admin/_contract", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401, (
         f"Stale tkv claim must be rejected with 401, got {resp.status_code}"
     )
 
 
 # --- S5.6: impersonation token rejected by require_superadmin ---
+
 
 def test_s5_impersonation_token_rejected_by_require_superadmin(app_with_user):
     """Even a superadmin's impersonation token must not pass require_superadmin."""
@@ -242,15 +259,14 @@ def test_s5_impersonation_token_rejected_by_require_superadmin(app_with_user):
     )
     # /api/v1/root/users is gated by require_superadmin.
     with TestClient(app, raise_server_exceptions=False) as client:
-        resp = client.get(
-            "/api/v1/root/users", headers={"Authorization": f"Bearer {imp_token}"}
-        )
+        resp = client.get("/api/v1/root/users", headers={"Authorization": f"Bearer {imp_token}"})
     assert resp.status_code == 403, (
         f"Impersonation token must be rejected on root routes, got {resp.status_code}"
     )
 
 
 # --- S5.7: unknown permission denied ---
+
 
 def test_s5_unknown_permission_denied():
     """``assert_permission`` raises 403 when the granted set does not match."""
@@ -272,6 +288,7 @@ def test_s5_wildcard_permission_grants_required():
 
 
 # --- E2E sanity: full deny path through the CRUD router ---
+
 
 def test_s5_unknown_permission_denied_at_crud_layer(app_with_user):
     """Roundtrip via the real CRUD router — proves the gate is wired, not

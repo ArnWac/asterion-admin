@@ -1,10 +1,10 @@
 """Permission-matrix HTTP surface (Roadmap 5.2).
 
 Closes a known UX gap: tenant operators today have to navigate three
-admin tables (``tenant_roles`` × ``permission_catalog`` ×
+admin tables (``tenant_roles`` x ``permission_catalog`` x
 ``tenant_role_permissions``) to grant or revoke a single permission.
 This router collapses the relationship into a single round-trip the
-UI can render as a roles × permissions grid.
+UI can render as a roles x permissions grid.
 
 Endpoints
 ---------
@@ -95,19 +95,19 @@ async def get_matrix(
 ) -> dict[str, Any]:
     assert_permission(ctx.permissions, "admin.tenant_roles.list")
 
-    roles = (
-        await session.execute(
-            select(TenantRole).order_by(TenantRole.name)
-        )
-    ).scalars().all()
+    roles = (await session.execute(select(TenantRole).order_by(TenantRole.name))).scalars().all()
 
     permissions = (
-        await session.execute(
-            select(PermissionCatalog).order_by(
-                PermissionCatalog.category, PermissionCatalog.key
+        (
+            await session.execute(
+                select(PermissionCatalog).order_by(
+                    PermissionCatalog.category, PermissionCatalog.key
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     assignments_rows = (
         await session.execute(
@@ -135,10 +135,7 @@ async def get_matrix(
             }
             for r in roles
         ],
-        "permissions": [
-            {"key": p.key, "category": p.category}
-            for p in permissions
-        ],
+        "permissions": [{"key": p.key, "category": p.category} for p in permissions],
         "assignments": assignments,
     }
 
@@ -177,11 +174,9 @@ async def update_matrix(
     role_ids = [_parse_role_id(rid) for rid in body.assignments.keys()]
     roles_by_id = {
         r.id: r
-        for r in (
-            await session.execute(
-                select(TenantRole).where(TenantRole.id.in_(role_ids))
-            )
-        ).scalars().all()
+        for r in (await session.execute(select(TenantRole).where(TenantRole.id.in_(role_ids))))
+        .scalars()
+        .all()
     }
     for rid in role_ids:
         role = roles_by_id.get(rid)
@@ -194,18 +189,14 @@ async def update_matrix(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    f"Role {role.name!r} is a system role and cannot "
-                    "be edited via the matrix."
+                    f"Role {role.name!r} is a system role and cannot be edited via the matrix."
                 ),
             )
 
     # Validate every key against the catalog so a typo or stale
     # client-side cache fails loud.
     catalog_keys = {
-        row
-        for row in (
-            await session.execute(select(PermissionCatalog.key))
-        ).scalars().all()
+        row for row in (await session.execute(select(PermissionCatalog.key))).scalars().all()
     }
     requested_keys: set[str] = set()
     for keys in body.assignments.values():
@@ -251,13 +242,17 @@ async def update_matrix(
 
         if to_remove:
             existing_rows = (
-                await session.execute(
-                    select(TenantRolePermission).where(
-                        TenantRolePermission.role_id == rid,
-                        TenantRolePermission.permission_key.in_(to_remove),
+                (
+                    await session.execute(
+                        select(TenantRolePermission).where(
+                            TenantRolePermission.role_id == rid,
+                            TenantRolePermission.permission_key.in_(to_remove),
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for row in existing_rows:
                 await session.delete(row)
 

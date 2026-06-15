@@ -829,9 +829,7 @@ def permissions_sync(
         )
         raise typer.Exit(code=2)
     runtime = _load_runtime_from_app_spec(app_spec)
-    asyncio.run(
-        _permissions_sync(runtime.registry, runtime.permission_registry, prune=prune)
-    )
+    asyncio.run(_permissions_sync(runtime.registry, runtime.permission_registry, prune=prune))
 
 
 async def _permissions_sync(registry, permission_registry, *, prune: bool) -> None:

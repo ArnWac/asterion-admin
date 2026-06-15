@@ -213,9 +213,7 @@ def test_full_contract_omits_import_export_when_not_mounted(tmp_path):
             await conn.run_sync(Widget.metadata.create_all)
 
     asyncio.run(_setup())
-    override_admin_context(
-        application, principal=make_admin_principal(email="alice@example.com")
-    )
+    override_admin_context(application, principal=make_admin_principal(email="alice@example.com"))
     _grant(application, {"admin.export_widgets.list"})
     try:
         resp = _client(application).get("/api/v1/admin/_contract")
@@ -360,9 +358,7 @@ def test_export_with_unknown_ids_returns_empty(app):
     _seeded_widget_ids(app, 3)
     _grant(app, {"admin.export_widgets.list"})
     # Valid id shape (int) but no row matches → 0 rows, still 200.
-    resp = _client(app).get(
-        "/api/v1/admin/export_widgets/_export?format=csv&ids=99999"
-    )
+    resp = _client(app).get("/api/v1/admin/export_widgets/_export?format=csv&ids=99999")
     assert resp.status_code == 200
     assert _parse_csv(resp.text) == []
 
@@ -371,9 +367,7 @@ def test_export_with_invalid_id_shape_returns_400(app):
     _seeded_widget_ids(app, 3)
     _grant(app, {"admin.export_widgets.list"})
     # Widget.id is Integer — a non-numeric id fails coercion.
-    resp = _client(app).get(
-        "/api/v1/admin/export_widgets/_export?format=csv&ids=not-an-int"
-    )
+    resp = _client(app).get("/api/v1/admin/export_widgets/_export?format=csv&ids=not-an-int")
     assert resp.status_code == 400
 
 
@@ -395,7 +389,9 @@ def test_export_audit_records_selection_count(app):
                     await session.execute(
                         select(AuditLog).where(AuditLog.action == EXPORT_AUDIT_ACTION)
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
 
     rows = asyncio.run(_fetch())
@@ -443,7 +439,9 @@ def test_export_xlsx_audit_records_format(app):
                     await session.execute(
                         select(AuditLog).where(AuditLog.action == EXPORT_AUDIT_ACTION)
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
 
     rows = asyncio.run(_fetch())
@@ -534,7 +532,7 @@ def test_csv_import_partial_success(app):
     payload = _csv_bytes(
         ["name", "color", "junk"],
         [
-            ["alpha", "red", ""],   # junk is empty → normalized away → ok
+            ["alpha", "red", ""],  # junk is empty → normalized away → ok
             ["beta", "blue", "x"],  # junk has value → unknown field → fails
             ["gamma", "green", ""],  # ok
         ],
@@ -584,7 +582,9 @@ def test_csv_import_writes_audit_row(app):
                     await session.execute(
                         select(AuditLog).where(AuditLog.action == IMPORT_AUDIT_ACTION)
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
 
     rows = asyncio.run(_fetch())
@@ -718,7 +718,9 @@ def test_dry_run_writes_no_audit_log(app):
                     await session.execute(
                         select(AuditLog).where(AuditLog.action == IMPORT_AUDIT_ACTION)
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
 
     rows = asyncio.run(_fetch())

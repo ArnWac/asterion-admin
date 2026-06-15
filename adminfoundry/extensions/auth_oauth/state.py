@@ -179,9 +179,7 @@ def unseal_state(
         # Clock skew or forged timestamp. Refuse rather than guess.
         raise OAuthStateInvalidError("state cookie created in the future")
     if age > max_age_seconds:
-        raise OAuthStateExpiredError(
-            f"state cookie expired ({age}s > {max_age_seconds}s TTL)"
-        )
+        raise OAuthStateExpiredError(f"state cookie expired ({age}s > {max_age_seconds}s TTL)")
 
     return payload
 

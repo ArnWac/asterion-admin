@@ -68,19 +68,21 @@ async def store_backup_codes(
     The caller is responsible for clearing any previous codes first
     (enable regenerates the whole set)."""
     for raw in codes:
-        session.add(
-            TwoFactorBackupCode(user_id=user_id, code_hash=_hash_code(raw))
-        )
+        session.add(TwoFactorBackupCode(user_id=user_id, code_hash=_hash_code(raw)))
     await session.flush()
 
 
 async def clear_backup_codes(session: AsyncSession, *, user_id) -> None:
     """Delete every backup code for a user (on disable / regenerate)."""
     rows = (
-        await session.execute(
-            select(TwoFactorBackupCode).where(TwoFactorBackupCode.user_id == user_id)
+        (
+            await session.execute(
+                select(TwoFactorBackupCode).where(TwoFactorBackupCode.user_id == user_id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for row in rows:
         await session.delete(row)
     await session.flush()

@@ -84,7 +84,7 @@ class InlineAdmin:
     #: a child without its own policy adds no further restriction.
     #: ``can_create`` is consulted for new rows, ``can_update_object``
     #: for edits, ``can_delete_object`` for removals.
-    policy: "AdminPolicy | None" = None
+    policy: AdminPolicy | None = None
 
     #: Display label shown above the inline section. Defaults to the
     #: child model's class name (pluralized) at contract-build time.
@@ -112,7 +112,7 @@ class InlineAdmin:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_inline_instance(entry: "type[InlineAdmin] | InlineAdmin") -> InlineAdmin:
+def _resolve_inline_instance(entry: type[InlineAdmin] | InlineAdmin) -> InlineAdmin:
     return entry() if isinstance(entry, type) else entry
 
 
@@ -156,7 +156,7 @@ def _coerce_pk(model, raw: Any):
 
 
 async def _fetch_inline_record(
-    session: "AsyncSession",
+    session: AsyncSession,
     inline: InlineAdmin,
     raw_id: Any,
 ):
@@ -225,7 +225,7 @@ def split_parent_payload(
 
 
 async def fetch_inline_children(
-    session: "AsyncSession",
+    session: AsyncSession,
     parent: Any,
     model_admin,
 ) -> dict[str, list[dict[str, Any]]]:
@@ -302,7 +302,7 @@ async def _enforce_inline_policy(
     *,
     action: str,
     obj: Any | None,
-    ctx: "AdminContext | None",
+    ctx: AdminContext | None,
     tablename: str,
 ) -> None:
     """Run the inline's own :class:`AdminPolicy` gate for one row.
@@ -333,12 +333,12 @@ async def _enforce_inline_policy(
 
 
 async def process_inline_writes(
-    session: "AsyncSession",
+    session: AsyncSession,
     parent: Any,
     model_admin,
     inline_payload: Mapping[str, list[dict[str, Any]]],
     *,
-    ctx: "AdminContext | None" = None,
+    ctx: AdminContext | None = None,
 ) -> None:
     """Apply inline writes for one parent record.
 

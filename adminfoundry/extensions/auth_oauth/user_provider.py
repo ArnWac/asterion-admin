@@ -142,9 +142,7 @@ class BuiltinOAuthUserProvider:
 
             if identity is not None:
                 user = (
-                    await session.execute(
-                        select(User).where(User.id == identity.user_id)
-                    )
+                    await session.execute(select(User).where(User.id == identity.user_id))
                 ).scalar_one_or_none()
                 if user is None:
                     # Identity row references a deleted user — treat as
@@ -152,13 +150,9 @@ class BuiltinOAuthUserProvider:
                     # prevents a duplicate identity from being created
                     # if the same subject ever returns; an admin must
                     # delete the orphan row manually.
-                    raise OAuthAutoCreateDisabledError(
-                        "identity link references a deleted user"
-                    )
+                    raise OAuthAutoCreateDisabledError("identity link references a deleted user")
                 if not user.is_active:
-                    raise OAuthUserInactiveError(
-                        f"user {user.id} linked to identity is inactive"
-                    )
+                    raise OAuthUserInactiveError(f"user {user.id} linked to identity is inactive")
                 return _to_admin_principal(user)
 
             # --- 2. No identity. Auto-create policy. ---
@@ -171,15 +165,11 @@ class BuiltinOAuthUserProvider:
                 # The IdP either didn't send email_verified or sent
                 # False. Either way, the email isn't trustworthy enough
                 # to bootstrap a new account from.
-                raise OAuthEmailNotVerifiedError(
-                    "IdP did not verify the email address"
-                )
+                raise OAuthEmailNotVerifiedError("IdP did not verify the email address")
 
             email = claims.email_at_provider
             if not email:
-                raise OAuthEmailNotVerifiedError(
-                    "IdP did not provide an email address"
-                )
+                raise OAuthEmailNotVerifiedError("IdP did not provide an email address")
 
             # Refuse silent account linking by email — see module
             # docstring for the threat model.
@@ -187,9 +177,7 @@ class BuiltinOAuthUserProvider:
                 await session.execute(select(User).where(User.email == email))
             ).scalar_one_or_none()
             if existing is not None:
-                raise OAuthEmailCollisionError(
-                    f"email {email!r} is already taken by another user"
-                )
+                raise OAuthEmailCollisionError(f"email {email!r} is already taken by another user")
 
             # --- 3. Create fresh User + identity link. ---
             new_user = User(
