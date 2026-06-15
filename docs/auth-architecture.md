@@ -149,6 +149,17 @@ PostgreSQL-only caveat: tenant-scoped permission lookup needs
 built-in provider returns `frozenset()` — the same legacy behaviour the
 framework had before v1-providers.
 
+### Boundary: where external auth stops (Roadmap A0.5)
+
+External `user_mode` (your own providers) fully covers **auth, CRUD and
+contract**. It does **not** yet cover the superadmin/root tooling
+(`root/*`), audit-actor resolution (`audit/service.py`), tenant
+bootstrap, or the CLI — those still import the concrete builtin `User`
+model. So an external IdP runs the admin surface, but root/audit/CLI
+remain builtin-coupled by design for now. This is a deliberate, documented
+limitation, not an oversight; full decoupling is tracked in
+[stabilization.md](stabilization.md).
+
 ---
 
 ## Superadmin

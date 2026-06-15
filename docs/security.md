@@ -98,6 +98,22 @@ config says. These rules apply to:
 - serializer output (list + detail responses omit them)
 - payload validator `clean_write_payload` (writes rejected with 422)
 
+### One resolution rule (Roadmap A0.4)
+
+There are three *inputs* to a field's effective permission — `protected_fields`
+(→ `HIDDEN`), `readonly_fields` (→ `READ`), and the per-user, per-row
+`AdminPolicy.field_permission()` — but **one** resolver combines them:
+`FieldPermission.strictest(...)` (`WRITE < READ < HIDDEN`). The static
+class (`static_field_permission`) is computed from the admin's lists, then
+the policy result is folded in with `strictest`.
+
+The invariant: **a policy can only *tighten*, never loosen.** A field that
+is statically `READ`/`HIDDEN` can never be widened to `WRITE` by a policy.
+The three knobs are kept as ergonomic shortcuts on purpose — they are not
+competing mechanisms, just inputs to the single `strictest` rule
+(see [`adminfoundry/admin/policy.py`](../adminfoundry/admin/policy.py),
+tested in `tests/crud/test_field_permission_resolution.py`).
+
 ## Secret sanitization
 
 `adminfoundry.security.sanitize.sanitize_payload(payload)` recursively
@@ -138,9 +154,15 @@ for how to raise custom envelopes via `AdminError`.
 
 - PostgreSQL schema isolation is only **proven** if `pytest -m postgres`
   runs in CI against a real PG service. SQLite tests cannot verify it.
+  (It does run in CI — see `.github/workflows/ci.yml`.)
 - The in-memory rate limiter is not distributed.
-- Token revocation is user-wide, not per-token.
-- No password reset endpoint in MVP — use the CLI to rotate.
+- **Root / Audit / CLI are builtin-`User` coupled (Roadmap A0.5).**
+  External `user_mode` fully covers auth + CRUD + contract via the
+  providers, but `root/*`, `audit/service.py`, `tenancy/bootstrap.py`
+  and `cli/main.py` still import the concrete builtin `User` model. An
+  external IdP works for the admin surface; superadmin/root tooling and
+  audit-actor resolution remain builtin-only by design for now. Full
+  decoupling is tracked in [stabilization.md](stabilization.md).
 - No strict CSP (the bundled UI's inline scripts would break).
 - No automatic audit retention; run `DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '90 days';`
   on a schedule.
