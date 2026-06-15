@@ -87,8 +87,19 @@ class AdminRuntime:
     #: the request path while ``None`` is a clear programming error;
     #: the FileField adapter / upload router check it and raise.
     storage: Any = None
-    #: Module-level singleton — every runtime references the same registry.
-    #: Extension ``register_protected_fields`` hooks write into it before
+    #: Module-level singleton — every runtime references the SAME registry.
+    #: This is deliberate and documented (see
+    #: ``adminfoundry/security/protected_fields.py`` and the "documented
+    #: singletons are allowed" carve-out in ``docs/roadmap.md``): a leaked
+    #: secret from any admin's response is the same security failure no
+    #: matter which app instance holds the registry, so protected fields
+    #: are a global, fail-safe concern — two apps sharing the registry can
+    #: only ever *over*-protect, never leak. The read path
+    #: (``ModelAdmin.all_protected`` / inline serialization) reads this
+    #: same singleton, so do NOT swap this for a per-runtime factory
+    #: without also re-routing every reader — see
+    #: ``tests/security/test_protected_field_registry.py``. Extension
+    #: ``register_protected_fields`` hooks write into it before
     #: ``create_admin`` freezes it for the duration of the request lifecycle.
     protected_fields: ProtectedFieldRegistry = field(
         default_factory=get_protected_field_registry
