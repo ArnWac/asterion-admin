@@ -115,7 +115,7 @@ markers = [
 # consumers depend on — the provider Protocols and the config object. The
 # rest of the package still carries ~80 framework-typing nits (SQLAlchemy /
 # FastAPI generics, type[ModelAdmin]-vs-instance) tracked in
-# docs/stabilization.md; broadening this scope is a follow-up, not a 1.0
+# docs/review-hardening-roadmap.md; broadening this scope is a follow-up, not a 1.0
 # blocker. ``follow_imports = silent`` keeps transitive noise from those
 # modules out of the report while still checking the targeted files.
 python_version = "3.11"

@@ -162,7 +162,7 @@ for how to raise custom envelopes via `AdminError`.
   and `cli/main.py` still import the concrete builtin `User` model. An
   external IdP works for the admin surface; superadmin/root tooling and
   audit-actor resolution remain builtin-only by design for now. Full
-  decoupling is tracked in [stabilization.md](stabilization.md).
+  decoupling is tracked in [review-hardening-roadmap.md](review-hardening-roadmap.md).
 - No strict CSP (the bundled UI's inline scripts would break).
 - No automatic audit retention; run `DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '90 days';`
   on a schedule.
