@@ -3,7 +3,9 @@
 Both ``Project`` and ``Ticket`` inherit from :class:`TenantModel`, which
 means their tables live inside each tenant's PostgreSQL schema. There is
 no ``tenant_id`` column — isolation is enforced by ``SET LOCAL
-search_path`` applied by ``TenantMiddleware`` on every request.
+search_path``, which ``get_async_session`` applies to the request-scoped
+CRUD session on every request (``TenantMiddleware`` resolves the tenant;
+the session dependency points the search_path at its schema).
 """
 
 from __future__ import annotations
