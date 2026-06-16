@@ -153,12 +153,13 @@ Request
   ▼  CORSMiddleware            only if cors_origins configured
   ▼  TenantMiddleware          extracts slug → request.state.tenant: TenantContext
   ▼  Route handler             Depends(get_async_session) opens a txn-scoped session
+  │                              and (PostgreSQL + resolved tenant) issues
+  │                              SET LOCAL search_path → the tenant schema for the txn
   │                            Depends(require_admin_context) walks the four providers:
   │                              · AuthProvider.authenticate_request → AuthIdentity
   │                              · UserProvider.get_by_id            → AdminPrincipal
   │                              · TenantProvider.resolve_tenant      → AdminTenant
   │                              · PermissionProvider.get_permissions → frozenset[str]
-  │                                (BuiltinPermissionProvider issues SET LOCAL search_path)
   │                            Permission check via AdminContext.has_permission()
   │                            Body validation via Pydantic + clean_write_payload
   │                            Audit via record_audit_in_session (savepoint-isolated)

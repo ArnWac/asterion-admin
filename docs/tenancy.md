@@ -30,7 +30,9 @@ TenantMiddleware
             │
             ▼
 Depends(get_async_session)
-  └─► opens an AsyncSession, BEGIN
+  └─► opens an AsyncSession, BEGIN, and — on PostgreSQL with a resolved
+      tenant — issues SET LOCAL search_path TO "tenant_acme", public for
+      this transaction. This is the session the handler runs CRUD on.
             │
             ▼
 Depends(require_admin_context)
@@ -38,13 +40,13 @@ Depends(require_admin_context)
   └─► UserProvider.get_by_id(identity.user_id)              → AdminPrincipal
   └─► TenantProvider.resolve_tenant(request)                → AdminTenant
   └─► PermissionProvider.get_permissions(principal, tenant) → frozenset[str]
-        (BuiltinPermissionProvider issues SET LOCAL search_path
-         TO "tenant_acme", public — scoped to the txn — and loads
-         TenantRole + TenantRolePermission for the membership.)
+        (BuiltinPermissionProvider loads TenantRole +
+         TenantRolePermission for the membership; its own short-lived
+         session sets the same search_path for that lookup.)
   └─► returns AdminContext(principal, tenant, permissions, …)
             │
             ▼
-Handler reads/writes via the SAME session
+Handler reads/writes via the get_async_session session
   └─► SELECTs/INSERTs against tenant_roles, etc. naturally hit "tenant_acme"
   └─► SELECTs against users/tenants explicitly use "public" prefix via GlobalModel.metadata
             │
@@ -58,15 +60,19 @@ The plan's central architectural claim — *tenant isolation comes from
 PostgreSQL, not from filters in Python* — rests on three invariants:
 
 1. `SET LOCAL search_path` lives **only** for the current transaction.
-2. The CRUD session and the `BuiltinPermissionProvider` session are the
-   **same object** (so the search_path it sets applies to subsequent
-   CRUD queries).
+2. The request-scoped CRUD session (`get_async_session`) sets the tenant
+   `search_path` itself, so every tenant-local SELECT/INSERT the handler
+   runs resolves inside the tenant schema. Global tables carry an explicit
+   `public.` qualifier (via `GlobalModel.metadata`) and are unaffected.
 3. Tenant-local tables don't carry a `tenant_id` column. If they did,
    they could leak across schemas via cross-schema joins; without it,
    PostgreSQL's schema resolution is the only routing mechanism.
 
 `tests/postgres/` proves all three against a real PG instance (skipped
-without `ADMINFOUNDRY_TEST_POSTGRES_URL`).
+without `ADMINFOUNDRY_TEST_POSTGRES_URL`): the `search_path` lifecycle and
+schema isolation primitives in `test_search_path_lifecycle.py` /
+`test_tenant_isolation.py`, and the full request path — create under one
+tenant, invisible to another — in `test_http_tenant_isolation.py`.
 
 ## Provisioning a tenant
 
