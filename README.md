@@ -164,8 +164,7 @@ adminfoundry doctor
 - [`docs/tenancy.md`](docs/tenancy.md) — schema-per-tenant strategy + bootstrap
 - [`docs/model-admin.md`](docs/model-admin.md) — `ModelAdmin` API reference
 - [`docs/deployment.md`](docs/deployment.md) — Docker, env, health probes, observability
-- [`docs/roadmap.md`](docs/roadmap.md) — binding roadmap: scope, phases, deliberate non-goals
-- [`docs/stabilization.md`](docs/stabilization.md) — prioritized pre-1.0 hardening (no new features)
+- [`docs/review-hardening-roadmap.md`](docs/review-hardening-roadmap.md) — consolidated roadmap: open pre-1.0 hardening, scope, phases, deliberate non-goals
 
 ---
 

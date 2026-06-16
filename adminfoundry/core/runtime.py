@@ -91,7 +91,8 @@ class AdminRuntime:
     #: Module-level singleton — every runtime references the SAME registry.
     #: This is deliberate and documented (see
     #: ``adminfoundry/security/protected_fields.py`` and the "documented
-    #: singletons are allowed" carve-out in ``docs/roadmap.md``): a leaked
+    #: singletons are allowed" carve-out in
+    #: ``docs/review-hardening-roadmap.md``): a leaked
     #: secret from any admin's response is the same security failure no
     #: matter which app instance holds the registry, so protected fields
     #: are a global, fail-safe concern — two apps sharing the registry can
