@@ -74,8 +74,18 @@ def test_tenant_slug_accepts_valid(value):
 
 
 @pytest.mark.parametrize(
+    "raw,expected",
+    [("Acme", "acme"), ("  acme  ", "acme"), ("Foo-Bar", "foo-bar")],
+)
+def test_tenant_slug_normalizes_case_and_whitespace(raw, expected):
+    # Review R12: casing / surrounding whitespace are normalized rather than
+    # rejected, so a client header like "Acme" resolves the stored "acme".
+    assert validate_tenant_slug(raw) == expected
+
+
+@pytest.mark.parametrize(
     "value",
-    ["", "a", "Acme", "_acme", "ac_me", "ac.me", "1acme", "a" * 64],
+    ["", "a", "_acme", "ac_me", "ac.me", "1acme", "has space", "a" * 64],
 )
 def test_tenant_slug_rejects_invalid(value):
     with pytest.raises(InvalidTenantSlugError):

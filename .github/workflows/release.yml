@@ -1,0 +1,64 @@
+name: Release
+
+# Tag-triggered release (Review R10). Push an annotated tag like ``v0.1.0`` to
+# build the distribution, smoke-test the built wheel in a clean environment,
+# and publish to PyPI via Trusted Publishing (no API token stored).
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build + verify dist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  smoke:
+    name: Install built wheel in a clean venv
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Install the wheel into a fresh venv and smoke-test it
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --upgrade pip
+          # Install the built wheel (not the source tree) so packaging gaps
+          # — missing templates/static, bad entry point — surface here.
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/python -c "import adminfoundry; print('adminfoundry', adminfoundry.__version__)"
+          /tmp/smoke/bin/adminfoundry --help
+
+  publish:
+    name: Publish to PyPI (Trusted Publishing)
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # Required for PyPI Trusted Publishing (OIDC); no API token needed.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -40,10 +40,17 @@ shape change bumps `CONTRACT_VERSION`.
   verifies it; unset keeps the historic claim-free behaviour.
 - `invalidate_tenant(slug)` and a configurable `tenant_cache_ttl_seconds`
   (default 30) for the per-process tenant resolution cache.
+- Tag-triggered release workflow (`.github/workflows/release.yml`): build,
+  clean-venv wheel smoke test, and PyPI publish via Trusted Publishing.
+- jsdom-based JS tests for `api.js` (`tokenStore`, `APIError` envelope
+  parsing); `jsdom` added as a JS dev dependency.
 
 ### Changed
 - CI: the `build` job now depends on `test-postgres`, so PostgreSQL
   integration tests gate the release artifact.
+- Tenant slugs are normalized (strip + lowercase) on both the write path
+  (`validate_tenant_slug`) and the read path (`X-Tenant-Slug` / subdomain),
+  so client casing/whitespace resolves the canonical tenant.
 - Docs: `roadmap.md` and `stabilization.md` consolidated into
   `docs/review-hardening-roadmap.md`; tenancy/architecture docs corrected to
   describe where `search_path` is actually applied.
