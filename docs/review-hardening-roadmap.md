@@ -1,10 +1,11 @@
 # adminfoundry — Roadmap & Hardening (konsolidiert)
 
-Stand: 2026-06-16 · bezieht sich auf `adminfoundry` 0.1.0
+Stand: 2026-06-18 · bezieht sich auf `adminfoundry` 0.1.0
 
 Dieses Dokument konsolidiert die frühere `roadmap.md` (Feature-Phasen,
 Non-Goals) und `stabilization.md` (Pre-1.0-Härtung) und führt sie mit den
-Befunden des externen Code-Reviews vom 2026-06-16 zusammen. Es ist die
+Befunden des externen Code-Reviews vom 2026-06-16 (Runde 1, R1–R12) und der
+Folge-Analyse vom 2026-06-18 (Runde 2, R13–R17) zusammen. Es ist die
 **einzige maßgebliche Roadmap**.
 
 > Leitregel: **keine neuen Produktfeatures** vor 1.0. Jeder offene Punkt
@@ -14,9 +15,11 @@ Befunden des externen Code-Reviews vom 2026-06-16 zusammen. Es ist die
 > über den HTTP-Pfad, nicht nur das Primitiv.
 
 **Status der aktiven Arbeit:** Feature-Phasen 1–5 und Härtung P1–P3
-abgeschlossen (siehe [Historie](#abgeschlossen-historie)). Offen ist die
-**Review-Härtung R1–R12** unten plus zwei Follow-ups; Phasen 6/7 sind
-geparkt.
+abgeschlossen (siehe [Historie](#abgeschlossen-historie)). Runde-1-Härtung
+**R1–R12 ist code-seitig umgesetzt + gemergt**, ABER R1/R2 (Isolation) gilt
+erst als erledigt, wenn der `test-postgres`-CI-Job grün ist — aktuell ist er
+**rot** (s. R13). Runde 2 (**R13–R17**) sammelt die Befunde der Folge-Analyse.
+Phasen 6/7 bleiben geparkt.
 
 ---
 
@@ -24,8 +27,12 @@ geparkt.
 
 | Prio | ID | Thema | Status |
 |---|---|---|---|
-| **P0** | R1 | [`search_path` auf der Request-Session](#p0--r1-search_path-auf-der-request-session) | ✅ erledigt |
-| **P0** | R2 | [HTTP-PG-Isolationstest](#p0--r2-http-pg-isolationstest) | ✅ erledigt |
+### Runde 1 (Review 2026-06-16)
+
+| Prio | ID | Thema | Status |
+|---|---|---|---|
+| **P0** | R1 | [`search_path` auf der Request-Session](#p0--r1-search_path-auf-der-request-session) | 🟡 Code fertig — CI-Beweis offen (s. R13) |
+| **P0** | R2 | [HTTP-PG-Isolationstest](#p0--r2-http-pg-isolationstest) | 🟡 geschrieben — **läuft im CI rot** (s. R13) |
 | **P0** | R3 | [Doku-Zusagen zur Isolation korrigieren](#p0--r3-doku-zusagen-zur-isolation-korrigieren) | ✅ erledigt |
 | **P1** | R4 | [`test-postgres` als Build-Gate](#p1--r4-test-postgres-als-build-gate) | ✅ erledigt |
 | **P1** | R5 | [CHANGELOG.md + SECURITY.md](#p1--r5-changelogmd--securitymd) | ✅ erledigt |
@@ -36,10 +43,17 @@ geparkt.
 | **P3** | R10 | [Release-Workflow + Wheel-Smoke](#p3--r10-release-workflow--wheel-smoke) | ✅ erledigt |
 | **P3** | R11 | [JS-Tests ausbauen](#p3--r11-js-tests-ausbauen) | ✅ erledigt |
 | **P3** | R12 | [Slug-Normalisierung](#p3--r12-slug-normalisierung) | ✅ erledigt |
-| **—** | — | [Bewusst NICHT umgesetzt](#bewusst-nicht-umgesetzt) | entschieden |
 
-**Phasen:** Phase 0 = R1–R3 (zusammen mergen — der Fix ohne Test/Doku ist
-unvollständig). Phase 1 = R4–R6. Phase 2 = R7–R9. Phase 3 = R10–R12.
+### Runde 2 (Analyse 2026-06-18)
+
+| Prio | ID | Thema | Status |
+|---|---|---|---|
+| **P0** | R13 | [Roten `test-postgres`-Job klären](#p0--r13-roten-test-postgres-job-klären) | ⬜ offen |
+| **P1** | R14 | [XSS-Härtung: CSP + Token-Storage](#p1--r14-xss-härtung-csp--token-storage) | ⬜ offen |
+| **P2** | R15 | [Login-Enumeration + Default-Limiter-Keying](#p2--r15-login-enumeration--default-limiter-keying) | ⬜ offen |
+| **P2** | R16 | [Proxy-/Client-IP (CIDR-Allowlist, Audit)](#p2--r16-proxy--client-ip) | ⬜ offen |
+| **P3** | R17 | [Toten/redundanten Code aufräumen](#p3--r17-totenredundanten-code-aufräumen) | 🟡 teilweise (clear()-Fix lokal) |
+| **—** | — | [Bewusst NICHT umgesetzt](#bewusst-nicht-umgesetzt) | entschieden |
 
 ---
 
@@ -314,9 +328,11 @@ SPA-Shell beworbene UI; reines DOM-Mounting nur per Python-Smoke gedeckt
 
 **Risiko:** Niedrig.
 
-**Änderung:** Bei Bedarf jsdom-Render-Tests der View-Module ergänzen.
+**Änderung:** jsdom-Tests ergänzt für `api.js` (`tokenStore`-localStorage-
+Round-Trip, `APIError`-Envelope-Parsing); `jsdom` als JS-Dev-Dependency. Die
+Pure-Logic-Tests bleiben per Datei-Direktive auf dem node-Environment.
 
-**Status:** ⬜ offen · nur bei konkretem Bedarf.
+**Status:** ✅ erledigt (`tests/js/api.test.js`).
 
 ---
 
@@ -332,7 +348,116 @@ Treffer/Fehltreffer).
 **Änderung:** Slug vor Lookup normalisieren (lowercase/trim) und beim
 Tenant-Anlegen dieselbe Normalisierung erzwingen.
 
+**Status:** ✅ erledigt (`validate_tenant_slug` + `_extract_slug`).
+
+---
+
+# Runde 2 — Folge-Analyse (2026-06-18)
+
+Befunde aus der Anwendung der 5 Analyse-Achsen auf den Stand nach R1–R12.
+
+## P0 — R13: Roten `test-postgres`-Job klären
+
+**Problem:** Der `test-postgres`-CI-Job für den letzten `main`-Push
+(`aea91f4`) ist **rot** — Step `Run postgres-marked tests` (`pytest -m
+postgres`). Damit ist die Isolation aus R1 **auf echtem PostgreSQL nicht
+bewiesen**; lokal lief der HTTP-Isolationstest (R2) nur als Skip (keine DB).
+Verdächtig ist primär der neue `test_http_tenant_isolation.py`, der lokal nie
+ausgeführt werden konnte.
+
+**Risiko:** **Kritisch/Blocker** — solange ungeklärt, ist der Kern-Claim
+(Tenant-Isolation) offen; im schlimmsten Fall ein realer Fehler in R1/R2 auf
+PG.
+
+**Betroffene Dateien:** [tests/postgres/test_http_tenant_isolation.py](../tests/postgres/test_http_tenant_isolation.py),
+[db/dependencies.py](../adminfoundry/db/dependencies.py),
+[.github/workflows/ci.yml](../.github/workflows/ci.yml).
+
+**Änderung:** CI-Log lesen (GitHub-Token) oder lokal gegen echtes PostgreSQL
+reproduzieren (`ADMINFOUNDRY_TEST_POSTGRES_URL`), Ursache fixen, Job grün.
+
+**Test:** `test-postgres` grün auf `main`.
+
+**Status:** ⬜ offen · **höchste Priorität.**
+
+## P1 — R14: XSS-Härtung: CSP + Token-Storage
+
+**Problem:** Kein CSP ([core/middleware.py:109-113](../adminfoundry/core/middleware.py))
+und Bearer-Token im `localStorage` ([ui/static/admin/api.js:14](../adminfoundry/ui/static/admin/api.js))
+→ eine einzige XSS im Admin-UI = Token-Diebstahl ohne HttpOnly-Schutz.
+
+**Risiko:** Hoch (clientseitig der größte Hebel).
+
+**Änderung:** Opt-in-CSP-Header (konfigurierbar, sobald die UI kompatibel ist;
+die statische No-Build-UI ggf. an eine restriktive CSP anpassen) und/oder
+Token-Speicherung auf HttpOnly-Cookie umstellen (zieht dann R14 ↔ CSRF nach
+sich — vgl. „Bewusst NICHT umgesetzt").
+
+**Test:** Header-Assertion (CSP gesetzt, wenn konfiguriert); UI-Smoke unter CSP.
+
 **Status:** ⬜ offen.
+
+## P2 — R15: Login-Enumeration + Default-Limiter-Keying
+
+**Problem:** (a) `inactive_user`→403 vs. `invalid_credentials`→401
+([auth/router.py](../adminfoundry/auth/router.py)) plus bcrypt-Timing-Short-
+Circuit ([providers/auth.py:133](../adminfoundry/providers/auth.py)) erlauben
+User-Enumeration. (b) Der Default-Limiter ist per-Worker und nur per E-Mail
+gekeyt (kein IP) → schwacher Brute-Force-/Spraying-Schutz im Default.
+
+**Risiko:** Mittel.
+
+**Änderung:** Einheitliche, generische Login-Fehlermeldung (gleicher Status/
+Text für unbekannt/falsch/inaktiv); konstante-Zeit-Pfad (Dummy-Hash bei
+unbekannter E-Mail); optional `(email, ip)`-Keying. Default-Schwäche zumindest
+klar dokumentieren + R7 als Produktionsempfehlung verlinken.
+
+**Test:** Negativtests: unbekannte vs. falsche vs. inaktive E-Mail liefern
+identische Antwort.
+
+**Status:** ⬜ offen.
+
+## P2 — R16: Proxy- / Client-IP
+
+**Problem:** Tenant-CIDR-Allowlist ([tenancy/middleware.py:42](../adminfoundry/tenancy/middleware.py))
+und Audit-IP ([audit/service.py:66](../adminfoundry/audit/service.py)) nutzen
+`request.client.host` direkt — kein `X-Forwarded-For`. Hinter dem üblichen
+Reverse-Proxy ist die CIDR-Allowlist faktisch wirkungslos/umgehbar, Audit-IPs
+sind die Proxy-IP.
+
+**Risiko:** Mittel (eine Sicherheitskontrolle, die Mandanten vertrauen).
+
+**Änderung:** Echte Client-IP aus `X-Forwarded-For` ableiten — **nur** bei
+konfigurierten Trusted Proxies (z. B. `forwarded_allow_ips` / Anzahl Hops),
+nie ungeprüft (sonst Spoofing). Deployment-Doku: `uvicorn --proxy-headers`.
+
+**Test:** CIDR-Entscheidung gegen gesetztes `X-Forwarded-For` bei
+konfiguriertem Trusted Proxy; ohne Konfiguration unverändert.
+
+**Status:** ⬜ offen.
+
+## P3 — R17: Toten/redundanten Code aufräumen
+
+**Problem:**
+- `resolve_impersonation_tenant` ([tenancy/resolver.py:102](../adminfoundry/tenancy/resolver.py))
+  ist **tot** (keine Aufrufer).
+- `BuiltinPermissionProvider.get_permissions` öffnet pro Request eine zweite
+  Session ([providers/permissions.py:59](../adminfoundry/providers/permissions.py));
+  seit R1 ist die Request-Session bereits gescoped → ließe sich
+  zusammenführen (zweiter Pool-Hop entfällt).
+- `clear()`-Inkonsistenz im Login (nutzte den Modul-Default statt des
+  injizierten Limiters) — **lokal bereits gefixt** ([auth/router.py:160](../adminfoundry/auth/router.py)).
+
+**Risiko:** Niedrig (Wartbarkeit; der `clear()`-Bug war ein echter
+Korrektheitsfehler mit Redis-Backend).
+
+**Änderung:** Toten Code entfernen; Provider-Doppel-Session als eigener,
+getesteter Schritt zusammenführen; `clear()`-Fix committen.
+
+**Test:** Integrationstest „injizierter Limiter wird auf allen drei Pfaden
+(is_limited/record/clear) benutzt".
+
+**Status:** 🟡 teilweise — `clear()`-Fix lokal, Rest offen.
 
 ---
 
@@ -385,10 +510,13 @@ Commit/Changelog markiert. Ab `1.0` gilt SemVer:
 - [x] Härtung P1 erfüllt (JS-Harness, Contract-Snapshots, mypy-CI auf Vertragsschicht)
 - [x] Härtung P2 entschieden + dokumentiert (Field-Visibility-Resolver, User-Entkopplungs-Grenze)
 - [x] Doku ehrlich bei „Known limitations"
-- [x] **R1–R4 erledigt** — tenant-lokales CRUD über den HTTP-Pfad auf echtem
-  PostgreSQL nachweislich isoliert (Test) und im Build gegated. **Harter
-  1.0-Blocker** (und Voraussetzung für jede Multi-Tenant-Produktion).
+- [ ] **R1–R4 + R13** — tenant-lokales CRUD über den HTTP-Pfad auf echtem
+  PostgreSQL **nachweislich** isoliert (CI grün) und im Build gegated. Code +
+  Test + Gate stehen, aber der `test-postgres`-Job ist aktuell **rot** (R13) →
+  noch **nicht** erfüllt. **Harter 1.0-Blocker** (und Voraussetzung für jede
+  Multi-Tenant-Produktion).
 - [x] R5 — Changelog/Release-Notes-Prozess etabliert (`CHANGELOG.md`)
+- [ ] R14 — XSS-Härtung (CSP / Token-Storage) bewertet + adressiert
 - [ ] mypy aufs Gesamtpaket grün (Follow-up) — *empfohlen, nicht zwingend*
 
 ---

@@ -157,7 +157,7 @@ async def login(
         )
         raise HTTPException(status_code=http_status, detail=detail) from exc
 
-    await _login_limiter.clear(email_key)
+    await limiter.clear(email_key)
 
     # 2FA step-up (Roadmap 3.4b). Builtin-only concern — the User
     # model carries totp_enabled. External auth providers handle MFA
