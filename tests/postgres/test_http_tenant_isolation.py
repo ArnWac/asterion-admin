@@ -17,6 +17,7 @@ import uuid
 
 import httpx
 import pytest
+from fastapi import Request
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -67,7 +68,7 @@ def _build_app(url: str):
         register=lambda reg: reg.register(IsoWidgetAdmin),
     )
 
-    async def _ctx_override(request) -> AdminContext:
+    async def _ctx_override(request: Request) -> AdminContext:
         t = getattr(request.state, "tenant", None)
         admin_tenant = (
             AdminTenant(id=str(t.id), slug=t.slug, name=t.name) if t is not None else None

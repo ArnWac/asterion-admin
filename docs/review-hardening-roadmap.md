@@ -48,7 +48,7 @@ Phasen 6/7 bleiben geparkt.
 
 | Prio | ID | Thema | Status |
 |---|---|---|---|
-| **P0** | R13 | [Roten `test-postgres`-Job klären](#p0--r13-roten-test-postgres-job-klären) | ⬜ offen |
+| **P0** | R13 | [Roten `test-postgres`-Job klären](#p0--r13-roten-test-postgres-job-klären) | 🟡 Fix angewandt (Test-Override-Annotation) — CI-Bestätigung offen |
 | **P1** | R14 | [XSS-Härtung: CSP + Token-Storage](#p1--r14-xss-härtung-csp--token-storage) | ⬜ offen |
 | **P2** | R15 | [Login-Enumeration + Default-Limiter-Keying](#p2--r15-login-enumeration--default-limiter-keying) | ⬜ offen |
 | **P2** | R16 | [Proxy-/Client-IP (CIDR-Allowlist, Audit)](#p2--r16-proxy--client-ip) | ⬜ offen |
@@ -373,12 +373,20 @@ PG.
 [db/dependencies.py](../adminfoundry/db/dependencies.py),
 [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 
-**Änderung:** CI-Log lesen (GitHub-Token) oder lokal gegen echtes PostgreSQL
-reproduzieren (`ADMINFOUNDRY_TEST_POSTGRES_URL`), Ursache fixen, Job grün.
+**Ursache (gefunden 2026-06-18):** **kein Produktbug.** Der Dependency-Override
+im R2-Test hatte `async def _ctx_override(request)` **ohne Typannotation** →
+FastAPI behandelte `request` als erforderlichen Query-Parameter → jeder POST
+scheiterte mit `422 {"fields":[{"name":"request","message":"Field required"}]}`,
+bevor die Isolationslogik (R1) überhaupt lief. Lokal unsichtbar, weil der Test
+nur auf PostgreSQL läuft.
 
-**Test:** `test-postgres` grün auf `main`.
+**Änderung:** `request: Request` annotiert ([test_http_tenant_isolation.py](../tests/postgres/test_http_tenant_isolation.py)),
+damit FastAPI das Request-Objekt injiziert statt es zu validieren.
 
-**Status:** ⬜ offen · **höchste Priorität.**
+**Test:** `test-postgres` grün auf `main` (per CI bestätigen — lokal nicht
+ausführbar).
+
+**Status:** 🟡 Fix angewandt — CI-Bestätigung ausstehend.
 
 ## P1 — R14: XSS-Härtung: CSP + Token-Storage
 
