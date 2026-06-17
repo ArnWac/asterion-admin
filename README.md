@@ -1,5 +1,7 @@
 # adminfoundry
 
+[![CI](https://github.com/ArnWac/adminfoundry/actions/workflows/ci.yml/badge.svg)](https://github.com/ArnWac/adminfoundry/actions/workflows/ci.yml)
+
 A contract-driven FastAPI admin framework for SQLAlchemy applications.
 
 Register your models declaratively and get a generated admin: CRUD routes,

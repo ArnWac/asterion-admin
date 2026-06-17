@@ -62,7 +62,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -e ".[dev]"
-      - run: pytest -q
+      - run: pytest -q --cov=adminfoundry --cov-report=term-missing
 
   test-postgres:
     name: Test (PostgreSQL integration)
@@ -96,7 +96,7 @@ jobs:
   build:
     name: Build wheel + sdist
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, js, test]
+    needs: [lint, typecheck, js, test, test-postgres]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
