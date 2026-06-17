@@ -1,35 +1,14 @@
-"""Redis-backed login rate limiter (Review R7).
-
-A distributed, multi-worker-safe implementation of the
-:class:`~adminfoundry.auth.rate_limiter.RateLimiterBackend` Protocol. Unlike
-the in-memory default, the failure counters live in Redis, so every uvicorn
-worker / process / instance shares one view and a restart does not reset the
-window.
-
-Core does **not** depend on ``redis``: this module is duck-typed against any
-async Redis client (``redis.asyncio.Redis``, ``fakeredis.aioredis.FakeRedis``,
-…). Install the client yourself — the ``rate-limit-redis`` extra pulls in
-``redis``:
-
-    pip install adminfoundry[rate-limit-redis]
-
-then wire it in::
-
-    import redis.asyncio as aioredis
-    from adminfoundry import create_admin
-    from adminfoundry.auth.rate_limiter_redis import RedisLoginRateLimiter
-
-    app = create_admin(
-        config=...,
-        login_rate_limiter=RedisLoginRateLimiter(aioredis.from_url("redis://localhost:6379")),
-    )
+"""Redis-backed login rate limiter implementation (Review R7).
 
 The window is a sliding one, modelled as a Redis sorted set per key whose
 members are scored by their unix timestamp. ``record_failure`` appends an entry
 and refreshes the key TTL; ``is_limited`` counts entries inside the window with
-``ZCOUNT`` (read-only). The login flow keys on the lowercased email; a future
-change can key on ``(email, ip)`` without touching this class — the key is
-opaque here.
+``ZCOUNT`` (read-only).
+
+Core depends only on the :class:`~adminfoundry.auth.rate_limiter.RateLimiterBackend`
+Protocol, never on ``redis`` — this class is duck-typed against any async Redis
+client, so it imports nothing from ``redis`` itself. See the package
+``__init__`` for the install + wiring story.
 """
 
 from __future__ import annotations

@@ -14,7 +14,7 @@ import pytest
 from fakeredis import aioredis
 
 from adminfoundry.auth.rate_limiter import RateLimiterBackend
-from adminfoundry.auth.rate_limiter_redis import RedisLoginRateLimiter
+from adminfoundry.extensions.rate_limit_redis import RedisLoginRateLimiter
 
 
 @pytest.fixture

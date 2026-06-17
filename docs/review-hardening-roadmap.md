@@ -220,15 +220,19 @@ dokumentiert und über `RateLimiterBackend`-Protocol austauschbar.**
 **Risiko:** Mittel — Design ist vorbereitet, der Default reicht nur für
 Single-Worker/MVP.
 
-**Betroffene Dateien:** neues Backend (z. B.
-`adminfoundry/auth/rate_limiter_redis.py`) hinter dem vorhandenen Protocol;
-Verdrahtung in der Config; ggf. Keying-Strategie `(email, ip)`.
+**Betroffene Dateien:** neues Backend als Extension (analog `storage_s3`):
+`adminfoundry/extensions/rate_limit_redis/` hinter dem vorhandenen Protocol;
+Verdrahtung über `create_admin(login_rate_limiter=...)` + Runtime-Feld; ggf.
+Keying-Strategie `(email, ip)`.
 
-**Änderung:** Optionales Redis-/DB-Backend bereitstellen (als Extra, analog
-`storage-s3`); Default unverändert lassen. IP-/Tupel-Keying als Option.
+**Änderung:** Optionales Redis-Backend als Extra `rate-limit-redis`
+bereitgestellt (analog `storage-s3`, eigener `extensions/`-Ordner); Default
+unverändert. `RedisLoginRateLimiter` ist gegen jeden async Redis-Client
+duck-typed (kein harter `redis`-Import im Core). IP-/Tupel-Keying bleibt offen.
 
-**Test:** Protocol-Conformance-Test gegen `fakeredis`/in-process-Mock;
-Fenster-/Reset-Verhalten.
+**Test:** Protocol-Conformance-Test gegen `fakeredis`
+(`tests/extensions/rate_limit_redis/test_backend.py`); Fenster-/Reset-/
+Clear-Verhalten.
 
 **Status:** ⬜ offen.
 

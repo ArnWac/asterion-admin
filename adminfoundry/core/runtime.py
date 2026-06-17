@@ -79,7 +79,7 @@ class AdminRuntime:
     #: Login rate-limiter backend (Review R7). ``None`` → the auth router
     #: falls back to its in-memory, single-process default. Multi-worker
     #: deployments pass a shared backend (e.g.
-    #: ``adminfoundry.auth.rate_limiter_redis.RedisLoginRateLimiter``)
+    #: ``adminfoundry.extensions.rate_limit_redis.RedisLoginRateLimiter``)
     #: satisfying :class:`adminfoundry.auth.rate_limiter.RateLimiterBackend`.
     login_rate_limiter: Any = None
     #: Typed-notifier registry (Roadmap P4.5). Apps and extensions

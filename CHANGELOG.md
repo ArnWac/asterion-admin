@@ -33,8 +33,10 @@ shape change bumps `CONTRACT_VERSION`.
   README.
 - **Distributed login rate limiter:** `RedisLoginRateLimiter` (duck-typed
   against any async Redis client) behind the existing `RateLimiterBackend`
-  Protocol, plus a `rate-limit-redis` extra. `create_admin(login_rate_limiter=…)`
-  swaps it in; the in-memory default is unchanged.
+  Protocol, shipped as the `adminfoundry.extensions.rate_limit_redis` extension
+  (mirrors `storage_s3`), plus a `rate-limit-redis` extra.
+  `create_admin(login_rate_limiter=…)` swaps it in; the in-memory default is
+  unchanged.
 - **JWT `iss`/`aud` hardening:** optional `jwt_issuer` / `jwt_audience` config.
   When set, every minted token carries the claim and every decode requires +
   verifies it; unset keeps the historic claim-free behaviour.
