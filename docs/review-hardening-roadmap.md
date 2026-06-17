@@ -33,9 +33,9 @@ geparkt.
 | **P2** | R7 | [Verteilter Rate-Limiter](#p2--r7-verteilter-rate-limiter) | ✅ erledigt |
 | **P2** | R8 | [JWT-Härtung: aud/iss](#p2--r8-jwt-härtung-audiss) | ✅ erledigt |
 | **P2** | R9 | [Tenant-Cache-Invalidierung](#p2--r9-tenant-cache-invalidierung) | ✅ erledigt |
-| **P3** | R10 | [Release-Workflow + Wheel-Smoke](#p3--r10-release-workflow--wheel-smoke) | ⬜ offen |
-| **P3** | R11 | [JS-Tests ausbauen](#p3--r11-js-tests-ausbauen) | ⬜ offen |
-| **P3** | R12 | [Slug-Normalisierung](#p3--r12-slug-normalisierung) | ⬜ offen |
+| **P3** | R10 | [Release-Workflow + Wheel-Smoke](#p3--r10-release-workflow--wheel-smoke) | ✅ erledigt |
+| **P3** | R11 | [JS-Tests ausbauen](#p3--r11-js-tests-ausbauen) | ✅ erledigt |
+| **P3** | R12 | [Slug-Normalisierung](#p3--r12-slug-normalisierung) | ✅ erledigt |
 | **—** | — | [Bewusst NICHT umgesetzt](#bewusst-nicht-umgesetzt) | entschieden |
 
 **Phasen:** Phase 0 = R1–R3 (zusammen mergen — der Fix ohne Test/Doku ist

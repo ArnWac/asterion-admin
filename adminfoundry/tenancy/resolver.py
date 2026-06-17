@@ -59,15 +59,25 @@ def _get_resolution_strategy(request: Request) -> tuple[str, str]:
     return "header", "X-Tenant-Slug"
 
 
+def _normalize_slug(value: str | None) -> str | None:
+    """Canonicalize an inbound slug (Review R12): strip + lowercase so a
+    client sending ``"Acme"`` / ``" acme "`` resolves the same tenant that was
+    stored as ``"acme"``. Empty after trimming → ``None``."""
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
+
 def _extract_slug(request: Request) -> str | None:
     strategy, header_name = _get_resolution_strategy(request)
     if strategy == "subdomain":
         host = request.headers.get("host", "").split(":")[0]
         parts = host.split(".")
         if len(parts) >= 2:
-            return parts[0]
+            return _normalize_slug(parts[0])
         return None
-    return request.headers.get(header_name)
+    return _normalize_slug(request.headers.get(header_name))
 
 
 async def resolve_tenant(request: Request) -> TenantContext | None:

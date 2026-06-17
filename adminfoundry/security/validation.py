@@ -78,8 +78,13 @@ def validate_action_name(value: str) -> str:
 
 
 def validate_tenant_slug(value: str) -> str:
-    """Tenant slug: at least 2 chars, lowercase, hyphen-friendly."""
-    value = _require_str(value, name="tenant slug")
+    """Tenant slug: at least 2 chars, lowercase, hyphen-friendly.
+
+    Normalizes (strip + lowercase) before validating (Review R12) so callers
+    can pass ``"  Acme "`` and get the canonical ``"acme"``; genuinely invalid
+    shapes (spaces, punctuation, too short) still raise.
+    """
+    value = _require_str(value, name="tenant slug").strip().lower()
     if not _TENANT_SLUG_RE.fullmatch(value):
         raise InvalidTenantSlugError(
             f"Invalid tenant slug: {value!r}. "
