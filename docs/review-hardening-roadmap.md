@@ -16,10 +16,10 @@ Folge-Analyse vom 2026-06-18 (Runde 2, R13–R17) zusammen. Es ist die
 
 **Status der aktiven Arbeit:** Feature-Phasen 1–5 und Härtung P1–P3
 abgeschlossen (siehe [Historie](#abgeschlossen-historie)). Runde-1-Härtung
-**R1–R12 ist code-seitig umgesetzt + gemergt**, ABER R1/R2 (Isolation) gilt
-erst als erledigt, wenn der `test-postgres`-CI-Job grün ist — aktuell ist er
-**rot** (s. R13). Runde 2 (**R13–R17**) sammelt die Befunde der Folge-Analyse.
-Phasen 6/7 bleiben geparkt.
+**R1–R12 umgesetzt + gemergt**; R1/R2 (Tenant-Isolation) ist seit dem CI-Lauf
+vom 2026-06-18 auf echtem PostgreSQL **bestätigt** (Job `test-postgres` grün).
+Runde 2 (**R13–R17**) sammelt die Befunde der Folge-Analyse — R13 erledigt,
+R14–R17 offen. Phasen 6/7 bleiben geparkt.
 
 ---
 
@@ -31,8 +31,8 @@ Phasen 6/7 bleiben geparkt.
 
 | Prio | ID | Thema | Status |
 |---|---|---|---|
-| **P0** | R1 | [`search_path` auf der Request-Session](#p0--r1-search_path-auf-der-request-session) | 🟡 Code fertig — CI-Beweis offen (s. R13) |
-| **P0** | R2 | [HTTP-PG-Isolationstest](#p0--r2-http-pg-isolationstest) | 🟡 geschrieben — **läuft im CI rot** (s. R13) |
+| **P0** | R1 | [`search_path` auf der Request-Session](#p0--r1-search_path-auf-der-request-session) | ✅ erledigt (CI-bestätigt 2026-06-18) |
+| **P0** | R2 | [HTTP-PG-Isolationstest](#p0--r2-http-pg-isolationstest) | ✅ erledigt (CI grün) |
 | **P0** | R3 | [Doku-Zusagen zur Isolation korrigieren](#p0--r3-doku-zusagen-zur-isolation-korrigieren) | ✅ erledigt |
 | **P1** | R4 | [`test-postgres` als Build-Gate](#p1--r4-test-postgres-als-build-gate) | ✅ erledigt |
 | **P1** | R5 | [CHANGELOG.md + SECURITY.md](#p1--r5-changelogmd--securitymd) | ✅ erledigt |
@@ -48,7 +48,7 @@ Phasen 6/7 bleiben geparkt.
 
 | Prio | ID | Thema | Status |
 |---|---|---|---|
-| **P0** | R13 | [Roten `test-postgres`-Job klären](#p0--r13-roten-test-postgres-job-klären) | 🟡 Fix angewandt (Test-Override-Annotation) — CI-Bestätigung offen |
+| **P0** | R13 | [Roten `test-postgres`-Job klären](#p0--r13-roten-test-postgres-job-klären) | ✅ erledigt (Test-Override-Annotation; CI grün) |
 | **P1** | R14 | [XSS-Härtung: CSP + Token-Storage](#p1--r14-xss-härtung-csp--token-storage) | ⬜ offen |
 | **P2** | R15 | [Login-Enumeration + Default-Limiter-Keying](#p2--r15-login-enumeration--default-limiter-keying) | ⬜ offen |
 | **P2** | R16 | [Proxy-/Client-IP (CIDR-Allowlist, Audit)](#p2--r16-proxy--client-ip) | ⬜ offen |
@@ -95,7 +95,7 @@ Session pro Request, kein zweiter Pool-Connection-Hop).
 **Test (Abnahmekriterium):** siehe R2 — gilt erst als erledigt, wenn der
 HTTP-PG-Isolationstest grün ist.
 
-**Status:** ⬜ offen · **Blocker für jede Multi-Tenant-Produktion.**
+**Status:** ✅ erledigt — auf echtem PostgreSQL per CI bestätigt (s. R13).
 
 ---
 
@@ -127,7 +127,7 @@ eigenem Schema + je einer tenant-lokalen ModelAdmin):
    keine Daten.
 5. Tenant-lokale Action / Bulk-Operation läuft im richtigen Schema.
 
-**Status:** ⬜ offen · gehört in denselben PR wie R1.
+**Status:** ✅ erledigt — Test grün auf echtem PostgreSQL (CI, s. R13).
 
 ---
 
@@ -156,7 +156,7 @@ Lücke — sie verdeckt das Risiko vor Integratoren.
 „`TenantMiddleware`" korrigieren; die Test-Beweis-Zusage erst aufnehmen,
 wenn R2 grün ist.
 
-**Status:** ⬜ offen · zusammen mit R1/R2.
+**Status:** ✅ erledigt (zusammen mit R1/R2).
 
 ---
 
@@ -383,10 +383,10 @@ nur auf PostgreSQL läuft.
 **Änderung:** `request: Request` annotiert ([test_http_tenant_isolation.py](../tests/postgres/test_http_tenant_isolation.py)),
 damit FastAPI das Request-Objekt injiziert statt es zu validieren.
 
-**Test:** `test-postgres` grün auf `main` (per CI bestätigen — lokal nicht
-ausführbar).
+**Test:** `test-postgres` grün auf `main`.
 
-**Status:** 🟡 Fix angewandt — CI-Bestätigung ausstehend.
+**Status:** ✅ erledigt — CI-Lauf `65391f8` (2026-06-18) grün, inkl.
+`Test (PostgreSQL integration)` + `Build`.
 
 ## P1 — R14: XSS-Härtung: CSP + Token-Storage
 
@@ -518,11 +518,10 @@ Commit/Changelog markiert. Ab `1.0` gilt SemVer:
 - [x] Härtung P1 erfüllt (JS-Harness, Contract-Snapshots, mypy-CI auf Vertragsschicht)
 - [x] Härtung P2 entschieden + dokumentiert (Field-Visibility-Resolver, User-Entkopplungs-Grenze)
 - [x] Doku ehrlich bei „Known limitations"
-- [ ] **R1–R4 + R13** — tenant-lokales CRUD über den HTTP-Pfad auf echtem
-  PostgreSQL **nachweislich** isoliert (CI grün) und im Build gegated. Code +
-  Test + Gate stehen, aber der `test-postgres`-Job ist aktuell **rot** (R13) →
-  noch **nicht** erfüllt. **Harter 1.0-Blocker** (und Voraussetzung für jede
-  Multi-Tenant-Produktion).
+- [x] **R1–R4 + R13** — tenant-lokales CRUD über den HTTP-Pfad auf echtem
+  PostgreSQL **nachweislich** isoliert und im Build gegated. **Bestätigt:**
+  CI-Lauf `65391f8` vom 2026-06-18, Job `Test (PostgreSQL integration)` grün
+  (Run 27724422671). Der harte 1.0-Blocker ist gefallen.
 - [x] R5 — Changelog/Release-Notes-Prozess etabliert (`CHANGELOG.md`)
 - [ ] R14 — XSS-Härtung (CSP / Token-Storage) bewertet + adressiert
 - [ ] mypy aufs Gesamtpaket grün (Follow-up) — *empfohlen, nicht zwingend*
