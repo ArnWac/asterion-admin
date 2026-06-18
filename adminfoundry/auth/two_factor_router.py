@@ -28,6 +28,7 @@ from adminfoundry.audit import (
     request_audit_kwargs,
 )
 from adminfoundry.auth.dependencies import get_current_user
+from adminfoundry.auth.rate_limiter import InMemoryLoginRateLimiter
 from adminfoundry.auth.revocation import (
     is_token_revoked,
     revoke_token,
@@ -64,6 +65,16 @@ from adminfoundry.models.user import User
 from adminfoundry.providers.base import AdminPrincipal
 
 router = APIRouter()
+
+#: Fallback throttle for the 2FA login step (Review R18). The password factor
+#: is rate-limited in the parent auth router, but ``/2fa/login`` was not — so an
+#: attacker who cleared factor one could brute-force the 6-digit TOTP within the
+#: challenge token's TTL. We bound the number of second-factor attempts *per
+#: user* (not per challenge: a valid password can mint a fresh challenge at
+#: will, so a per-challenge counter would be trivially reset). A shared backend
+#: injected as ``runtime.login_rate_limiter`` (e.g. Redis) wins over this
+#: in-process default so multi-worker deployments throttle across processes.
+_mfa_limiter = InMemoryLoginRateLimiter()
 
 
 @router.post("/2fa/setup", response_model=TwoFactorSetupResponse)
@@ -232,7 +243,11 @@ async def two_factor_login(
             detail="Provide exactly one of 'code' or 'backup_code'.",
         )
 
-    config = request.app.state.adminfoundry.config
+    runtime = request.app.state.adminfoundry
+    config = runtime.config
+    # A shared backend (Review R7) wins over the in-memory default so
+    # multi-worker deployments throttle the second factor across processes.
+    limiter = getattr(runtime, "login_rate_limiter", None) or _mfa_limiter
 
     try:
         challenge_payload = decode_mfa_challenge_token(
@@ -270,9 +285,28 @@ async def two_factor_login(
         # tokens directly).
         raise _bad_challenge()
 
+    # Throttle second-factor attempts per user (Review R18). Without this an
+    # attacker holding a valid challenge could brute-force the 6-digit TOTP
+    # before it expires. Keyed on the user, not the challenge jti, so minting a
+    # fresh challenge via re-login does not reset the counter.
+    mfa_key = f"mfa:{user.id}"
+    if await limiter.is_limited(mfa_key):
+        await _audit_mfa_login(
+            request,
+            action=LOGIN_FAILURE,
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            user=user,
+            reason="mfa_rate_limited",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many 2FA attempts. Try again later.",
+        )
+
     # Verify the second factor.
     if has_code:
         if not verify_totp(user.totp_secret, payload.code or ""):
+            await limiter.record_failure(mfa_key)
             await _audit_mfa_login(
                 request,
                 action=LOGIN_FAILURE,
@@ -289,6 +323,7 @@ async def two_factor_login(
     else:
         ok = await consume_backup_code(session, user_id=user.id, raw_code=payload.backup_code or "")
         if not ok:
+            await limiter.record_failure(mfa_key)
             await _audit_mfa_login(
                 request,
                 action=LOGIN_FAILURE,
@@ -302,6 +337,9 @@ async def two_factor_login(
                 detail="Invalid backup code.",
             )
         factor = "backup_code"
+
+    # Second factor passed — reset the attempt counter for this user.
+    await limiter.clear(mfa_key)
 
     # Single-use challenge — revoke its jti so a replay (e.g. with a
     # leaked challenge token + a phished code) is rejected.

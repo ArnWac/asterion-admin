@@ -281,6 +281,82 @@ def test_challenge_rejected_after_logout_all(app_with_2fa_user):
 
 
 # ---------------------------------------------------------------------------
+# Second-factor brute-force throttling (Review R18)
+# ---------------------------------------------------------------------------
+
+
+def test_2fa_login_throttles_repeated_wrong_codes(app_with_2fa_user):
+    """After the failure threshold, /2fa/login returns 429 — even for a
+    correct code. Without this an attacker who cleared the password factor
+    could brute-force the 6-digit TOTP within the challenge TTL."""
+    app, _, _, secret = app_with_2fa_user
+    token = _login(app).json()["mfa_token"]
+
+    # A wrong code does NOT consume the challenge, so the same token can be
+    # replayed — exactly the brute-force surface we are throttling. Five
+    # failures (the in-memory default) trip the limiter.
+    for _ in range(5):
+        r = _client(app).post(
+            "/api/v1/auth/2fa/login",
+            json={"mfa_token": token, "code": "000000"},
+        )
+        assert r.status_code == 401, r.text
+
+    # The next attempt is throttled before the code is even checked: a
+    # CORRECT code is now rejected with 429.
+    good = pyotp.TOTP(secret).now()
+    r = _client(app).post(
+        "/api/v1/auth/2fa/login",
+        json={"mfa_token": token, "code": good},
+    )
+    assert r.status_code == 429, r.text
+
+
+def test_2fa_throttle_keyed_per_user_not_per_challenge(app_with_2fa_user):
+    """Re-login mints a fresh challenge, but the throttle is keyed on the
+    user — so the attacker cannot reset the counter by getting a new
+    challenge token."""
+    app, _, _, secret = app_with_2fa_user
+
+    token = _login(app).json()["mfa_token"]
+    for _ in range(5):
+        _client(app).post(
+            "/api/v1/auth/2fa/login",
+            json={"mfa_token": token, "code": "000000"},
+        )
+
+    # Brand-new challenge for the same user — still throttled.
+    fresh = _login(app).json()["mfa_token"]
+    good = pyotp.TOTP(secret).now()
+    r = _client(app).post(
+        "/api/v1/auth/2fa/login",
+        json={"mfa_token": fresh, "code": good},
+    )
+    assert r.status_code == 429, r.text
+
+
+def test_2fa_login_success_under_threshold_clears_counter(app_with_2fa_user):
+    """A handful of failures below the limit must not lock out a legitimate
+    user, and a successful exchange resets the counter."""
+    app, _, _, secret = app_with_2fa_user
+    token = _login(app).json()["mfa_token"]
+
+    for _ in range(3):
+        r = _client(app).post(
+            "/api/v1/auth/2fa/login",
+            json={"mfa_token": token, "code": "000000"},
+        )
+        assert r.status_code == 401, r.text
+
+    good = pyotp.TOTP(secret).now()
+    r = _client(app).post(
+        "/api/v1/auth/2fa/login",
+        json={"mfa_token": token, "code": good},
+    )
+    assert r.status_code == 200, r.text
+
+
+# ---------------------------------------------------------------------------
 # Backup codes work for login
 # ---------------------------------------------------------------------------
 
