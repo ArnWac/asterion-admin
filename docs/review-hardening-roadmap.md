@@ -50,7 +50,7 @@ R14–R17 offen. Phasen 6/7 bleiben geparkt.
 |---|---|---|---|
 | **P0** | R13 | [Roten `test-postgres`-Job klären](#p0--r13-roten-test-postgres-job-klären) | ✅ erledigt (Test-Override-Annotation; CI grün) |
 | **P1** | R14 | [XSS-Härtung: CSP + Token-Storage](#p1--r14-xss-härtung-csp--token-storage) | 🟡 CSP-Knopf erledigt; Bundled-UI-Nonce + Cookie-Option offen |
-| **P2** | R15 | [Login-Enumeration + Default-Limiter-Keying](#p2--r15-login-enumeration--default-limiter-keying) | 🟡 Konstante-Zeit erledigt; `(email,ip)`-Keying nach R16 offen |
+| **P2** | R15 | [Login-Enumeration + Default-Limiter-Keying](#p2--r15-login-enumeration--default-limiter-keying) | ✅ erledigt (Konstante-Zeit + opt-in `(email,ip)`-Keying) |
 | **P2** | R16 | [Proxy-/Client-IP (CIDR-Allowlist, Audit)](#p2--r16-proxy--client-ip) | ✅ erledigt (`trusted_proxy_count`) |
 | **P3** | R17 | [Toten/redundanten Code aufräumen](#p3--r17-totenredundanten-code-aufräumen) | ✅ erledigt (Provider-Session-Merge als Folgeschritt offen) |
 | **—** | — | [Bewusst NICHT umgesetzt](#bewusst-nicht-umgesetzt) | entschieden |
@@ -425,9 +425,9 @@ klar dokumentieren + R7 als Produktionsempfehlung verlinken.
 **Test:** unbekannte vs. falsche E-Mail liefern identische Antwort; „inactive"
 nur bei korrektem Passwort — `tests/auth/test_login_enumeration.py`.
 
-**Status:** 🟡 teilweise — Konstante-Zeit-Pfad (`dummy_verify_password`) +
-uniforme 401 erledigt. **Offen:** optionales `(email, ip)`-Keying (baut auf
-R16 auf), bewusst danach.
+**Status:** ✅ erledigt — Konstante-Zeit-Pfad (`dummy_verify_password`) +
+uniforme 401; opt-in `login_rate_limit_by_ip` keyt auf `(email, ip)` über die
+R16-Client-IP (`tests/auth/test_login_limiter_keying.py`).
 
 ## P2 — R16: Proxy- / Client-IP
 

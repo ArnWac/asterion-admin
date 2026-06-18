@@ -197,6 +197,11 @@ class CoreAdminConfig:
     #: from the right of ``X-Forwarded-For``. Affects the tenant IP allowlist
     #: and the audit ``ip_address``.
     trusted_proxy_count: int = 0
+    #: Include the client IP in the login rate-limit key (Review R15). ``False``
+    #: (default) keys on email only; ``True`` keys on ``(email, ip)`` so one
+    #: source can't lock a victim out everywhere. Opt-in because it also resets
+    #: the counter per IP. The IP honours ``trusted_proxy_count``.
+    login_rate_limit_by_ip: bool = False
 
     # --- PR-10: production guards ---
     environment: Environment = "development"
@@ -316,6 +321,7 @@ class CoreAdminConfig:
             security_headers_enabled=_env_bool("ADMINFOUNDRY_SECURITY_HEADERS_ENABLED", True),
             content_security_policy=os.getenv("ADMINFOUNDRY_CONTENT_SECURITY_POLICY") or None,
             trusted_proxy_count=_env_int("ADMINFOUNDRY_TRUSTED_PROXY_COUNT", 0),
+            login_rate_limit_by_ip=_env_bool("ADMINFOUNDRY_LOGIN_RATE_LIMIT_BY_IP", False),
             environment=_env_literal(
                 "ADMINFOUNDRY_ENVIRONMENT",
                 "development",

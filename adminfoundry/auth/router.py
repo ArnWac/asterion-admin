@@ -47,6 +47,7 @@ from adminfoundry.auth.tokens import (
     get_token_jti,
     get_token_version,
 )
+from adminfoundry.core.net import request_client_ip
 from adminfoundry.db.dependencies import get_async_session
 from adminfoundry.models.user import User
 from adminfoundry.providers.base import (
@@ -112,11 +113,20 @@ async def login(
     transport-agnostic. A provider that can't do password login (e.g.
     a pure OAuth/OIDC provider) makes this endpoint return 501.
     """
+    runtime = request.app.state.adminfoundry
+    # Limiter key (Review R15): email by default. When ``login_rate_limit_by_ip``
+    # is on, scope it to ``(email, ip)`` using the trusted client IP (R16) so a
+    # single source can't lock a victim out of every other client — at the cost
+    # of a per-IP reset, which is why it is opt-in.
     email_key = payload.email.lower()
+    if getattr(runtime.config, "login_rate_limit_by_ip", False):
+        limiter_key = f"{email_key}|{request_client_ip(request) or 'unknown'}"
+    else:
+        limiter_key = email_key
     # A shared backend (Review R7) wins over the in-memory default so
     # multi-worker deployments throttle across processes.
-    limiter = getattr(request.app.state.adminfoundry, "login_rate_limiter", None) or _login_limiter
-    provider = request.app.state.adminfoundry.providers.auth
+    limiter = getattr(runtime, "login_rate_limiter", None) or _login_limiter
+    provider = runtime.providers.auth
 
     login_fn = getattr(provider, "login", None)
     if login_fn is None:
@@ -125,7 +135,7 @@ async def login(
             detail="The configured auth provider does not support password login.",
         )
 
-    if await limiter.is_limited(email_key):
+    if await limiter.is_limited(limiter_key):
         await _audit_login(
             request,
             action=LOGIN_FAILURE,
@@ -144,7 +154,7 @@ async def login(
             request=request,
         )
     except LoginError as exc:
-        await limiter.record_failure(email_key)
+        await limiter.record_failure(limiter_key)
         http_status, detail = _LOGIN_FAILURE_STATUS.get(
             exc.reason, (status.HTTP_401_UNAUTHORIZED, "Invalid credentials.")
         )
@@ -157,7 +167,7 @@ async def login(
         )
         raise HTTPException(status_code=http_status, detail=detail) from exc
 
-    await limiter.clear(email_key)
+    await limiter.clear(limiter_key)
 
     # 2FA step-up (Roadmap 3.4b). Builtin-only concern — the User
     # model carries totp_enabled. External auth providers handle MFA

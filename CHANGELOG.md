@@ -52,6 +52,9 @@ shape change bumps `CONTRACT_VERSION`.
   allowlist and audit `ip_address` now derive the real client IP from
   `X-Forwarded-For` when behind N trusted proxies (default 0 = ignore the
   header).
+- Opt-in `login_rate_limit_by_ip` config (R15): keys the login limiter on
+  `(email, ip)` instead of email only, so one source can't lock a victim out
+  everywhere. Default off.
 
 ### Fixed
 - Login no longer leaks account existence by timing (R15): the unknown-email
