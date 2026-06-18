@@ -24,4 +24,12 @@ class BuiltinTenantProvider:
         ctx = getattr(request.state, "tenant", None)
         if ctx is None:
             return None
-        return AdminTenant(id=str(ctx.id), slug=ctx.slug, name=ctx.name)
+        # Carry the resolved schema_name (DB source of truth) so the permission
+        # lookup scopes to the same schema the CRUD session uses, instead of
+        # re-deriving tenant_<slug>.
+        return AdminTenant(
+            id=str(ctx.id),
+            slug=ctx.slug,
+            name=ctx.name,
+            schema_name=getattr(ctx, "schema_name", None),
+        )

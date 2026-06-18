@@ -95,7 +95,14 @@ class BuiltinPermissionProvider:
 
 
 def _schema_for(tenant: AdminTenant) -> str:
-    """Match the schema name convention from ``tenancy.schema_names``."""
+    """Resolve the tenant's PostgreSQL schema for the RBAC lookup.
+
+    Prefer the provider-supplied ``schema_name`` (the DB source of truth, also
+    used by the request CRUD session) so both read the SAME schema; fall back
+    to the ``tenant_<slug>`` convention for providers that don't supply it.
+    """
+    if tenant.schema_name:
+        return tenant.schema_name
     from adminfoundry.tenancy.schema_names import make_tenant_schema_name
 
     return make_tenant_schema_name(tenant.slug)

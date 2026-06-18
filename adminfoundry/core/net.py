@@ -20,7 +20,12 @@ def client_ip(request: Request, *, trusted_proxy_count: int = 0) -> str | None:
     ignores ``X-Forwarded-For``. With ``N`` trusted proxies, returns the N-th
     entry from the right of ``X-Forwarded-For`` (the address the outermost
     trusted proxy observed); entries further left are client-controlled and not
-    trusted. Falls back to the peer when the header is absent/empty.
+    trusted.
+
+    Fails **safe**: if the header is absent, or has fewer entries than the
+    configured trusted hops (the request did not traverse the expected proxy
+    chain), the direct peer is returned rather than a client-controlled entry —
+    so a too-high ``trusted_proxy_count`` can't be turned into IP spoofing.
     """
     peer = request.client.host if request.client else None
     if trusted_proxy_count <= 0:
@@ -29,10 +34,9 @@ def client_ip(request: Request, *, trusted_proxy_count: int = 0) -> str | None:
     if not xff:
         return peer
     parts = [p.strip() for p in xff.split(",") if p.strip()]
-    if not parts:
+    if len(parts) < trusted_proxy_count:
         return peer
-    idx = min(trusted_proxy_count, len(parts))
-    return parts[-idx]
+    return parts[-trusted_proxy_count]
 
 
 def request_client_ip(request: Request) -> str | None:

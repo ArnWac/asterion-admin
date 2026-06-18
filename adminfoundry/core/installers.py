@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -53,6 +55,14 @@ def install_middleware(
         )
 
     if config.security_headers_enabled:
+        if config.content_security_policy and config.enable_builtin_ui:
+            logging.getLogger("adminfoundry").warning(
+                "content_security_policy is set while the bundled admin UI is "
+                "enabled. The bundled UI relies on inline <script> config blocks "
+                "that a strict 'script-src' will block (the UI then fails to "
+                "boot). Ensure the policy permits them (e.g. a nonce/'unsafe-inline') "
+                "or set enable_builtin_ui=False for API-first deployments."
+            )
         app.add_middleware(SecurityHeadersMiddleware, csp=config.content_security_policy)
 
     # Access log sits just inside RequestIDMiddleware so its log records
