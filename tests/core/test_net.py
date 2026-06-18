@@ -37,9 +37,19 @@ def test_two_proxies_takes_second_from_right():
     assert client_ip(req, trusted_proxy_count=2) == "70.0.0.2"
 
 
-def test_count_exceeding_chain_falls_back_to_leftmost():
+def test_count_exceeding_chain_fails_safe_to_peer():
+    # Fewer XFF entries than trusted hops → the request didn't traverse the
+    # expected chain; never trust a client-controlled entry, use the peer.
     req = _req("10.0.0.1", xff="203.0.113.9")
-    assert client_ip(req, trusted_proxy_count=5) == "203.0.113.9"
+    assert client_ip(req, trusted_proxy_count=5) == "10.0.0.1"
+
+
+def test_short_chain_with_spoofed_entry_fails_safe_to_peer():
+    # Misconfigured count=2 but only a single, client-supplied entry: the fake
+    # must NOT be returned — the chain is shorter than the trusted hops, so we
+    # fall back to the peer.
+    req = _req("10.0.0.1", xff="9.9.9.9")
+    assert client_ip(req, trusted_proxy_count=2) == "10.0.0.1"
 
 
 def test_no_forwarded_header_falls_back_to_peer():

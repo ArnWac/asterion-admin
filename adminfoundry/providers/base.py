@@ -87,11 +87,18 @@ class AdminTenant:
     ``id`` is the opaque tenant identifier the TenantProvider works with.
     ``slug`` is the human-readable handle (also used by the built-in
     schema-per-tenant strategy as ``tenant_<slug>``).
+    ``schema_name`` is the tenant's actual PostgreSQL schema (the DB source of
+    truth). When a provider supplies it, the permission lookup scopes to it
+    rather than re-deriving ``tenant_<slug>`` — keeping the RBAC read on the
+    same schema the request CRUD session uses (see
+    ``adminfoundry.db.dependencies.get_async_session``). ``None`` → fall back to
+    ``tenant_<slug>``.
     """
 
     id: str
     slug: str
     name: str | None = None
+    schema_name: str | None = None
 
 
 # ---------------------------------------------------------------------------

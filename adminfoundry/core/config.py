@@ -111,6 +111,13 @@ class CoreAdminConfig:
     #: (the default) keeps the pre-R8 behaviour — no claim set, none checked —
     #: which is fine for a single-service, single-secret deployment. Set these
     #: once tokens are shared across services/audiences.
+    #:
+    #: Rotation caveat: changing or **unsetting** these invalidates every
+    #: already-issued token (a token still carrying ``aud`` is rejected once
+    #: decode no longer expects it, and vice-versa) — i.e. it forces a global
+    #: re-login. Roll the value at a low-traffic window, or accept the
+    #: short-lived churn (access tokens expire quickly; refresh tokens force a
+    #: fresh login).
     jwt_issuer: str | None = None
     jwt_audience: str | None = None
     access_token_expire_minutes: int = 60
