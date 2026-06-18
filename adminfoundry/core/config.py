@@ -181,6 +181,22 @@ class CoreAdminConfig:
     )
 
     security_headers_enabled: bool = True
+    #: Optional ``Content-Security-Policy`` header value (Review R14). ``None``
+    #: (default) emits no CSP — the **bundled** admin UI uses inline
+    #: ``<script>`` config blocks that a strict ``script-src 'self'`` would
+    #: block. Apps driving the framework via the API/contract with their own
+    #: frontend SHOULD set a strict policy here, e.g.
+    #: ``"default-src 'self'; frame-ancestors 'none'"``. Emitted only when
+    #: ``security_headers_enabled`` is True.
+    content_security_policy: str | None = None
+    #: Number of trusted reverse-proxy hops in front of the app (Review R16).
+    #: ``0`` (default) → the real client IP is the direct peer
+    #: (``request.client.host``) and ``X-Forwarded-For`` is **ignored** (never
+    #: trust a client-supplied header). Set to N when behind N trusted proxies
+    #: (e.g. ``1`` behind a single nginx): the client IP is then the N-th entry
+    #: from the right of ``X-Forwarded-For``. Affects the tenant IP allowlist
+    #: and the audit ``ip_address``.
+    trusted_proxy_count: int = 0
 
     # --- PR-10: production guards ---
     environment: Environment = "development"
@@ -298,6 +314,8 @@ class CoreAdminConfig:
                 ("Authorization", "Content-Type", "X-Tenant-Slug"),
             ),
             security_headers_enabled=_env_bool("ADMINFOUNDRY_SECURITY_HEADERS_ENABLED", True),
+            content_security_policy=os.getenv("ADMINFOUNDRY_CONTENT_SECURITY_POLICY") or None,
+            trusted_proxy_count=_env_int("ADMINFOUNDRY_TRUSTED_PROXY_COUNT", 0),
             environment=_env_literal(
                 "ADMINFOUNDRY_ENVIRONMENT",
                 "development",

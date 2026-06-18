@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from adminfoundry.core.errors import FORBIDDEN, NOT_FOUND, error_response
+from adminfoundry.core.net import request_client_ip
 from adminfoundry.tenancy.resolver import _extract_slug, resolve_tenant
 
 
@@ -39,7 +40,7 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 message=f"Tenant {slug!r} is disabled.",
             )
         if ctx.allowed_cidrs:
-            client_ip = request.client.host if request.client else None
+            client_ip = request_client_ip(request)
             if not client_ip:
                 return error_response(
                     request,

@@ -53,7 +53,7 @@ def install_middleware(
         )
 
     if config.security_headers_enabled:
-        app.add_middleware(SecurityHeadersMiddleware)
+        app.add_middleware(SecurityHeadersMiddleware, csp=config.content_security_policy)
 
     # Access log sits just inside RequestIDMiddleware so its log records
     # already see request.state.request_id, but it still wraps everything

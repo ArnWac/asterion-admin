@@ -16,8 +16,11 @@
 ``SecurityHeadersMiddleware``
     Adds the three baseline security headers the production-ready prompt
     requires (``X-Content-Type-Options``, ``Referrer-Policy``,
-    ``X-Frame-Options``). Strict CSP is deliberately NOT enabled by
-    default — the bundled UI is not yet compatible with one.
+    ``X-Frame-Options``). A ``Content-Security-Policy`` is emitted only when
+    ``CoreAdminConfig.content_security_policy`` is set (Review R14): the
+    bundled UI uses inline config scripts that a strict ``script-src 'self'``
+    would block, so the default is header-less, but API-first deployments with
+    their own frontend can opt into a strict policy.
 """
 
 from __future__ import annotations
@@ -114,8 +117,17 @@ _SECURITY_HEADERS = {
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, *, csp: str | None = None) -> None:
+        super().__init__(app)
+        self._csp = csp
+
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         for header, value in _SECURITY_HEADERS.items():
             response.headers.setdefault(header, value)
+        # Review R14: emit a CSP only when configured. The bundled UI is not
+        # compatible with a strict policy (inline config scripts), so the
+        # default (None) stays header-less.
+        if self._csp:
+            response.headers.setdefault("Content-Security-Policy", self._csp)
         return response

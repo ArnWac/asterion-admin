@@ -87,3 +87,29 @@ def test_security_headers_disabled_when_config_off(tmp_path):
     with TestClient(app, raise_server_exceptions=False) as c:
         resp = c.get("/healthz")
     assert "X-Content-Type-Options" not in resp.headers
+
+
+# --- CSP (Review R14) ---
+
+
+def test_no_csp_header_by_default(client):
+    # The bundled UI uses inline scripts; no CSP is emitted unless configured.
+    resp = client.get("/healthz")
+    assert "Content-Security-Policy" not in resp.headers
+
+
+def test_csp_header_emitted_when_configured(tmp_path):
+    policy = "default-src 'self'; frame-ancestors 'none'"
+    app = create_admin(
+        config=CoreAdminConfig(
+            database_url=f"sqlite+aiosqlite:///{tmp_path / 'csp.db'}",
+            secret_key="test-csp",
+            enable_multi_tenant=False,
+            enable_builtin_ui=False,
+            enable_builtin_admins=False,
+            content_security_policy=policy,
+        )
+    )
+    with TestClient(app, raise_server_exceptions=False) as c:
+        resp = c.get("/healthz")
+    assert resp.headers["Content-Security-Policy"] == policy

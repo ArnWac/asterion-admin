@@ -46,6 +46,18 @@ shape change bumps `CONTRACT_VERSION`.
   clean-venv wheel smoke test, and PyPI publish via Trusted Publishing.
 - jsdom-based JS tests for `api.js` (`tokenStore`, `APIError` envelope
   parsing); `jsdom` added as a JS dev dependency.
+- Optional `content_security_policy` config (R14) — emits a CSP header when
+  set; default off so the bundled UI keeps working.
+- `trusted_proxy_count` config (R16) + `core.net.client_ip`: the tenant IP
+  allowlist and audit `ip_address` now derive the real client IP from
+  `X-Forwarded-For` when behind N trusted proxies (default 0 = ignore the
+  header).
+
+### Fixed
+- Login no longer leaks account existence by timing (R15): the unknown-email
+  branch runs a dummy bcrypt verify (`dummy_verify_password`) so it costs the
+  same as a wrong-password attempt; unknown email and wrong password return an
+  identical 401.
 
 ### Changed
 - CI: the `build` job now depends on `test-postgres`, so PostgreSQL

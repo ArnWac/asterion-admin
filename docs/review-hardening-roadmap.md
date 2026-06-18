@@ -49,9 +49,9 @@ R14–R17 offen. Phasen 6/7 bleiben geparkt.
 | Prio | ID | Thema | Status |
 |---|---|---|---|
 | **P0** | R13 | [Roten `test-postgres`-Job klären](#p0--r13-roten-test-postgres-job-klären) | ✅ erledigt (Test-Override-Annotation; CI grün) |
-| **P1** | R14 | [XSS-Härtung: CSP + Token-Storage](#p1--r14-xss-härtung-csp--token-storage) | ⬜ offen |
-| **P2** | R15 | [Login-Enumeration + Default-Limiter-Keying](#p2--r15-login-enumeration--default-limiter-keying) | ⬜ offen |
-| **P2** | R16 | [Proxy-/Client-IP (CIDR-Allowlist, Audit)](#p2--r16-proxy--client-ip) | ⬜ offen |
+| **P1** | R14 | [XSS-Härtung: CSP + Token-Storage](#p1--r14-xss-härtung-csp--token-storage) | 🟡 CSP-Knopf erledigt; Bundled-UI-Nonce + Cookie-Option offen |
+| **P2** | R15 | [Login-Enumeration + Default-Limiter-Keying](#p2--r15-login-enumeration--default-limiter-keying) | 🟡 Konstante-Zeit erledigt; `(email,ip)`-Keying nach R16 offen |
+| **P2** | R16 | [Proxy-/Client-IP (CIDR-Allowlist, Audit)](#p2--r16-proxy--client-ip) | ✅ erledigt (`trusted_proxy_count`) |
 | **P3** | R17 | [Toten/redundanten Code aufräumen](#p3--r17-totenredundanten-code-aufräumen) | ✅ erledigt (Provider-Session-Merge als Folgeschritt offen) |
 | **—** | — | [Bewusst NICHT umgesetzt](#bewusst-nicht-umgesetzt) | entschieden |
 
@@ -400,9 +400,12 @@ die statische No-Build-UI ggf. an eine restriktive CSP anpassen) und/oder
 Token-Speicherung auf HttpOnly-Cookie umstellen (zieht dann R14 ↔ CSRF nach
 sich — vgl. „Bewusst NICHT umgesetzt").
 
-**Test:** Header-Assertion (CSP gesetzt, wenn konfiguriert); UI-Smoke unter CSP.
+**Test:** Header-Assertion (CSP gesetzt, wenn konfiguriert; sonst abwesend) —
+`tests/operations/test_middleware.py`.
 
-**Status:** ⬜ offen.
+**Status:** 🟡 teilweise — konfigurierbarer `content_security_policy`-Header
+erledigt (Default aus, API-first kann strikt setzen). **Offen:** Nonce-Härtung
+der Inline-Skripte der Bundled-UI bzw. HttpOnly-Cookie-Token-Option.
 
 ## P2 — R15: Login-Enumeration + Default-Limiter-Keying
 
@@ -419,10 +422,12 @@ Text für unbekannt/falsch/inaktiv); konstante-Zeit-Pfad (Dummy-Hash bei
 unbekannter E-Mail); optional `(email, ip)`-Keying. Default-Schwäche zumindest
 klar dokumentieren + R7 als Produktionsempfehlung verlinken.
 
-**Test:** Negativtests: unbekannte vs. falsche vs. inaktive E-Mail liefern
-identische Antwort.
+**Test:** unbekannte vs. falsche E-Mail liefern identische Antwort; „inactive"
+nur bei korrektem Passwort — `tests/auth/test_login_enumeration.py`.
 
-**Status:** ⬜ offen.
+**Status:** 🟡 teilweise — Konstante-Zeit-Pfad (`dummy_verify_password`) +
+uniforme 401 erledigt. **Offen:** optionales `(email, ip)`-Keying (baut auf
+R16 auf), bewusst danach.
 
 ## P2 — R16: Proxy- / Client-IP
 
@@ -438,10 +443,11 @@ sind die Proxy-IP.
 konfigurierten Trusted Proxies (z. B. `forwarded_allow_ips` / Anzahl Hops),
 nie ungeprüft (sonst Spoofing). Deployment-Doku: `uvicorn --proxy-headers`.
 
-**Test:** CIDR-Entscheidung gegen gesetztes `X-Forwarded-For` bei
-konfiguriertem Trusted Proxy; ohne Konfiguration unverändert.
+**Test:** `client_ip`-Auflösung für 0/1/2 Trusted Hops + Fallbacks —
+`tests/core/test_net.py`.
 
-**Status:** ⬜ offen.
+**Status:** ✅ erledigt — `trusted_proxy_count`-Config + `core/net.client_ip`,
+verdrahtet in Tenant-CIDR-Allowlist + Audit-IP (Default 0 = unverändert).
 
 ## P3 — R17: Toten/redundanten Code aufräumen
 

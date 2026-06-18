@@ -27,6 +27,7 @@ from typing import Any
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adminfoundry.core.net import request_client_ip
 from adminfoundry.db.session import DatabaseManager
 from adminfoundry.models.audit_log import AuditLog
 from adminfoundry.providers.base import AdminPrincipal
@@ -63,7 +64,7 @@ def request_audit_kwargs(
         "method": request.method,
         "path": request.url.path,
         "status_code": status_code,
-        "ip_address": request.client.host if request.client else None,
+        "ip_address": request_client_ip(request),
     }
 
 

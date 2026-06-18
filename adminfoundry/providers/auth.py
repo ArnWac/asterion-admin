@@ -22,7 +22,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry.auth.password import verify_password
+from adminfoundry.auth.password import dummy_verify_password, verify_password
 from adminfoundry.auth.revocation import is_token_revoked
 from adminfoundry.auth.tokens import (
     TokenError,
@@ -132,7 +132,14 @@ class BuiltinJWTAuthProvider:
                 await session.execute(select(User).where(User.email == credentials.email))
             ).scalar_one_or_none()
 
-        if user is None or not verify_password(credentials.password, user.hashed_password):
+        # Constant-time path (Review R15): on an unknown email, still spend one
+        # bcrypt verify (against a dummy hash) so the response time matches a
+        # wrong-password attempt and can't be used to enumerate accounts. Both
+        # branches raise the SAME error/status.
+        if user is None:
+            dummy_verify_password(credentials.password)
+            raise LoginError("invalid_credentials", "Invalid credentials.")
+        if not verify_password(credentials.password, user.hashed_password):
             raise LoginError("invalid_credentials", "Invalid credentials.")
         if not user.is_active:
             raise LoginError("inactive_user", "User is inactive.")
