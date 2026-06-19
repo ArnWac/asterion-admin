@@ -24,18 +24,18 @@ from sqlalchemy import Column, Integer, String, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.extensions.import_export import (
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.auth.password import hash_password
+from asterion.extensions.import_export import (
     EXPORT_AUDIT_ACTION,
     IMPORT_AUDIT_ACTION,
     MAX_EXPORT_ROWS,
     MAX_IMPORT_ROWS,
     ImportExportExtension,
 )
-from adminfoundry.models.audit_log import AuditLog
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion.models.audit_log import AuditLog
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 from tests._helpers import make_admin_principal, make_admin_tenant, override_admin_context
 
 
@@ -82,7 +82,7 @@ def app(tmp_path):
         register=lambda reg: reg.register(WidgetAdmin),
         extensions=[ImportExportExtension()],
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -109,7 +109,7 @@ def app(tmp_path):
 
 
 def _seed_widgets(app, count: int) -> None:
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _go():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -168,8 +168,8 @@ def test_export_csv_omits_protected_fields(app):
 def test_extension_contributes_import_export_capability_fragment():
     """The extension publishes its capability so the UI can gate the
     Import / Export controls instead of rendering buttons that 404."""
-    from adminfoundry.contract.contributions import ContractContributionRegistry
-    from adminfoundry.extensions.import_export import available_formats
+    from asterion.contract.contributions import ContractContributionRegistry
+    from asterion.extensions.import_export import available_formats
 
     registry = ContractContributionRegistry()
     ImportExportExtension().register_contract_contributions(registry)
@@ -205,7 +205,7 @@ def test_full_contract_omits_import_export_when_not_mounted(tmp_path):
         ),
         register=lambda reg: reg.register(WidgetAdmin),
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -298,7 +298,7 @@ def test_export_writes_audit_row(app):
     resp = _client(app).get("/api/v1/admin/export_widgets/_export?format=csv")
     assert resp.status_code == 200
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _fetch():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -320,7 +320,7 @@ def test_export_writes_audit_row(app):
 
 def _seeded_widget_ids(app, count: int) -> list[int]:
     _seed_widgets(app, count)
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _q():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -379,7 +379,7 @@ def test_export_audit_records_selection_count(app):
     )
     assert resp.status_code == 200
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _fetch():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -429,7 +429,7 @@ def test_export_xlsx_audit_records_format(app):
     resp = _client(app).get("/api/v1/admin/export_widgets/_export?format=xlsx")
     assert resp.status_code == 200
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _fetch():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -467,7 +467,7 @@ def _upload(app, filename: str, data: bytes, mime: str):
 
 
 def _count_widgets(app) -> int:
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _q():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -572,7 +572,7 @@ def test_csv_import_writes_audit_row(app):
     resp = _upload(app, "widgets.csv", payload, "text/csv")
     assert resp.status_code == 200
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _fetch():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -708,7 +708,7 @@ def test_dry_run_writes_no_audit_log(app):
     payload = _csv_bytes(["name", "color"], [["alpha", "red"]])
     _upload_dry_run(app, "widgets.csv", payload, "text/csv")
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _fetch():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)

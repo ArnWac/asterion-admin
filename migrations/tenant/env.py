@@ -15,26 +15,26 @@ from alembic import context
 from sqlalchemy import pool, text
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-import adminfoundry.models.tenant_rbac  # noqa: F401 — registers TenantBase tables
-from adminfoundry.models.base import TenantBase
+import asterion.models.tenant_rbac  # noqa: F401 — registers TenantBase tables
+from asterion.models.base import TenantBase
 
 config = context.config
 
 _database_url = (
-    os.environ.get("ADMINFOUNDRY_DATABASE_URL")
+    os.environ.get("ASTERION_DATABASE_URL")
     or os.environ.get("DATABASE_URL")
     or config.get_main_option("sqlalchemy.url")
 )
 if not _database_url:
     raise RuntimeError(
-        "Set ADMINFOUNDRY_DATABASE_URL (or DATABASE_URL), or set "
+        "Set ASTERION_DATABASE_URL (or DATABASE_URL), or set "
         "'sqlalchemy.url' on the alembic Config before running."
     )
 config.set_main_option("sqlalchemy.url", _database_url)
 
 if config.config_file_name is not None:
     # disable_existing_loggers=False so loggers created before alembic
-    # was invoked (e.g. adminfoundry.access) stay enabled.
+    # was invoked (e.g. asterion.access) stay enabled.
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = TenantBase.metadata

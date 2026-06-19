@@ -23,14 +23,14 @@ moto = pytest.importorskip("moto")
 
 from moto import mock_aws
 
-from adminfoundry.extensions.storage_s3 import S3StorageBackend
-from adminfoundry.storage import (
+from asterion.extensions.storage_s3 import S3StorageBackend
+from asterion.storage import (
     ObjectNotFound,
     StorageBackend,
     StoredObject,
 )
 
-_BUCKET = "adminfoundry-test"
+_BUCKET = "asterion-test"
 _REGION = "us-east-1"
 
 

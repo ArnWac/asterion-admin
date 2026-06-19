@@ -18,17 +18,17 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.admin.context import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.admin.context import (
     AdminContext,
     build_admin_context,
     require_admin_context,
 )
-from adminfoundry.db.dependencies import get_async_session
-from adminfoundry.models.base import GLOBAL_METADATA, TenantBase
-from adminfoundry.models.permission_catalog import PermissionCatalog
-from adminfoundry.models.tenant_rbac import TenantRole, TenantRolePermission
-from adminfoundry.providers.base import AdminPrincipal
+from asterion.db.dependencies import get_async_session
+from asterion.models.base import GLOBAL_METADATA, TenantBase
+from asterion.models.permission_catalog import PermissionCatalog
+from asterion.models.tenant_rbac import TenantRole, TenantRolePermission
+from asterion.providers.base import AdminPrincipal
 
 SECRET = "x" * 64
 
@@ -63,7 +63,7 @@ async def matrix_app(tmp_path):
             enable_builtin_admins=False,
         ),
     )
-    engine = app.state.adminfoundry.db.engine
+    engine = app.state.asterion.db.engine
     async with engine.begin() as conn:
         await conn.run_sync(GLOBAL_METADATA.create_all)
         # TenantRole / TenantRolePermission live in the tenant

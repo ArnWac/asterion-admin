@@ -11,7 +11,7 @@ import {
   editIsDirty,
   looseEqual,
   nextSortState,
-} from "../../adminfoundry/ui/static/admin/logic.js";
+} from "../../asterion/ui/static/admin/logic.js";
 
 describe("looseEqual", () => {
   it("treats number/string forms as equal", () => {

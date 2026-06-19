@@ -9,10 +9,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry.auth.dependencies import get_current_user, require_superadmin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.rate_limiter import InMemoryLoginRateLimiter
-from adminfoundry.auth.tokens import (
+from asterion.auth.dependencies import get_current_user, require_superadmin
+from asterion.auth.password import hash_password
+from asterion.auth.rate_limiter import InMemoryLoginRateLimiter
+from asterion.auth.tokens import (
     ACCESS_TOKEN_TYPE,
     IMPERSONATION_TOKEN_TYPE,
     TokenError,
@@ -23,11 +23,11 @@ from adminfoundry.auth.tokens import (
     get_token_version,
     is_impersonation_token,
 )
-from adminfoundry.core.config import CoreAdminConfig
-from adminfoundry.core.runtime import AdminRuntime
-from adminfoundry.db.session import DatabaseManager
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion.core.config import CoreAdminConfig
+from asterion.core.runtime import AdminRuntime
+from asterion.db.session import DatabaseManager
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 
 SECRET = "test-secret-key-for-auth-invariants"
 ALG = "HS256"
@@ -109,7 +109,7 @@ def app_with_user(tmp_path):
         config=config,
         db=DatabaseManager(db_url),
     )
-    app.state.adminfoundry = runtime
+    app.state.asterion = runtime
 
     async def _setup_schema_and_user() -> User:
         async with runtime.db.engine.begin() as conn:

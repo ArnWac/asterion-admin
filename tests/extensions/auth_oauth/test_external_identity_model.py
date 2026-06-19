@@ -24,16 +24,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.extensions.auth_oauth import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.extensions.auth_oauth import (
     ExternalIdentity,
     GoogleOIDCProvider,
     OAuthExtension,
 )
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
-from adminfoundry.security.protected_fields import reset_for_tests as reset_protected
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
+from asterion.security.protected_fields import reset_for_tests as reset_protected
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +58,7 @@ def app(tmp_path):
         ],
     )
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -74,7 +74,7 @@ def app(tmp_path):
 
 def test_extension_registers_external_identity_model(app):
     """register_models returns the class so runtime tooling can find it."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     assert ExternalIdentity in runtime.extension_models
 
 
@@ -87,7 +87,7 @@ def test_table_is_attached_to_shared_metadata(app):
 def test_create_all_actually_creates_the_table(app):
     """The Phase-8b.7 flow assumes the table exists at runtime — confirm
     create_all materialized it on the engine."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _probe() -> set[str]:
         async with runtime.db.engine.connect() as conn:
@@ -108,7 +108,7 @@ def test_create_all_actually_creates_the_table(app):
 def test_unique_constraint_on_provider_plus_subject(app):
     """Two rows with the same (provider, provider_subject) MUST fail —
     that's the credential-confusion guard."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _run():
@@ -149,7 +149,7 @@ def test_unique_constraint_on_provider_plus_subject(app):
 def test_same_subject_allowed_across_different_providers(app):
     """The unique constraint is (provider, subject), not just subject —
     a Google sub and a GitHub sub can collide on the string '123'."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _run() -> int:
@@ -172,7 +172,7 @@ def test_same_subject_allowed_across_different_providers(app):
 
 def test_one_user_can_link_multiple_providers(app):
     """user_id is indexed but NOT unique — multiple identities per user OK."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _run() -> list[str]:
@@ -204,7 +204,7 @@ def test_one_user_can_link_multiple_providers(app):
 
 def test_optional_fields_default_to_none(app):
     """email_at_provider / name / picture_url / hosted_domain are nullable."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _run() -> ExternalIdentity:

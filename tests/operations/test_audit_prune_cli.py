@@ -1,4 +1,4 @@
-"""CLI tests for ``adminfoundry audit prune`` (plan §PR-10)."""
+"""CLI tests for ``asterion audit prune`` (plan §PR-10)."""
 
 from __future__ import annotations
 
@@ -9,19 +9,19 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from typer.testing import CliRunner
 
-from adminfoundry.cli.main import app as cli_app
-from adminfoundry.models.audit_log import AuditLog
-from adminfoundry.models.base import GlobalModel
+from asterion.cli.main import app as cli_app
+from asterion.models.audit_log import AuditLog
+from asterion.models.base import GlobalModel
 
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     db_path = tmp_path / "audit-prune.db"
     url = f"sqlite+aiosqlite:///{db_path}"
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", url)
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "test-audit-prune-secret")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_MULTI_TENANT", "false")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_BUILTIN_UI", "false")
+    monkeypatch.setenv("ASTERION_DATABASE_URL", url)
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "test-audit-prune-secret")
+    monkeypatch.setenv("ASTERION_ENABLE_MULTI_TENANT", "false")
+    monkeypatch.setenv("ASTERION_ENABLE_BUILTIN_UI", "false")
 
     async def _setup():
         engine = create_async_engine(

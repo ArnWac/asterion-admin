@@ -20,9 +20,9 @@ import inspect
 
 import pytest
 
-from adminfoundry.admin.context import AdminContext
-from adminfoundry.providers.base import AdminPrincipal
-from adminfoundry.registry import ModelAdmin
+from asterion.admin.context import AdminContext
+from asterion.providers.base import AdminPrincipal
+from asterion.registry import ModelAdmin
 
 HOOKS_DATA_INOUT = ("before_validate", "before_create", "before_update")
 HOOKS_VOID = (
@@ -136,7 +136,7 @@ class _StampedAdmin(ModelAdmin):
 
 def test_subclass_can_override_hook():
     admin = _StampedAdmin()
-    from adminfoundry.providers.base import AdminTenant
+    from asterion.providers.base import AdminTenant
 
     ctx = AdminContext(
         request=None,

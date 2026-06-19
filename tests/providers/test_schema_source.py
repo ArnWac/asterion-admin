@@ -13,9 +13,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from adminfoundry.providers.base import AdminTenant
-from adminfoundry.providers.permissions import _schema_for
-from adminfoundry.providers.tenants import BuiltinTenantProvider
+from asterion.providers.base import AdminTenant
+from asterion.providers.permissions import _schema_for
+from asterion.providers.tenants import BuiltinTenantProvider
 
 
 def test_schema_for_prefers_explicit_schema_name():

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from adminfoundry.builtins.installer import install_builtin_admins
-from adminfoundry.registry import AdminRegistry
+from asterion.builtins.installer import install_builtin_admins
+from asterion.registry import AdminRegistry
 
 
 def test_install_registers_tenant_role_admins():
@@ -23,7 +23,7 @@ def test_install_skips_already_registered():
 
 
 def test_install_with_extra_admin():
-    from adminfoundry.registry import ModelAdmin
+    from asterion.registry import ModelAdmin
 
     class _FakeModel:
         __tablename__ = "custom_things"

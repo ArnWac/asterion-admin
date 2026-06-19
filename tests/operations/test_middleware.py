@@ -6,8 +6,8 @@ import pytest
 from fastapi import Request  # imported at module level so FastAPI's
 from fastapi.testclient import TestClient  # forward-ref resolver finds it
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.core.middleware import REQUEST_ID_HEADER
+from asterion import CoreAdminConfig, create_admin
+from asterion.core.middleware import REQUEST_ID_HEADER
 
 
 @pytest.fixture

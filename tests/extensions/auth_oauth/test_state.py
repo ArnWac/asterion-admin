@@ -25,7 +25,7 @@ import time
 
 import pytest
 
-from adminfoundry.extensions.auth_oauth.state import (
+from asterion.extensions.auth_oauth.state import (
     COOKIE_NAME_INSECURE,
     COOKIE_NAME_SECURE,
     STATE_TTL_SECONDS,
@@ -169,7 +169,7 @@ def test_undecodable_payload_rejected():
     # Build a signed cookie where the body is not valid b64.
     # We have to compute the signature over the bogus body to get past
     # the signature check first; the undecodable test only fires after.
-    from adminfoundry.extensions.auth_oauth.state import _sign
+    from asterion.extensions.auth_oauth.state import _sign
 
     bogus = "!!! not b64 !!!"
     sig = _sign(bogus, _SECRET)
@@ -179,7 +179,7 @@ def test_undecodable_payload_rejected():
 
 def test_schema_mismatch_rejected():
     """Attacker forges a payload with missing required fields — refused."""
-    from adminfoundry.extensions.auth_oauth.state import _sign
+    from asterion.extensions.auth_oauth.state import _sign
 
     bad_payload = {"state": "x", "code_verifier": "y"}  # missing fields
     body = json.dumps(bad_payload, separators=(",", ":")).encode("utf-8")
@@ -257,7 +257,7 @@ def test_set_state_cookie_produces_lax_httponly_secure_on_https():
     request = _StubRequest("https")
 
     # Call the real helper.
-    from adminfoundry.extensions.auth_oauth.state import set_state_cookie
+    from asterion.extensions.auth_oauth.state import set_state_cookie
 
     set_state_cookie(response, sealed, request=request)
 
@@ -279,7 +279,7 @@ def test_set_state_cookie_omits_secure_on_http():
     """Setting Secure on http would mean the browser never sends it back."""
     from fastapi import Response
 
-    from adminfoundry.extensions.auth_oauth.state import set_state_cookie
+    from asterion.extensions.auth_oauth.state import set_state_cookie
 
     response = Response()
     set_state_cookie(response, seal_state(_make_state(), _SECRET), request=_StubRequest("http"))
@@ -294,7 +294,7 @@ def test_clear_state_cookie_emits_expiring_set_cookie():
     callback path actually invalidates the cookie."""
     from fastapi import Response
 
-    from adminfoundry.extensions.auth_oauth.state import clear_state_cookie
+    from asterion.extensions.auth_oauth.state import clear_state_cookie
 
     response = Response()
     clear_state_cookie(response, request=_StubRequest("https"))

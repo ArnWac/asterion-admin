@@ -18,7 +18,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-from adminfoundry.models.base import GUID
+from asterion.models.base import GUID
 
 # Alembic identifiers
 revision = "0002_saved_filters_revoked_tokens"

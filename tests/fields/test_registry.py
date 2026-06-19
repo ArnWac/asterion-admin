@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from adminfoundry.fields import FieldRegistry, build_default_registry
-from adminfoundry.fields.base import FieldContract
+from asterion.fields import FieldRegistry, build_default_registry
+from asterion.fields.base import FieldContract
 
 
 class _FakeAdapter:

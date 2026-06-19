@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
+from asterion import CoreAdminConfig, create_admin
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_healthz_does_not_touch_database(app):
     the endpoint still returns 200."""
     import asyncio
 
-    asyncio.run(app.state.adminfoundry.db.dispose())
+    asyncio.run(app.state.asterion.db.dispose())
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.get("/healthz")
     assert resp.status_code == 200

@@ -14,28 +14,28 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-import adminfoundry.models  # noqa: F401 — registers all global models on GlobalBase
-from adminfoundry.models.base import GlobalBase
+import asterion.models  # noqa: F401 — registers all global models on GlobalBase
+from asterion.models.base import GlobalBase
 
 config = context.config
 
 # Prefer env var (production CLI path). Fall back to the URL the caller set
 # on the Config object (tests use this via `cfg.set_main_option`).
 _database_url = (
-    os.environ.get("ADMINFOUNDRY_DATABASE_URL")
+    os.environ.get("ASTERION_DATABASE_URL")
     or os.environ.get("DATABASE_URL")
     or config.get_main_option("sqlalchemy.url")
 )
 if not _database_url:
     raise RuntimeError(
-        "Set ADMINFOUNDRY_DATABASE_URL (or DATABASE_URL), or set "
+        "Set ASTERION_DATABASE_URL (or DATABASE_URL), or set "
         "'sqlalchemy.url' on the alembic Config before running."
     )
 config.set_main_option("sqlalchemy.url", _database_url)
 
 if config.config_file_name is not None:
     # disable_existing_loggers=False so loggers created before alembic
-    # was invoked (e.g. adminfoundry.access) stay enabled.
+    # was invoked (e.g. asterion.access) stay enabled.
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = GlobalBase.metadata

@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from adminfoundry.auth.tokens import (
+from asterion.auth.tokens import (
     TokenError,
     create_access_token,
     decode_access_token,

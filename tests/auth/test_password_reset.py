@@ -13,12 +13,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password, verify_password
-from adminfoundry.auth.tokens import create_access_token
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.password_reset_token import PasswordResetToken
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password, verify_password
+from asterion.auth.tokens import create_access_token
+from asterion.models.base import GlobalModel
+from asterion.models.password_reset_token import PasswordResetToken
+from asterion.models.user import User
 
 SECRET = "test-password-reset-secret"
 ALG = "HS256"
@@ -49,7 +49,7 @@ def app_with_user(tmp_path):
         ),
         password_reset_notifier=notifier,
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup() -> User:
         async with runtime.db.engine.begin() as conn:
@@ -277,7 +277,7 @@ def test_default_notifier_is_logging(tmp_path):
     """Without an explicit notifier, create_admin wires the dev-only
     logging notifier — the flow still works (token issued), it's just
     logged instead of emailed."""
-    from adminfoundry.auth.password_reset import LoggingPasswordResetNotifier
+    from asterion.auth.password_reset import LoggingPasswordResetNotifier
 
     app = create_admin(
         config=CoreAdminConfig(
@@ -288,4 +288,4 @@ def test_default_notifier_is_logging(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    assert isinstance(app.state.adminfoundry.password_reset_notifier, LoggingPasswordResetNotifier)
+    assert isinstance(app.state.asterion.password_reset_notifier, LoggingPasswordResetNotifier)

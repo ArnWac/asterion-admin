@@ -18,19 +18,19 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.tokens import create_access_token
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
-from adminfoundry.providers.base import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.auth.tokens import create_access_token
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
+from asterion.providers.base import (
     AdminPrincipal,
     Page,
     UserListingProvider,
     UserProvider,
     UserQuery,
 )
-from adminfoundry.providers.users import BuiltinSQLAlchemyUserProvider
+from asterion.providers.users import BuiltinSQLAlchemyUserProvider
 
 SECRET = "test-user-listing-secret"
 
@@ -93,7 +93,7 @@ def app_state(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
     state: dict = {}
 
     async def _setup():
@@ -204,8 +204,8 @@ def test_root_users_list_returns_501_when_provider_cannot_list(tmp_path):
     # that authenticates the seeded superadmin via the framework's JWT.
     class _ExternalAuth:
         async def authenticate_request(self, request):
-            from adminfoundry.auth.tokens import decode_access_token
-            from adminfoundry.providers.base import AuthIdentity
+            from asterion.auth.tokens import decode_access_token
+            from asterion.providers.base import AuthIdentity
 
             header = request.headers.get("Authorization", "")
             if not header.startswith("Bearer "):
@@ -232,7 +232,7 @@ def test_root_users_list_returns_501_when_provider_cannot_list(tmp_path):
         auth_provider=_ExternalAuth(),
         user_provider=_ExternalAuthOnly(),
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -276,7 +276,7 @@ def test_builtin_list_users_unit(app_state):
     provider = BuiltinSQLAlchemyUserProvider()
 
     # The provider needs a request to reach the DB; fake the minimal
-    # surface it touches (request.app.state.adminfoundry).
+    # surface it touches (request.app.state.asterion).
     class _FakeRequest:
         def __init__(self, application):
             self.app = application

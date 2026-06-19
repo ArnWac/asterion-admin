@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import text
 
-from adminfoundry.tenancy.schema_strategy import set_search_path
+from asterion.tenancy.schema_strategy import set_search_path
 
 pytestmark = pytest.mark.postgres
 

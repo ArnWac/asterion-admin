@@ -1,6 +1,6 @@
-# adminfoundry
+# asterion
 
-[![CI](https://github.com/ArnWac/adminfoundry/actions/workflows/ci.yml/badge.svg)](https://github.com/ArnWac/adminfoundry/actions/workflows/ci.yml)
+[![CI](https://github.com/ArnWac/asterion-admin/actions/workflows/ci.yml/badge.svg)](https://github.com/ArnWac/asterion-admin/actions/workflows/ci.yml)
 
 A contract-driven FastAPI admin framework for SQLAlchemy applications.
 
@@ -15,10 +15,10 @@ that any frontend can consume.
 
 ```bash
 # PostgreSQL deployment
-pip install adminfoundry[postgres]
+pip install asterion-admin[postgres]
 
 # SQLite (development / testing)
-pip install adminfoundry[sqlite]
+pip install asterion-admin[sqlite]
 ```
 
 Requires Python 3.11+.
@@ -32,9 +32,9 @@ Requires Python 3.11+.
 from sqlalchemy import Boolean, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.actions import BulkDeleteAction
-from adminfoundry.models.base import GlobalModel
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.actions import BulkDeleteAction
+from asterion.models.base import GlobalModel
 
 
 class Post(GlobalModel):
@@ -64,12 +64,12 @@ app = create_admin(
 ```
 
 ```bash
-export ADMINFOUNDRY_DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/myapp"
-export ADMINFOUNDRY_SECRET_KEY="$(openssl rand -hex 32)"
+export ASTERION_DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/myapp"
+export ASTERION_SECRET_KEY="$(openssl rand -hex 32)"
 
-adminfoundry db upgrade-public
-adminfoundry permissions sync --app app:app
-adminfoundry create-superadmin --email admin@example.com
+asterion db upgrade-public
+asterion permissions sync --app app:app
+asterion create-superadmin --email admin@example.com
 
 uvicorn app:app --reload
 ```
@@ -133,28 +133,28 @@ tests, never for production.
 ## CLI
 
 ```bash
-adminfoundry --help
+asterion --help
 
 # Database lifecycle
-adminfoundry db upgrade-public
-adminfoundry db upgrade-tenant <slug>
-adminfoundry db upgrade-tenants
+asterion db upgrade-public
+asterion db upgrade-tenant <slug>
+asterion db upgrade-tenants
 
 # Tenants
-adminfoundry tenant create --name "Acme" --slug acme --owner-email owner@example.com
-adminfoundry tenant list
-adminfoundry tenant bootstrap <slug>
+asterion tenant create --name "Acme" --slug acme --owner-email owner@example.com
+asterion tenant list
+asterion tenant bootstrap <slug>
 
 # Users
-adminfoundry create-superadmin --email admin@example.com
+asterion create-superadmin --email admin@example.com
 
 # Permission catalog
-adminfoundry permissions sync --app app:app
-adminfoundry permissions list
-adminfoundry permissions check admin.users.list
+asterion permissions sync --app app:app
+asterion permissions list
+asterion permissions check admin.users.list
 
 # Diagnostics
-adminfoundry doctor
+asterion doctor
 ```
 
 ---
@@ -173,11 +173,11 @@ adminfoundry doctor
 ## Development
 
 ```bash
-git clone https://github.com/ArnWac/adminfoundry
-cd adminfoundry
+git clone https://github.com/ArnWac/asterion-admin
+cd asterion
 pip install -e ".[dev]"
 docker-compose up -d db                       # optional, for postgres tests
-export ADMINFOUNDRY_TEST_POSTGRES_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/adminfoundry
+export ASTERION_TEST_POSTGRES_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/asterion
 pytest -q
 pytest -m postgres -q                         # only with the env var above
 ruff check .

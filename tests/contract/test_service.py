@@ -5,12 +5,12 @@ from __future__ import annotations
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.contract.service import (
+from asterion.contract.service import (
     CRUD_ACTIONS,
     build_field_metadata,
     build_model_contract,
 )
-from adminfoundry.registry import ModelAdmin
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

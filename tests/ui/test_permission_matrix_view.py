@@ -18,9 +18,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _RUNNER = _REPO_ROOT / "tests" / "ui" / "permission_matrix_diff_runner.mjs"
-_VIEW_JS = (
-    _REPO_ROOT / "adminfoundry" / "ui" / "static" / "admin" / "views" / "permission_matrix.js"
-)
+_VIEW_JS = _REPO_ROOT / "asterion" / "ui" / "static" / "admin" / "views" / "permission_matrix.js"
 
 
 def test_view_module_exists():

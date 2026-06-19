@@ -15,10 +15,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import dummy_verify_password, hash_password
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import dummy_verify_password, hash_password
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 
 SECRET = "test-enum-secret"
 PASSWORD = "hunter2-strong"
@@ -35,7 +35,7 @@ def client(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:

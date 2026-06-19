@@ -21,10 +21,10 @@ from sqlalchemy import Boolean, Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.contract.service import build_filter_metadata, build_model_contract
-from adminfoundry.crud.query import parse_filter_query
-from adminfoundry.crud.services import create_record, list_records
-from adminfoundry.registry import ModelAdmin
+from asterion.contract.service import build_filter_metadata, build_model_contract
+from asterion.crud.query import parse_filter_query
+from asterion.crud.services import create_record, list_records
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from adminfoundry.security.validation import InvalidTenantSlugError, validate_tenant_slug
-from adminfoundry.tenancy.resolver import _extract_slug, _normalize_slug
+from asterion.security.validation import InvalidTenantSlugError, validate_tenant_slug
+from asterion.tenancy.resolver import _extract_slug, _normalize_slug
 
 
 @pytest.mark.parametrize(

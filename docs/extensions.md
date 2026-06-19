@@ -1,6 +1,6 @@
 # Extensions
 
-`adminfoundry` ships an extension SPI so optional behaviour (CSV
+`asterion` ships an extension SPI so optional behaviour (CSV
 import/export, OAuth, custom auth backends, …) lives **outside** the
 core package without having to fork it.
 
@@ -15,8 +15,8 @@ strictly **extension → core**, enforced by an AST-based test in
 ```python
 from fastapi import FastAPI
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.extensions import AdminExtension
+from asterion import CoreAdminConfig, create_admin
+from asterion.extensions import AdminExtension
 
 
 class GreetingExtension(AdminExtension):
@@ -72,7 +72,7 @@ so a static-path extension route (`/{resource}/_export`) wins.
 ## The extension-side registries
 
 Each is populated **only** during the corresponding hook, then
-frozen. They live on the `AdminRuntime` (`request.app.state.adminfoundry`)
+frozen. They live on the `AdminRuntime` (`request.app.state.asterion`)
 and are reachable from routes / templates.
 
 ### `PermissionRegistry` — `runtime.permission_registry`
@@ -143,7 +143,7 @@ reserved `{admin_ui_path}/_pages/{id}` prefix (mounted before the dynamic
 `/{resource}` route, so a slug can never collide with a resource).
 
 ```python
-from adminfoundry.ui.admin_pages import AdminPage
+from asterion.ui.admin_pages import AdminPage
 
 def register_admin_pages(self, registry):
     registry.register(
@@ -174,7 +174,7 @@ them on `runtime.extension_models` so tooling can answer "which
 extension owns table X".
 
 ```python
-from adminfoundry.models.base import GlobalBase
+from asterion.models.base import GlobalBase
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import String
 
@@ -196,7 +196,7 @@ class MyExtension(AdminExtension):
         return (models.MyExtensionThing,)
 ```
 
-The model class **must** subclass `adminfoundry.models.base.GlobalBase`
+The model class **must** subclass `asterion.models.base.GlobalBase`
 (or `TenantBase` for tenant-local data) so it lands on the shared
 metadata. Defining it under your own `DeclarativeBase` would put it in
 its own private namespace and `create_all` / autogenerate wouldn't see it.
@@ -214,7 +214,7 @@ revisions:
 3. Run `alembic upgrade head` in deployments.
 
 This is intentional: bundling migrations for extension tables would
-inflate every adminfoundry installation with tables the host might
+inflate every asterion installation with tables the host might
 never use, and would couple framework releases to extension schema
 changes. Each host opts in by importing.
 
@@ -271,7 +271,7 @@ synchronous setup is already complete.
 | `RegistryFrozenError` | a hook tries to add to a registry after freeze |
 | `ExtensionDependencyError` | reserved for future cross-extension dependency declarations |
 
-All live in `adminfoundry.extensions.errors`.
+All live in `asterion.extensions.errors`.
 
 ---
 
@@ -279,8 +279,8 @@ All live in `adminfoundry.extensions.errors`.
 
 | Name | Module | What it does |
 |---|---|---|
-| `import_export` | `adminfoundry.extensions.import_export` | CSV + XLSX import/export, per-admin |
-| `auth_oauth` | `adminfoundry.extensions.auth_oauth` | OIDC sign-in (Google ships, GitHub/Microsoft/etc. via subclass) — see [auth-oauth.md](auth-oauth.md) |
+| `import_export` | `asterion.extensions.import_export` | CSV + XLSX import/export, per-admin |
+| `auth_oauth` | `asterion.extensions.auth_oauth` | OIDC sign-in (Google ships, GitHub/Microsoft/etc. via subclass) — see [auth-oauth.md](auth-oauth.md) |
 
 Both are reference implementations of "the right way" to do
 permissions / contract contributions / route mounting / model

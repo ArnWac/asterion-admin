@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry.authz.permissions import assert_permission, has_permission, permission_key
+from asterion.authz.permissions import assert_permission, has_permission, permission_key
 
 # --- permission_key() ---
 

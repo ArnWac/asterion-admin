@@ -9,12 +9,12 @@ from __future__ import annotations
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.admin import InlineAdmin
-from adminfoundry.contract.service import (
+from asterion.admin import InlineAdmin
+from asterion.contract.service import (
     build_inline_metadata,
     build_model_contract,
 )
-from adminfoundry.registry import ModelAdmin
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

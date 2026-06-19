@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from adminfoundry.registry import ModelAdmin
+from asterion.registry import ModelAdmin
 
 
 class Thing:
@@ -36,7 +36,7 @@ def test_display_label_uses_label_if_set():
 
 
 def test_all_protected_includes_globally_protected():
-    from adminfoundry.registry.admin import GLOBALLY_PROTECTED
+    from asterion.registry.admin import GLOBALLY_PROTECTED
 
     admin = ThingAdmin()
     assert "hashed_password" in admin.all_protected

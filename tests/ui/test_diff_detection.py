@@ -21,7 +21,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _RUNNER = _REPO_ROOT / "tests" / "ui" / "diff_detection_runner.mjs"
-_DIFF_JS = _REPO_ROOT / "adminfoundry" / "ui" / "static" / "admin" / "diff.js"
+_DIFF_JS = _REPO_ROOT / "asterion" / "ui" / "static" / "admin" / "diff.js"
 
 
 def test_diff_js_module_exists():

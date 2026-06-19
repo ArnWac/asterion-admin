@@ -20,16 +20,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.extensions import (
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.extensions import (
     AdminExtension,
     DuplicateExtensionError,
     ExtensionContext,
     ExtensionRegistry,
     RegistryFrozenError,
 )
-from adminfoundry.models.base import GlobalBase
-from adminfoundry.security.protected_fields import reset_for_tests as reset_protected
+from asterion.models.base import GlobalBase
+from asterion.security.protected_fields import reset_for_tests as reset_protected
 
 
 class _Base(DeclarativeBase):
@@ -223,7 +223,7 @@ def test_extension_contributions_land_on_runtime(tmp_path):
         config=_config(tmp_path),
         extensions=[ContribExt()],
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     assert "contrib.foo.list" in runtime.permission_registry.all()
     assert "contrib.foo.create" in runtime.permission_registry.all()
@@ -240,7 +240,7 @@ def test_registries_are_frozen_after_create_admin(tmp_path):
     # Re-fetch the runtime via a freshly created app — Phase 5 freezes
     # every extension-side registry after setup.
     app = create_admin(config=_config(tmp_path))
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     assert runtime.permission_registry.is_frozen
     assert runtime.contract_contributions.is_frozen
     assert runtime.navigation.is_frozen
@@ -278,7 +278,7 @@ def test_extension_routes_win_over_crud_dynamic_path(tmp_path):
 
 def test_extensions_default_empty_tuple_is_noop(tmp_path):
     app = create_admin(config=_config(tmp_path))
-    assert len(app.state.adminfoundry.extensions) == 0
+    assert len(app.state.asterion.extensions) == 0
 
 
 def test_extension_configure_can_abort_startup(tmp_path):
@@ -388,7 +388,7 @@ def test_register_models_default_returns_empty_tuple(tmp_path):
         config=_config(tmp_path),
         extensions=[type("X", (AdminExtension,), {"name": "x"})()],
     )
-    assert app.state.adminfoundry.extension_models == ()
+    assert app.state.asterion.extension_models == ()
 
 
 def test_register_models_collects_returned_classes_onto_runtime(tmp_path):
@@ -402,14 +402,14 @@ def test_register_models_collects_returned_classes_onto_runtime(tmp_path):
             return (_PhaseB1Widget,)
 
     app = create_admin(config=_config(tmp_path), extensions=[WidgetExt()])
-    assert app.state.adminfoundry.extension_models == (_PhaseB1Widget,)
+    assert app.state.asterion.extension_models == (_PhaseB1Widget,)
 
 
 def test_register_models_table_attached_to_shared_metadata(tmp_path):
     """The whole point of the hook: a model declared by an extension and
     returned from register_models is reachable from GlobalBase.metadata,
     so create_all + autogenerate see it."""
-    from adminfoundry.models.base import GlobalBase
+    from asterion.models.base import GlobalBase
 
     class GadgetExt(AdminExtension):
         name = "gadget_ext"
@@ -435,4 +435,4 @@ def test_register_models_flattens_across_extensions(tmp_path):
             return (_PhaseB1ModelB,)
 
     app = create_admin(config=_config(tmp_path), extensions=[ExtA(), ExtB()])
-    assert app.state.adminfoundry.extension_models == (_PhaseB1ModelA, _PhaseB1ModelB)
+    assert app.state.asterion.extension_models == (_PhaseB1ModelA, _PhaseB1ModelB)

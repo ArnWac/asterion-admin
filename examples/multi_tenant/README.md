@@ -30,7 +30,7 @@ and tenant-scoped models in `~200` lines of app code.
   The audit/impersonation admins are read-only in the UI (every field
   listed in `readonly_fields`). The framework doesn't ship these by
   default; the file is structured so it can be lifted into
-  `adminfoundry/builtins/admin.py` later.
+  `asterion/builtins/admin.py` later.
 
 ## Requirements
 
@@ -42,9 +42,9 @@ Spin up a throwaway database:
 
 ```bash
 docker run --rm -d \
-    --name adminfoundry-pg \
+    --name asterion-pg \
     -e POSTGRES_PASSWORD=postgres \
-    -e POSTGRES_DB=adminfoundry \
+    -e POSTGRES_DB=asterion \
     -p 5432:5432 \
     postgres:16
 ```
@@ -52,7 +52,7 @@ docker run --rm -d \
 ## Run
 
 ```bash
-export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/adminfoundry
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/asterion
 export SECRET_KEY=$(openssl rand -hex 32)
 
 uvicorn examples.multi_tenant.app:app --reload

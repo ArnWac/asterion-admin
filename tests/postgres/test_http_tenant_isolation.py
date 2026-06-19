@@ -7,7 +7,7 @@ search_path has to be applied to the request-scoped CRUD session by
 ``create_admin`` app over ASGI, registers a tenant-local ``ModelAdmin``, and
 asserts that a record written under tenant A is invisible under tenant B.
 
-Runs only when ``ADMINFOUNDRY_TEST_POSTGRES_URL`` is set (see conftest).
+Runs only when ``ASTERION_TEST_POSTGRES_URL`` is set (see conftest).
 """
 
 from __future__ import annotations
@@ -21,13 +21,13 @@ from fastapi import Request
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.admin import require_admin_context
-from adminfoundry.admin.context import AdminContext
-from adminfoundry.models.base import TenantModel
-from adminfoundry.models.tenant import Tenant
-from adminfoundry.providers.base import AdminPrincipal, AdminTenant
-from adminfoundry.tenancy.resolver import clear_tenant_cache
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.admin import require_admin_context
+from asterion.admin.context import AdminContext
+from asterion.models.base import TenantModel
+from asterion.models.tenant import Tenant
+from asterion.providers.base import AdminPrincipal, AdminTenant
+from asterion.tenancy.resolver import clear_tenant_cache
 
 pytestmark = pytest.mark.postgres
 
@@ -107,7 +107,7 @@ async def _seed_tenants(pg_sessionmaker, schema_a: str, schema_b: str) -> tuple[
 async def test_record_written_under_one_tenant_is_invisible_to_the_other(
     pg_schemas, pg_sessionmaker
 ):
-    url = os.environ["ADMINFOUNDRY_TEST_POSTGRES_URL"]
+    url = os.environ["ASTERION_TEST_POSTGRES_URL"]
     slug_a, slug_b = await _seed_tenants(pg_sessionmaker, pg_schemas["a"], pg_schemas["b"])
     app = _build_app(url)
 
@@ -149,7 +149,7 @@ async def test_record_written_under_one_tenant_is_invisible_to_the_other(
 
 @pytest.mark.asyncio
 async def test_each_tenant_lists_only_its_own_rows(pg_schemas, pg_sessionmaker):
-    url = os.environ["ADMINFOUNDRY_TEST_POSTGRES_URL"]
+    url = os.environ["ASTERION_TEST_POSTGRES_URL"]
     slug_a, slug_b = await _seed_tenants(pg_sessionmaker, pg_schemas["a"], pg_schemas["b"])
     app = _build_app(url)
 

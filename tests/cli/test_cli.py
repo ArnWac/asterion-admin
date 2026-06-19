@@ -1,4 +1,4 @@
-"""Smoke tests for the adminfoundry CLI.
+"""Smoke tests for the asterion CLI.
 
 We exercise the CLI through Typer's CliRunner against an in-memory SQLite
 database. PostgreSQL-only paths (tenant schema provisioning) are skipped via
@@ -13,20 +13,20 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from typer.testing import CliRunner
 
-from adminfoundry.cli.main import app
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.tenant import Tenant
-from adminfoundry.models.user import User
+from asterion.cli.main import app
+from asterion.models.base import GlobalModel
+from asterion.models.tenant import Tenant
+from asterion.models.user import User
 
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
-    db_path = tmp_path / "adminfoundry.db"
+    db_path = tmp_path / "asterion.db"
     url = f"sqlite+aiosqlite:///{db_path}"
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", url)
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "test-cli-secret-key")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_MULTI_TENANT", "false")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_BUILTIN_UI", "false")
+    monkeypatch.setenv("ASTERION_DATABASE_URL", url)
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "test-cli-secret-key")
+    monkeypatch.setenv("ASTERION_ENABLE_MULTI_TENANT", "false")
+    monkeypatch.setenv("ASTERION_ENABLE_BUILTIN_UI", "false")
 
     async def _setup_schema():
         engine = create_async_engine(
@@ -89,7 +89,7 @@ def test_doctor_succeeds(env, runner):
 
 
 def test_doctor_fails_with_missing_secret(env, runner, monkeypatch):
-    monkeypatch.delenv("ADMINFOUNDRY_SECRET_KEY", raising=False)
+    monkeypatch.delenv("ASTERION_SECRET_KEY", raising=False)
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code != 0
 

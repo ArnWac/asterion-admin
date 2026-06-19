@@ -12,16 +12,16 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from adminfoundry.auth.password import hash_password
-from adminfoundry.models.base import GlobalModel, TenantBase
-from adminfoundry.models.permission_catalog import PermissionCatalog
-from adminfoundry.models.tenant_rbac import (
+from asterion.auth.password import hash_password
+from asterion.models.base import GlobalModel, TenantBase
+from asterion.models.permission_catalog import PermissionCatalog
+from asterion.models.tenant_rbac import (
     TenantMembershipRole,
     TenantRole,
     TenantRolePermission,
 )
-from adminfoundry.models.user import User
-from adminfoundry.tenancy.bootstrap import (
+from asterion.models.user import User
+from asterion.tenancy.bootstrap import (
     assign_owner_membership,
     bootstrap_tenant,
     create_tenant_record,

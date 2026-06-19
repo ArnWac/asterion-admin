@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry.providers import (
+from asterion.providers import (
     AdminPrincipal,
     AdminTenant,
     AuthIdentity,

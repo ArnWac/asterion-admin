@@ -61,7 +61,7 @@ wildcard-aware helper.
 ## Input validation
 
 Every external identifier passes through
-`adminfoundry.security.validation`:
+`asterion.security.validation`:
 
 ```python
 validate_resource_name(value)     # ^[a-z][a-z0-9_-]{0,62}$
@@ -111,12 +111,12 @@ The invariant: **a policy can only *tighten*, never loosen.** A field that
 is statically `READ`/`HIDDEN` can never be widened to `WRITE` by a policy.
 The three knobs are kept as ergonomic shortcuts on purpose — they are not
 competing mechanisms, just inputs to the single `strictest` rule
-(see [`adminfoundry/admin/policy.py`](../adminfoundry/admin/policy.py),
+(see [`asterion/admin/policy.py`](../asterion/admin/policy.py),
 tested in `tests/crud/test_field_permission_resolution.py`).
 
 ## Secret sanitization
 
-`adminfoundry.security.sanitize.sanitize_payload(payload)` recursively
+`asterion.security.sanitize.sanitize_payload(payload)` recursively
 walks a dict/list and redacts values under keys that contain (with
 word-boundary matching) any of:
 
@@ -147,7 +147,7 @@ Audit values pass through the sanitizer before insert.
 
 Every error response uses one shape so clients can rely on
 `error.code` and `error.message`. See [`docs/architecture.md`](architecture.md)
-for the canonical codes and to [`adminfoundry/core/errors.py`](../adminfoundry/core/errors.py)
+for the canonical codes and to [`asterion/core/errors.py`](../asterion/core/errors.py)
 for how to raise custom envelopes via `AdminError`.
 
 ## Known limitations (be honest)
@@ -165,7 +165,7 @@ for how to raise custom envelopes via `AdminError`.
   decoupling is tracked in [review-hardening-roadmap.md](review-hardening-roadmap.md).
 - No CSP by default (the bundled UI's inline config scripts would break a
   strict `script-src 'self'`). Set `CoreAdminConfig.content_security_policy`
-  (or `ADMINFOUNDRY_CONTENT_SECURITY_POLICY`) to emit one — recommended for
+  (or `ASTERION_CONTENT_SECURITY_POLICY`) to emit one — recommended for
   API-first deployments with their own frontend, e.g.
   `default-src 'self'; frame-ancestors 'none'`. Note the built-in UI keeps the
   access token in `localStorage`, so a strict CSP is the main defence against
@@ -173,14 +173,14 @@ for how to raise custom envelopes via `AdminError`.
   scripts is a tracked follow-up.
 - Client IP (tenant IP allowlist + audit `ip_address`) defaults to the direct
   peer and **ignores `X-Forwarded-For`**. Behind a reverse proxy set
-  `CoreAdminConfig.trusted_proxy_count` (or `ADMINFOUNDRY_TRUSTED_PROXY_COUNT`)
+  `CoreAdminConfig.trusted_proxy_count` (or `ASTERION_TRUSTED_PROXY_COUNT`)
   to the number of trusted proxy hops, and run `uvicorn --proxy-headers` — else
   the per-tenant IP allowlist sees only the proxy IP and the audit IP is wrong.
   Never set this above the real hop count: it would let clients spoof the IP
   via the header.
 - The default login rate limiter is in-memory (per process) and keyed by email
   only. For multi-worker production wire a shared backend
-  (`adminfoundry.extensions.rate_limit_redis`); `(email, ip)` keying is a
+  (`asterion.extensions.rate_limit_redis`); `(email, ip)` keying is a
   planned follow-up that builds on `trusted_proxy_count`.
 - No automatic audit retention; run `DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '90 days';`
   on a schedule.

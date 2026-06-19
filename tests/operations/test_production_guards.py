@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry import CoreAdminConfig
+from asterion import CoreAdminConfig
 
 
 def _make(**overrides) -> CoreAdminConfig:

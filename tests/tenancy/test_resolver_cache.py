@@ -11,8 +11,8 @@ import uuid
 
 import pytest
 
-from adminfoundry.tenancy import resolver
-from adminfoundry.tenancy.context import TenantContext
+from asterion.tenancy import resolver
+from asterion.tenancy.context import TenantContext
 
 
 def _ctx(slug: str) -> TenantContext:

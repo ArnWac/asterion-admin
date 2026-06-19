@@ -17,17 +17,17 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import create_admin
-from adminfoundry.admin.context import (
+from asterion import create_admin
+from asterion.admin.context import (
     AdminContext,
     build_admin_context,
     require_admin_context,
 )
-from adminfoundry.core.config import CoreAdminConfig
-from adminfoundry.db.dependencies import get_async_session
-from adminfoundry.models.base import GLOBAL_METADATA
-from adminfoundry.providers.base import AdminPrincipal
-from adminfoundry.registry import ModelAdmin
+from asterion.core.config import CoreAdminConfig
+from asterion.db.dependencies import get_async_session
+from asterion.models.base import GLOBAL_METADATA
+from asterion.providers.base import AdminPrincipal
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):
@@ -48,7 +48,7 @@ class _PostAdmin(ModelAdmin):
 async def app_factory():
     """Build a fresh app with an in-memory SQLite session factory.
 
-    Uses adminfoundry's own DatabaseManager so the SQLite
+    Uses asterion's own DatabaseManager so the SQLite
     ``schema_translate_map`` is applied (Postgres-style ``public``
     schema collapses to None on SQLite).
 
@@ -69,7 +69,7 @@ async def app_factory():
     )
 
     # Create the tables on the same engine the app will use.
-    engine = app.state.adminfoundry.db.engine
+    engine = app.state.asterion.db.engine
     async with engine.begin() as conn:
         await conn.run_sync(GLOBAL_METADATA.create_all)
 

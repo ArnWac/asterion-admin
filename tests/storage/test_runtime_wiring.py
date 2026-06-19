@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.storage import LocalFileStorage, StorageBackend
+from asterion import CoreAdminConfig, create_admin
+from asterion.storage import LocalFileStorage, StorageBackend
 
 SECRET = "test-storage-wiring-secret"
 
@@ -31,13 +31,13 @@ def _config(tmp_path, **kw) -> CoreAdminConfig:
 
 def test_no_storage_when_neither_configured(tmp_path):
     app = create_admin(config=_config(tmp_path))
-    assert app.state.adminfoundry.storage is None
+    assert app.state.asterion.storage is None
 
 
 def test_storage_root_auto_wires_local_filesystem(tmp_path):
     root = tmp_path / "uploads"
     app = create_admin(config=_config(tmp_path, storage_root=str(root)))
-    storage = app.state.adminfoundry.storage
+    storage = app.state.asterion.storage
     assert isinstance(storage, LocalFileStorage)
     assert isinstance(storage, StorageBackend)
     assert storage.root == root
@@ -53,14 +53,14 @@ def test_explicit_storage_wins_over_storage_root(tmp_path):
         config=_config(tmp_path, storage_root=str(tmp_path / "ignored")),
         storage=explicit,
     )
-    assert app.state.adminfoundry.storage is explicit
-    assert app.state.adminfoundry.storage.name == "explicit"
+    assert app.state.asterion.storage is explicit
+    assert app.state.asterion.storage.name == "explicit"
 
 
 def test_explicit_storage_without_storage_root(tmp_path):
     custom = LocalFileStorage(tmp_path / "custom", name="custom")
     app = create_admin(config=_config(tmp_path), storage=custom)
-    assert app.state.adminfoundry.storage is custom
+    assert app.state.asterion.storage is custom
 
 
 # ---------------------------------------------------------------------------

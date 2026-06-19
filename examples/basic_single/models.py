@@ -17,7 +17,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from adminfoundry.models.base import GUID, GlobalModel
+from asterion.models.base import GUID, GlobalModel
 
 
 class PostStatus(enum.StrEnum):

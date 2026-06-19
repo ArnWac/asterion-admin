@@ -32,11 +32,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from jose import jwk as jose_jwk
 from jose import jwt as jose_jwt
 
-from adminfoundry.extensions.auth_oauth.jwks import (
+from asterion.extensions.auth_oauth.jwks import (
     JWKSClient,
     JWKSKeyNotFoundError,
 )
-from adminfoundry.extensions.auth_oauth.verifier import (
+from asterion.extensions.auth_oauth.verifier import (
     IDTokenAudienceError,
     IDTokenExpiredError,
     IDTokenIssuerError,

@@ -7,9 +7,9 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.core.errors import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.core.errors import (
     AUTHENTICATION_REQUIRED,
     CONFLICT,
     FORBIDDEN,
@@ -20,7 +20,7 @@ from adminfoundry.core.errors import (
     VALIDATION_ERROR,
     AdminError,
 )
-from adminfoundry.core.middleware import REQUEST_ID_HEADER
+from asterion.core.middleware import REQUEST_ID_HEADER
 
 
 def _envelope(resp):
@@ -244,10 +244,10 @@ def test_crud_unknown_resource_uses_envelope(tmp_path):
         # bypass auth — we only care about the envelope
         from sqlalchemy.ext.asyncio import async_sessionmaker
 
-        from adminfoundry.models.base import GlobalModel
-        from adminfoundry.models.user import User
+        from asterion.models.base import GlobalModel
+        from asterion.models.user import User
 
-        runtime = app.state.adminfoundry
+        runtime = app.state.asterion
         async with runtime.db.engine.begin() as conn:
             await conn.run_sync(GlobalModel.metadata.create_all)
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)

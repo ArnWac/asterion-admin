@@ -25,10 +25,10 @@ test:
 	pytest tests/ -q
 
 doctor:
-	adminfoundry doctor
+	asterion doctor
 
 lint:
-	python -m compileall -q adminfoundry examples tests
+	python -m compileall -q asterion examples tests
 
 format:
 	@echo "No formatter configured. Add ruff/black to dev deps and wire here."

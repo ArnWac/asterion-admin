@@ -21,11 +21,11 @@ from sqlalchemy import Column, ForeignKey, Integer, String, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.admin import InlineAdmin
-from adminfoundry.admin.context import AdminContext
-from adminfoundry.crud.services import create_record, update_record
-from adminfoundry.providers.base import AdminPrincipal
-from adminfoundry.registry import ModelAdmin
+from asterion.admin import InlineAdmin
+from asterion.admin.context import AdminContext
+from asterion.crud.services import create_record, update_record
+from asterion.providers.base import AdminPrincipal
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

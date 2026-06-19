@@ -11,20 +11,20 @@ Registered admins:
 * ``ProjectAdmin``, ``TicketAdmin`` — tenant-scoped models (+ the custom
   ``CloseTicketsAction``, + ``TicketInline`` under projects).
 * framework global tables — from ``global_admins.py``.
-* tenant-local RBAC admins — from ``adminfoundry.builtins.admin``.
+* tenant-local RBAC admins — from ``asterion.builtins.admin``.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from adminfoundry import AdminRegistry, ModelAdmin
-from adminfoundry.actions import BulkDeleteAction
-from adminfoundry.admin.context import AdminContext
-from adminfoundry.admin.fieldset import Fieldset
-from adminfoundry.admin.inline import InlineAdmin
-from adminfoundry.admin.policy import AdminPolicy
-from adminfoundry.builtins.admin import (
+from asterion import AdminRegistry, ModelAdmin
+from asterion.actions import BulkDeleteAction
+from asterion.admin.context import AdminContext
+from asterion.admin.fieldset import Fieldset
+from asterion.admin.inline import InlineAdmin
+from asterion.admin.policy import AdminPolicy
+from asterion.builtins.admin import (
     TenantMembershipRoleAdmin,
     TenantRoleAdmin,
     TenantRolePermissionAdmin,

@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "adminfoundry"
+name = "asterion-admin"
 version = "0.1.0"
 description = "FastAPI admin framework with built-in UI, JWT auth, RBAC, and multi-tenancy"
 readme = "README.md"
@@ -38,10 +38,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ArnWac/adminfoundry"
-Repository = "https://github.com/ArnWac/adminfoundry"
-"Bug Tracker" = "https://github.com/ArnWac/adminfoundry/issues"
-Changelog = "https://github.com/ArnWac/adminfoundry/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/ArnWac/asterion-admin"
+Repository = "https://github.com/ArnWac/asterion-admin"
+"Bug Tracker" = "https://github.com/ArnWac/asterion-admin/issues"
+Changelog = "https://github.com/ArnWac/asterion-admin/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Production driver
@@ -88,18 +88,18 @@ dev = [
 # corresponding code paths.
 
 [project.scripts]
-adminfoundry = "adminfoundry.cli:app"
+asterion = "asterion.cli:app"
 
 # Third-party apps register custom CLI commands via this entry-points group:
-#   [project.entry-points."adminfoundry.commands"]
+#   [project.entry-points."asterion.commands"]
 #   my_command = "myapp.cli:my_command_fn"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["adminfoundry*"]
+include = ["asterion*"]
 
 [tool.setuptools.package-data]
-adminfoundry = [
+asterion = [
     "py.typed",
     "ui/templates/**/*",
     "ui/static/**/*",
@@ -111,7 +111,7 @@ asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 markers = [
-    "postgres: integration tests that require a real PostgreSQL server (set ADMINFOUNDRY_TEST_POSTGRES_URL to enable)",
+    "postgres: integration tests that require a real PostgreSQL server (set ASTERION_TEST_POSTGRES_URL to enable)",
 ]
 
 # ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ markers = [
 # blocker. ``follow_imports = silent`` keeps transitive noise from those
 # modules out of the report while still checking the targeted files.
 python_version = "3.11"
-files = ["adminfoundry/providers", "adminfoundry/core/config.py"]
+files = ["asterion/providers", "asterion/core/config.py"]
 follow_imports = "silent"
 ignore_missing_imports = true
 warn_unused_ignores = true
@@ -174,9 +174,9 @@ ignore = [
 "**/__init__.py" = ["F401"]
 # ModelAdmin / InlineAdmin use class-level lists/dicts as user-facing API
 # surface; subclasses get fresh copies via __init_subclass__.
-"adminfoundry/registry/**" = ["RUF012"]
-"adminfoundry/admin/**" = ["RUF012"]
-"adminfoundry/builtins/**" = ["RUF012"]
+"asterion/registry/**" = ["RUF012"]
+"asterion/admin/**" = ["RUF012"]
+"asterion/builtins/**" = ["RUF012"]
 "examples/**" = ["RUF012"]
 
 [tool.ruff.format]

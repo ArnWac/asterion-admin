@@ -9,12 +9,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.tokens import create_access_token, create_impersonation_token
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.tenant import Tenant
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.auth.tokens import create_access_token, create_impersonation_token
+from asterion.models.base import GlobalModel
+from asterion.models.tenant import Tenant
+from asterion.models.user import User
 
 SECRET = "test-root-secret"
 ALG = "HS256"
@@ -32,7 +32,7 @@ def app_state(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     state: dict = {"superadmin": None, "user": None, "tenants": []}
 

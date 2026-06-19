@@ -21,15 +21,15 @@ from __future__ import annotations
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.admin.context import AdminContext
-from adminfoundry.admin.policy import AdminPolicy, FieldPermission
-from adminfoundry.contract.service import (
+from asterion.admin.context import AdminContext
+from asterion.admin.policy import AdminPolicy, FieldPermission
+from asterion.contract.service import (
     build_field_metadata,
     build_model_contract,
     compute_field_permissions,
 )
-from adminfoundry.providers.base import AdminPrincipal
-from adminfoundry.registry import ModelAdmin
+from asterion.providers.base import AdminPrincipal
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

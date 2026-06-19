@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.extensions.errors import RegistryFrozenError
-from adminfoundry.registry import AdminRegistry, ModelAdmin
+from asterion import CoreAdminConfig, create_admin
+from asterion.extensions.errors import RegistryFrozenError
+from asterion.registry import AdminRegistry, ModelAdmin
 
 
 class _FakeModel:
@@ -118,7 +118,7 @@ def test_create_admin_freezes_registry_after_setup():
         ),
         register=lambda reg: reg.register(FakeAdmin),
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     assert runtime.registry.is_frozen is True
     assert runtime.registry.get("fake_things") is not None
 

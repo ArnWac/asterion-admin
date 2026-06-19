@@ -19,14 +19,14 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.admin.context import AdminContext
-from adminfoundry.crud.services import (
+from asterion.admin.context import AdminContext
+from asterion.crud.services import (
     create_record,
     delete_record,
     update_record,
 )
-from adminfoundry.providers.base import AdminPrincipal
-from adminfoundry.registry import ModelAdmin
+from asterion.providers.base import AdminPrincipal
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

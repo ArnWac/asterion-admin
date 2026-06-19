@@ -8,14 +8,14 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.crud.services import (
+from asterion.crud.services import (
     create_record,
     delete_record,
     list_records,
     read_record,
     update_record,
 )
-from adminfoundry.registry import ModelAdmin
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

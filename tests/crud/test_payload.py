@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from adminfoundry.crud.payload import clean_write_payload
-from adminfoundry.schemas.fields import AdminModelSchema, FieldInfo
+from asterion.crud.payload import clean_write_payload
+from asterion.schemas.fields import AdminModelSchema, FieldInfo
 
 
 def _schema(*fields):

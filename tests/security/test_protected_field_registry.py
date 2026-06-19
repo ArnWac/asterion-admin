@@ -19,12 +19,12 @@ from fastapi import HTTPException
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.contract.service import build_field_metadata, build_model_contract
-from adminfoundry.crud.payload import clean_write_payload
-from adminfoundry.registry import ModelAdmin
-from adminfoundry.schemas.builder import build_model_schema
-from adminfoundry.schemas.serialization.serializer import serialize_record
-from adminfoundry.security.protected_fields import (
+from asterion.contract.service import build_field_metadata, build_model_contract
+from asterion.crud.payload import clean_write_payload
+from asterion.registry import ModelAdmin
+from asterion.schemas.builder import build_model_schema
+from asterion.schemas.serialization.serializer import serialize_record
+from asterion.security.protected_fields import (
     DEFAULT_PROTECTED_FIELDS,
     ProtectedFieldRegistry,
     RegistryFrozenError,
@@ -175,7 +175,7 @@ def test_runtime_protected_fields_defaults_to_the_global_singleton():
     """
     import dataclasses
 
-    from adminfoundry.core.runtime import AdminRuntime
+    from asterion.core.runtime import AdminRuntime
 
     pf_field = {f.name: f for f in dataclasses.fields(AdminRuntime)}["protected_fields"]
     assert pf_field.default_factory is not dataclasses.MISSING
@@ -197,7 +197,7 @@ def test_protected_field_is_shared_across_admin_instances():
 def test_globally_protected_alias_still_exposes_defaults():
     """Existing imports of ``GLOBALLY_PROTECTED`` keep working (backwards
     compat alias for the documented seed set)."""
-    from adminfoundry.registry.admin import GLOBALLY_PROTECTED
+    from asterion.registry.admin import GLOBALLY_PROTECTED
 
     assert GLOBALLY_PROTECTED == DEFAULT_PROTECTED_FIELDS
     assert "hashed_password" in GLOBALLY_PROTECTED

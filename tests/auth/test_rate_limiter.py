@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry.auth.rate_limiter import InMemoryLoginRateLimiter, RateLimiterBackend
+from asterion.auth.rate_limiter import InMemoryLoginRateLimiter, RateLimiterBackend
 
 
 def test_in_memory_limiter_satisfies_protocol():
@@ -65,7 +65,7 @@ async def test_window_expiry_releases_block(monkeypatch):
     def _patched_time():
         return fake_now[0]
 
-    monkeypatch.setattr("adminfoundry.auth.rate_limiter.time.time", _patched_time)
+    monkeypatch.setattr("asterion.auth.rate_limiter.time.time", _patched_time)
 
     limiter = InMemoryLoginRateLimiter(max_failures=2, window_seconds=60)
     await limiter.record_failure("x")

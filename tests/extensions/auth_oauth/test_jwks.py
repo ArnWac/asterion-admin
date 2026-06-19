@@ -21,7 +21,7 @@ import asyncio
 import httpx
 import pytest
 
-from adminfoundry.extensions.auth_oauth.jwks import (
+from asterion.extensions.auth_oauth.jwks import (
     JWKSClient,
     JWKSFetchError,
     JWKSInvalidResponseError,

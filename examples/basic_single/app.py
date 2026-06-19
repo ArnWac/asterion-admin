@@ -19,13 +19,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.extensions import AdminExtension
-from adminfoundry.extensions.auth_oauth import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.extensions import AdminExtension
+from asterion.extensions.auth_oauth import (
     GoogleOIDCProvider,
     OAuthExtension,
 )
-from adminfoundry.extensions.import_export import ImportExportExtension
+from asterion.extensions.import_export import ImportExportExtension
 from examples.basic_single.admin_config import register
 from examples.basic_single.seed import print_banner, seed
 
@@ -35,7 +35,7 @@ config = CoreAdminConfig(
         "sqlite+aiosqlite:///./basic_single.db",
     ),
     secret_key=os.environ.get("SECRET_KEY", "dev-secret"),
-    app_title="adminfoundry — basic_single",
+    app_title="asterion — basic_single",
     enable_multi_tenant=False,
     enable_builtin_admins=False,
 )
@@ -75,7 +75,7 @@ def _build_extensions() -> list[AdminExtension]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await seed(app.state.adminfoundry.db)
+    await seed(app.state.asterion.db)
     print_banner()
     yield
 

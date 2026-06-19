@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.6
 #
-# Reference adminfoundry image. Builds an installable wheel of the
+# Reference asterion image. Builds an installable wheel of the
 # package and a thin runtime that runs uvicorn against `app:app`.
 #
 # Usage:
-#     docker build -t adminfoundry .
+#     docker build -t asterion .
 #     docker run --rm -p 8000:8000 \
-#         -e ADMINFOUNDRY_DATABASE_URL=postgresql+asyncpg://... \
-#         -e ADMINFOUNDRY_SECRET_KEY=$(openssl rand -hex 32) \
-#         adminfoundry
+#         -e ASTERION_DATABASE_URL=postgresql+asyncpg://... \
+#         -e ASTERION_SECRET_KEY=$(openssl rand -hex 32) \
+#         asterion
 #
 # Override the entrypoint to run CLI commands:
-#     docker run --rm adminfoundry adminfoundry doctor
+#     docker run --rm asterion asterion doctor
 # ----------------------------------------------------------------------
 
 ARG PYTHON_VERSION=3.12
@@ -31,7 +31,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
-COPY adminfoundry ./adminfoundry
+COPY asterion ./asterion
 COPY alembic_shared.ini alembic_tenant.ini ./
 COPY migrations ./migrations
 
@@ -58,9 +58,9 @@ COPY alembic_shared.ini alembic_tenant.ini ./
 COPY migrations ./migrations
 
 # Non-root user
-RUN useradd --create-home --uid 10001 adminfoundry \
- && chown -R adminfoundry:adminfoundry /app
-USER adminfoundry
+RUN useradd --create-home --uid 10001 asterion \
+ && chown -R asterion:asterion /app
+USER asterion
 
 EXPOSE 8000
 

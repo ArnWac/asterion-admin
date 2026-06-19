@@ -7,22 +7,22 @@ quickstart see [`README.md`](../README.md).
 
 | Variable | Purpose |
 |---|---|
-| `ADMINFOUNDRY_DATABASE_URL` | `postgresql+asyncpg://user:pass@host:port/db` |
-| `ADMINFOUNDRY_SECRET_KEY`   | Random 32+ bytes (`openssl rand -hex 32`). Must NOT equal `change-me-in-production`. |
+| `ASTERION_DATABASE_URL` | `postgresql+asyncpg://user:pass@host:port/db` |
+| `ASTERION_SECRET_KEY`   | Random 32+ bytes (`openssl rand -hex 32`). Must NOT equal `change-me-in-production`. |
 
 ## Strongly recommended
 
 | Variable | Default | Notes |
 |---|---|---|
-| `ADMINFOUNDRY_LOG_JSON` | `false` | Set `true` in production for one-line JSON per record. |
-| `ADMINFOUNDRY_LOG_LEVEL` | `INFO` | One of `CRITICAL/ERROR/WARNING/INFO/DEBUG/NOTSET`. |
-| `ADMINFOUNDRY_CORS_ORIGINS` | `` | Comma-separated allowed origins for browser frontends. |
-| `ADMINFOUNDRY_DB_POOL_SIZE` | `10` | Per worker. |
-| `ADMINFOUNDRY_DB_MAX_OVERFLOW` | `20` | Per worker. |
-| `ADMINFOUNDRY_ENABLE_BUILTIN_UI` | `true` | Set `false` if you serve the UI separately. |
+| `ASTERION_LOG_JSON` | `false` | Set `true` in production for one-line JSON per record. |
+| `ASTERION_LOG_LEVEL` | `INFO` | One of `CRITICAL/ERROR/WARNING/INFO/DEBUG/NOTSET`. |
+| `ASTERION_CORS_ORIGINS` | `` | Comma-separated allowed origins for browser frontends. |
+| `ASTERION_DB_POOL_SIZE` | `10` | Per worker. |
+| `ASTERION_DB_MAX_OVERFLOW` | `20` | Per worker. |
+| `ASTERION_ENABLE_BUILTIN_UI` | `true` | Set `false` if you serve the UI separately. |
 
 For the full list see `CoreAdminConfig` in
-[`adminfoundry/core/config.py`](../adminfoundry/core/config.py).
+[`asterion/core/config.py`](../asterion/core/config.py).
 
 A starter `.env.example` ships at the repo root.
 
@@ -34,7 +34,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml ./
-COPY adminfoundry ./adminfoundry
+COPY asterion ./asterion
 RUN pip install --no-cache-dir ".[postgres]" uvicorn[standard]
 COPY app.py ./
 ENV PYTHONUNBUFFERED=1
@@ -53,20 +53,20 @@ docker-compose up --build app
 
 ```bash
 # 1. Public schema
-adminfoundry db upgrade-public
+asterion db upgrade-public
 
 # 2. Catalog of permission keys derived from your registry
-ADMINFOUNDRY_APP=app:app adminfoundry permissions sync
+ASTERION_APP=app:app asterion permissions sync
 
 # 3. First superadmin
-adminfoundry create-superadmin --email admin@example.com
+asterion create-superadmin --email admin@example.com
 
 # 4. First tenant
-adminfoundry tenant create --name "Acme" --slug acme --owner-email owner@example.com
-adminfoundry db upgrade-tenant acme
+asterion tenant create --name "Acme" --slug acme --owner-email owner@example.com
+asterion db upgrade-tenant acme
 ```
 
-`adminfoundry doctor` verifies config + DB connectivity. Run it in your
+`asterion doctor` verifies config + DB connectivity. Run it in your
 deployment pipeline.
 
 ## Health probes
@@ -90,7 +90,7 @@ readinessProbe:
 ## Logging + correlation
 
 `configure_logging(config)` is called from `create_admin`. With
-`ADMINFOUNDRY_LOG_JSON=true` each log line is one JSON object including
+`ASTERION_LOG_JSON=true` each log line is one JSON object including
 the `request_id` when set in the request context. Every response
 carries `X-Request-ID`; if your client sends one, the server echoes it,
 otherwise it generates a UUID.
@@ -103,12 +103,12 @@ lines for one request.
 
 ```bash
 # After every model change in the public schema
-adminfoundry migrate generate -m "add posts.summary" --env shared
-adminfoundry db upgrade-public
+asterion migrate generate -m "add posts.summary" --env shared
+asterion db upgrade-public
 
 # After every model change in tenant-local schemas
-adminfoundry migrate generate -m "add tenant_roles.color" --env tenant
-adminfoundry db upgrade-tenants
+asterion migrate generate -m "add tenant_roles.color" --env tenant
+asterion db upgrade-tenants
 ```
 
 `db upgrade-tenants` iterates every active tenant. Run it after every

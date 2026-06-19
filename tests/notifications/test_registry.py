@@ -19,12 +19,12 @@ from typing import Protocol, runtime_checkable
 import pytest
 from fastapi import Request
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password_reset import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password_reset import (
     LoggingPasswordResetNotifier,
     PasswordResetNotifier,
 )
-from adminfoundry.notifications import Notifier, NotifierRegistry
+from asterion.notifications import Notifier, NotifierRegistry
 
 SECRET = "x" * 64
 
@@ -128,7 +128,7 @@ def test_create_admin_auto_registers_password_reset_notifier(tmp_path):
             enable_builtin_admins=False,
         ),
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     found = runtime.notifiers.get(PasswordResetNotifier)
     assert found is not None
     # Default is the dev-only logging notifier — pin the type rather
@@ -161,7 +161,7 @@ def test_create_admin_with_explicit_notifier_registers_that_instance(tmp_path):
         ),
         password_reset_notifier=explicit,
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     assert runtime.notifiers.get(PasswordResetNotifier) is explicit
     # Old attribute still works (backwards compat).
     assert runtime.password_reset_notifier is explicit

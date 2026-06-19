@@ -3,7 +3,7 @@
 Single-tenant subset of the same idea used by
 ``examples/multi_tenant/global_admins.py``. Kept in the example because
 the framework doesn't ship these by default; structured so the classes
-can be moved into ``adminfoundry/builtins/admin.py`` later without
+can be moved into ``asterion/builtins/admin.py`` later without
 touching the call sites.
 
 ``AuditLogAdmin`` expresses read-only intent by listing every field in
@@ -13,8 +13,8 @@ flag in v1.
 
 from __future__ import annotations
 
-from adminfoundry.models import AuditLog, User
-from adminfoundry.registry import AdminRegistry, ModelAdmin
+from asterion.models import AuditLog, User
+from asterion.registry import AdminRegistry, ModelAdmin
 
 
 class UserAdmin(ModelAdmin):

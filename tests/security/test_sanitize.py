@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from adminfoundry.security.sanitize import REDACTED, sanitize_payload
+from asterion.security.sanitize import REDACTED, sanitize_payload
 
 
 def test_redacts_top_level_password():

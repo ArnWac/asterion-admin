@@ -1,12 +1,12 @@
 # ModelAdmin API reference
 
-Subclass `adminfoundry.ModelAdmin`, set a few class attributes, register
+Subclass `asterion.ModelAdmin`, set a few class attributes, register
 it. The framework derives CRUD routes, a JSON contract, payload validators,
 and a serializer from the declaration.
 
 ```python
-from adminfoundry import ModelAdmin
-from adminfoundry.actions import BulkDeleteAction
+from asterion import ModelAdmin
+from asterion.actions import BulkDeleteAction
 
 
 class PostAdmin(ModelAdmin):
@@ -90,12 +90,12 @@ class ArticleAdmin(ModelAdmin):
 
 ## Actions
 
-Subclass `adminfoundry.actions.AdminAction`, set `name` + `label`,
+Subclass `asterion.actions.AdminAction`, set `name` + `label`,
 implement an async `execute(records, session, user) -> dict`. Add the
 instance to a `ModelAdmin.actions` list.
 
 ```python
-from adminfoundry.actions import AdminAction
+from asterion.actions import AdminAction
 
 
 class MarkPublished(AdminAction):
@@ -123,7 +123,7 @@ The endpoint is `POST /api/v1/admin/posts/_actions/publish` with body
 ## Registration
 
 ```python
-from adminfoundry import create_admin, CoreAdminConfig
+from asterion import create_admin, CoreAdminConfig
 
 def register(registry):
     registry.register(PostAdmin)
@@ -139,5 +139,5 @@ After registering models, sync the permission catalog so default tenant
 roles have something to grant:
 
 ```bash
-ADMINFOUNDRY_APP=app:app adminfoundry permissions sync
+ASTERION_APP=app:app asterion permissions sync
 ```

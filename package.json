@@ -1,9 +1,9 @@
 {
-  "name": "adminfoundry-ui",
+  "name": "asterion-ui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Test harness for the adminfoundry built-in UI (vanilla ES modules).",
+  "description": "Test harness for the asterion built-in UI (vanilla ES modules).",
   "scripts": {
     "test": "vitest run"
   },

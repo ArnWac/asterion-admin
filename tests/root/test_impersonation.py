@@ -10,19 +10,19 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.audit import IMPERSONATION_START
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.tokens import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.audit import IMPERSONATION_START
+from asterion.auth.password import hash_password
+from asterion.auth.tokens import (
     create_access_token,
     create_impersonation_token,
     decode_access_token,
     is_impersonation_token,
 )
-from adminfoundry.models.audit_log import AuditLog
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.impersonation_log import ImpersonationLog
-from adminfoundry.models.user import User
+from asterion.models.audit_log import AuditLog
+from asterion.models.base import GlobalModel
+from asterion.models.impersonation_log import ImpersonationLog
+from asterion.models.user import User
 
 SECRET = "test-impersonate-secret"
 ALG = "HS256"
@@ -40,7 +40,7 @@ def app_state(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     state = {"superadmin": None, "user": None}
 
@@ -107,7 +107,7 @@ def _user_token(state) -> str:
 
 
 def _impersonation_logs(app) -> list[ImpersonationLog]:
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _go():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -119,7 +119,7 @@ def _impersonation_logs(app) -> list[ImpersonationLog]:
 
 
 def _audit_rows(app, action: str) -> list[AuditLog]:
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _go():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -228,7 +228,7 @@ def test_minted_token_rejected_by_require_superadmin(app_state):
     when require_superadmin is the gate."""
     app, state = app_state
     # Bootstrap a second superadmin so we have a real superadmin to target.
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _add_second_superadmin():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -340,7 +340,7 @@ def test_unknown_target_user_returns_404(app_state):
 
 def test_inactive_target_user_returns_409(app_state):
     app, state = app_state
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _deactivate():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)

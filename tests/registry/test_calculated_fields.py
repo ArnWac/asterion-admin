@@ -20,17 +20,17 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.contract.service import (
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.auth.password import hash_password
+from asterion.contract.service import (
     build_field_metadata,
     build_model_contract,
 )
-from adminfoundry.crud.payload import clean_write_payload
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
-from adminfoundry.schemas.builder import build_model_schema
-from adminfoundry.schemas.serialization.serializer import (
+from asterion.crud.payload import clean_write_payload
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
+from asterion.schemas.builder import build_model_schema
+from asterion.schemas.serialization.serializer import (
     serialize_record,
     serialize_records,
 )
@@ -191,7 +191,7 @@ def app(tmp_path):
         register=lambda reg: reg.register(ArticleAdmin),
     )
 
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:

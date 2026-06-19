@@ -3,7 +3,7 @@
 Most existing test fixtures grant authorization via FastAPI dependency
 overrides on ``require_tenant_auth_context``. Phase 2 of the v1-providers
 refactor moved every CRUD/contract/actions/import-export router off that
-dependency and onto :func:`adminfoundry.admin.require_admin_context`, so
+dependency and onto :func:`asterion.admin.require_admin_context`, so
 those overrides became dead code.
 
 :func:`override_admin_context` is the new one-stop helper — install it
@@ -16,8 +16,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from adminfoundry.admin import AdminContext, require_admin_context
-from adminfoundry.providers.base import AdminPrincipal, AdminTenant
+from asterion.admin import AdminContext, require_admin_context
+from asterion.providers.base import AdminPrincipal, AdminTenant
 
 
 def make_admin_principal(

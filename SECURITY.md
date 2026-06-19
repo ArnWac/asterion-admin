@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-adminfoundry is pre-1.0 software under active development. Security fixes are
+asterion is pre-1.0 software under active development. Security fixes are
 applied to the `main` branch and roll into the next `0.x` release. There is no
 long-term support for older `0.x` versions yet.
 
@@ -17,9 +17,9 @@ long-term support for older `0.x` versions yet.
 
 Please report privately via one of:
 
-- GitHub's [private vulnerability reporting](https://github.com/ArnWac/adminfoundry/security/advisories/new)
+- GitHub's [private vulnerability reporting](https://github.com/ArnWac/asterion-admin/security/advisories/new)
   (Security → Report a vulnerability), or
-- email **arnewacker@gmail.com** with subject `adminfoundry security`.
+- email **arnewacker@gmail.com** with subject `asterion security`.
 
 Please include:
 

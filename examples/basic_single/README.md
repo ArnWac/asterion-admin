@@ -1,6 +1,6 @@
 # basic_single — single-tenant blog example
 
-A minimal single-tenant adminfoundry app: blog posts managed by a global superadmin.
+A minimal single-tenant asterion app: blog posts managed by a global superadmin.
 
 ## Run
 

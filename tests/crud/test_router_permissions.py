@@ -16,10 +16,10 @@ from sqlalchemy import Boolean, Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.auth.password import hash_password
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 from tests._helpers import make_admin_principal, make_admin_tenant, override_admin_context
 
 
@@ -60,7 +60,7 @@ def app(tmp_path):
         register=lambda reg: reg.register(WidgetAdmin),
     )
 
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup_schema():
         async with runtime.db.engine.begin() as conn:
@@ -104,7 +104,7 @@ def _client(app) -> TestClient:
 
 
 def _seed_widgets(app, *, count: int = 3, is_system: bool = False) -> list[int]:
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _seed():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)

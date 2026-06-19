@@ -13,9 +13,9 @@ from sqlalchemy import Column, Integer, String, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.actions import AdminAction
-from adminfoundry.audit import (
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.actions import AdminAction
+from asterion.audit import (
     ADMIN_ACTION,
     CRUD_CREATE,
     CRUD_DELETE,
@@ -23,10 +23,10 @@ from adminfoundry.audit import (
     LOGIN_FAILURE,
     LOGIN_SUCCESS,
 )
-from adminfoundry.auth.password import hash_password
-from adminfoundry.models.audit_log import AuditLog
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion.auth.password import hash_password
+from asterion.models.audit_log import AuditLog
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 from tests._helpers import make_admin_principal, make_admin_tenant, override_admin_context
 
 
@@ -69,7 +69,7 @@ def app(tmp_path):
         register=lambda reg: reg.register(WidgetAdmin),
     )
 
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -105,7 +105,7 @@ def _client(app):
 
 
 def _audits(app, action: str | None = None) -> list[AuditLog]:
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _go():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -165,7 +165,7 @@ def test_login_failure_unknown_user_writes_audit(app):
 
 
 def _seed_widget(app, name: str = "w1") -> int:
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _go():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -235,7 +235,7 @@ def test_audit_write_failure_does_not_break_request(app, monkeypatch):
     """Plan §Phase 7: 'Audit failure must not break the functional response
     path.' Forcing the in-session audit helper to raise must still produce
     a 2xx and a created widget."""
-    from adminfoundry.audit import service as audit_service
+    from asterion.audit import service as audit_service
 
     async def _boom(*args, **kwargs):
         raise RuntimeError("audit went up in flames")
@@ -243,8 +243,8 @@ def test_audit_write_failure_does_not_break_request(app, monkeypatch):
     monkeypatch.setattr(audit_service, "record_audit_in_session", _boom)
     # crud/router and actions/router both import the symbol at module load,
     # so we patch their bound copies as well.
-    from adminfoundry.actions import router as actions_router
-    from adminfoundry.crud import router as crud_router
+    from asterion.actions import router as actions_router
+    from asterion.crud import router as crud_router
 
     monkeypatch.setattr(crud_router, "record_audit_in_session", _boom)
     monkeypatch.setattr(actions_router, "record_audit_in_session", _boom)

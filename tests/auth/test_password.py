@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from adminfoundry.auth.password import hash_password, verify_password
+from asterion.auth.password import hash_password, verify_password
 
 
 def test_hash_returns_non_empty_string():

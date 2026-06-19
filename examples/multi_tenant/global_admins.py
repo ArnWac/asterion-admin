@@ -2,13 +2,13 @@
 
 Lives in the example for now because the framework does NOT ship these
 by default — only the three tenant-scoped RBAC admins live in
-``adminfoundry/builtins/admin.py``.
+``asterion/builtins/admin.py``.
 
 The classes here are written to be self-contained and free of any
 example-specific dependencies so that, if the framework ever decides to
-ship them, this file can be moved into ``adminfoundry/builtins/admin.py``
+ship them, this file can be moved into ``asterion/builtins/admin.py``
 (or a sibling module) almost verbatim. Conventions deliberately mirror
-``adminfoundry/builtins/admin.py`` — same attribute order, same style of
+``asterion/builtins/admin.py`` — same attribute order, same style of
 description, no external imports.
 
 Read-only intent
@@ -36,14 +36,14 @@ the default ``admin`` tenant role.
 
 from __future__ import annotations
 
-from adminfoundry.models import (
+from asterion.models import (
     AuditLog,
     ImpersonationLog,
     Tenant,
     TenantMembership,
     User,
 )
-from adminfoundry.registry import AdminRegistry, ModelAdmin
+from asterion.registry import AdminRegistry, ModelAdmin
 
 
 class UserAdmin(ModelAdmin):

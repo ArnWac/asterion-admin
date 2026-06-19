@@ -16,12 +16,12 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.extensions.auth_oauth import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.extensions.auth_oauth import (
     GoogleOIDCProvider,
     OAuthExtension,
 )
-from adminfoundry.security.protected_fields import reset_for_tests as reset_protected
+from asterion.security.protected_fields import reset_for_tests as reset_protected
 
 
 @pytest.fixture(autouse=True)

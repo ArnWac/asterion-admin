@@ -7,8 +7,8 @@ import logging
 import pytest
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.core.middleware import REQUEST_ID_HEADER
+from asterion import CoreAdminConfig, create_admin
+from asterion.core.middleware import REQUEST_ID_HEADER
 
 
 @pytest.fixture
@@ -31,9 +31,7 @@ def client(app):
 
 
 def _find_request_record(caplog) -> logging.LogRecord:
-    matches = [
-        r for r in caplog.records if r.name == "adminfoundry.access" and r.message == "request"
-    ]
+    matches = [r for r in caplog.records if r.name == "asterion.access" and r.message == "request"]
     assert matches, "Expected at least one access-log record"
     return matches[-1]
 
@@ -46,10 +44,10 @@ def test_access_log_writes_one_record_per_request(client, caplog):
     # have left the root logger at a higher level (configure_logging only
     # sets root, doesn't restore).
     caplog.set_level(logging.INFO)
-    caplog.set_level(logging.INFO, logger="adminfoundry.access")
+    caplog.set_level(logging.INFO, logger="asterion.access")
     client.get("/healthz")
 
-    requests = [r for r in caplog.records if r.name == "adminfoundry.access"]
+    requests = [r for r in caplog.records if r.name == "asterion.access"]
     assert len(requests) == 1
 
 
@@ -58,7 +56,7 @@ def test_access_log_includes_request_id_method_path_status(client, caplog):
     # have left the root logger at a higher level (configure_logging only
     # sets root, doesn't restore).
     caplog.set_level(logging.INFO)
-    caplog.set_level(logging.INFO, logger="adminfoundry.access")
+    caplog.set_level(logging.INFO, logger="asterion.access")
     client.get("/healthz", headers={REQUEST_ID_HEADER: "trace-abc"})
     rec = _find_request_record(caplog)
 
@@ -73,7 +71,7 @@ def test_access_log_includes_duration_ms(client, caplog):
     # have left the root logger at a higher level (configure_logging only
     # sets root, doesn't restore).
     caplog.set_level(logging.INFO)
-    caplog.set_level(logging.INFO, logger="adminfoundry.access")
+    caplog.set_level(logging.INFO, logger="asterion.access")
     client.get("/healthz")
     rec = _find_request_record(caplog)
     assert isinstance(rec.duration_ms, (int, float))
@@ -85,7 +83,7 @@ def test_access_log_status_reflects_error_responses(client, caplog):
     # have left the root logger at a higher level (configure_logging only
     # sets root, doesn't restore).
     caplog.set_level(logging.INFO)
-    caplog.set_level(logging.INFO, logger="adminfoundry.access")
+    caplog.set_level(logging.INFO, logger="asterion.access")
     client.get("/no-such-route")
     rec = _find_request_record(caplog)
     assert rec.status_code == 404
@@ -100,7 +98,7 @@ def test_log_extra_skips_actor_when_id_access_raises():
     successful response is never turned into a 500 by a logging failure."""
     from types import SimpleNamespace
 
-    from adminfoundry.core.middleware import _log_extra
+    from asterion.core.middleware import _log_extra
 
     class _Boom:
         @property
@@ -126,7 +124,7 @@ def test_log_extra_skips_actor_when_id_access_raises():
 def test_log_extra_skips_tenant_when_id_access_raises():
     from types import SimpleNamespace
 
-    from adminfoundry.core.middleware import _log_extra
+    from asterion.core.middleware import _log_extra
 
     class _BoomTenant:
         @property
@@ -143,7 +141,7 @@ def test_log_extra_includes_actor_and_tenant_when_safely_readable():
     import uuid as _uuid
     from types import SimpleNamespace
 
-    from adminfoundry.core.middleware import _log_extra
+    from asterion.core.middleware import _log_extra
 
     aid = _uuid.uuid4()
     tid = _uuid.uuid4()

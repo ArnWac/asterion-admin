@@ -17,15 +17,15 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.extensions.base import AdminExtension
-from adminfoundry.extensions.errors import RegistryFrozenError
-from adminfoundry.ui.admin_pages import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.extensions.base import AdminExtension
+from asterion.extensions.errors import RegistryFrozenError
+from asterion.ui.admin_pages import (
     AdminPage,
     AdminPageRegistry,
     mirror_pages_into_navigation,
 )
-from adminfoundry.ui.navigation import NavigationRegistry
+from asterion.ui.navigation import NavigationRegistry
 from tests._helpers import (
     make_admin_principal,
     make_admin_tenant,
@@ -166,7 +166,7 @@ def test_unknown_page_returns_404(app):
 
 
 def test_admin_pages_registry_frozen_after_setup(app):
-    assert app.state.adminfoundry.admin_pages.is_frozen is True
+    assert app.state.asterion.admin_pages.is_frozen is True
 
 
 def test_page_in_navigation_when_permitted(app):

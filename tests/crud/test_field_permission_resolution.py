@@ -16,8 +16,8 @@ from __future__ import annotations
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.admin.policy import FieldPermission, static_field_permission
-from adminfoundry.registry import ModelAdmin
+from asterion.admin.policy import FieldPermission, static_field_permission
+from asterion.registry import ModelAdmin
 
 # ---------------------------------------------------------------------------
 # FieldPermission.strictest

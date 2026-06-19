@@ -19,7 +19,7 @@ from sqlalchemy import Column, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from adminfoundry.fields import (
+from asterion.fields import (
     FileFieldAdapter,
     FileFieldType,
     build_default_registry,

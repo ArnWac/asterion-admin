@@ -1,6 +1,6 @@
 """Static guard: forbidden legacy patterns must not reappear in active code.
 
-This test scans every .py file in the adminfoundry package and rejects any
+This test scans every .py file in the asterion package and rejects any
 match against the legacy patterns documented in the v1 migration plan.
 
 If you intentionally need one of these strings (e.g. in a docstring), narrow
@@ -15,13 +15,13 @@ from pathlib import Path
 
 import pytest
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "adminfoundry"
+PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "asterion"
 
 
 FORBIDDEN_PATTERNS: dict[str, re.Pattern[str]] = {
     "admin_site": re.compile(r"\badmin_site\b"),
     # NOTE: ``AuthProvider`` is intentionally NOT in this list anymore. The
-    # name now refers to the neutral ``adminfoundry.providers.base.AuthProvider``
+    # name now refers to the neutral ``asterion.providers.base.AuthProvider``
     # Protocol introduced by the v1-providers refactor, which is the
     # opposite of the legacy concrete-class concept this guard used to
     # forbid. Re-add only if a future iteration moves away from the name.
@@ -34,11 +34,11 @@ FORBIDDEN_PATTERNS: dict[str, re.Pattern[str]] = {
     "EventBus": re.compile(r"\bEventBus\b"),
     "AsyncSessionLocal": re.compile(r"\bAsyncSessionLocal\b"),
     "get_admin_db": re.compile(r"\bget_admin_db\b"),
-    "adminfoundry.settings": re.compile(r"adminfoundry\.settings\b"),
+    "asterion.settings": re.compile(r"asterion\.settings\b"),
     # bare Role/RolePermission classes (excluding TenantRole/TenantRolePermission)
     "bare RolePermission class": re.compile(r"(?<!Tenant)\bRolePermission\b"),
     "bare Role import": re.compile(
-        r"\bfrom\s+adminfoundry\.models\s+import\s+[^\n]*\bRole\b(?!Permission)"
+        r"\bfrom\s+asterion\.models\s+import\s+[^\n]*\bRole\b(?!Permission)"
     ),
     "user_roles association": re.compile(r"\buser_roles\b"),
     "membership_roles assoc": re.compile(r"\bmembership_roles\b"),
@@ -107,4 +107,4 @@ def test_package_tree_only_contains_v1_subpackages():
         if not p.name.startswith("_") and p.name != "__pycache__"
     }
     extras = present - allowed
-    assert not extras, f"Unexpected top-level packages in adminfoundry/: {sorted(extras)}"
+    assert not extras, f"Unexpected top-level packages in asterion/: {sorted(extras)}"

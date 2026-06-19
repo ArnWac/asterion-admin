@@ -30,7 +30,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.fields import (
+from asterion.fields import (
     EnumAdapter,
     ForeignKeyAdapter,
     JSONAdapter,

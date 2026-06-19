@@ -62,7 +62,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -e ".[dev]"
-      - run: pytest -q --cov=adminfoundry --cov-report=term-missing
+      - run: pytest -q --cov=asterion --cov-report=term-missing
 
   test-postgres:
     name: Test (PostgreSQL integration)
@@ -73,7 +73,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: adminfoundry
+          POSTGRES_DB: asterion
         ports:
           - 5432:5432
         options: >-
@@ -90,7 +90,7 @@ jobs:
       - run: pip install -e ".[dev,postgres]"
       - name: Run postgres-marked tests
         env:
-          ADMINFOUNDRY_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/adminfoundry
+          ASTERION_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/asterion
         run: pytest -m postgres -q
 
   build:

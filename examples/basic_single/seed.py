@@ -9,10 +9,10 @@ from sqlalchemy import select
 
 # Ensure the app-local Post table is registered in GlobalModel.metadata.
 import examples.basic_single.models  # noqa: F401
-from adminfoundry.auth.password import hash_password
-from adminfoundry.db.session import DatabaseManager
-from adminfoundry.models import User
-from adminfoundry.models.base import GlobalModel
+from asterion.auth.password import hash_password
+from asterion.db.session import DatabaseManager
+from asterion.models import User
+from asterion.models.base import GlobalModel
 
 ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASSWORD = "admin123"  # demo only
@@ -41,7 +41,7 @@ async def seed(db: DatabaseManager) -> None:
 
 def print_banner() -> None:
     print(f"""
-adminfoundry demo ready
+asterion demo ready
 
 Admin UI:
   http://127.0.0.1:8000/admin

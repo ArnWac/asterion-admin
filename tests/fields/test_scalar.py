@@ -20,7 +20,7 @@ from datetime import datetime
 import sqlalchemy.types as sqltypes
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, Float, Integer, Numeric, String, Text
 
-from adminfoundry.fields import (
+from asterion.fields import (
     BooleanAdapter,
     DateTimeAdapter,
     FloatAdapter,

@@ -3,7 +3,7 @@
 ## Package layout
 
 ```text
-adminfoundry/
+asterion/
   __init__.py                # public API: create_admin, ModelAdmin, CoreAdminConfig, AdminRegistry
   py.typed                   # PEP 561 marker
 
@@ -103,7 +103,7 @@ adminfoundry/
     admin.py, installer.py   # TenantRoleAdmin, TenantRolePermissionAdmin, TenantMembershipRoleAdmin
 
   cli/
-    main.py                  # adminfoundry CLI (db, tenant, permissions, …)
+    main.py                  # asterion CLI (db, tenant, permissions, …)
 
   ui/
     router.py                # /admin shell routes
@@ -126,7 +126,7 @@ AdminRuntime(config, db, providers, extensions, permission_registry,
      │  compose_lifespan(extensions, user_lifespan)        # ext.startup/shutdown wraps user lifespan
      ▼
 FastAPI(lifespan=composed)
-     │  app.state.adminfoundry = runtime
+     │  app.state.asterion = runtime
      │  register_error_handlers(app)                       # consistent envelope
      │  install_middleware(app, config)                    # request_id ▸ access_log ▸ security_headers ▸ cors ▸ tenant
      │  install_builtin_admins(registry)                   # tenant_roles, tenant_role_permissions, tenant_membership_roles
@@ -171,7 +171,7 @@ Request
 Everything is reachable through one attribute on the FastAPI app:
 
 ```python
-runtime = request.app.state.adminfoundry          # AdminRuntime
+runtime = request.app.state.asterion          # AdminRuntime
 runtime.config                                    # CoreAdminConfig
 runtime.db                                        # DatabaseManager
 runtime.registry                                  # AdminRegistry

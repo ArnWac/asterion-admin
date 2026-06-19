@@ -16,12 +16,12 @@ from __future__ import annotations
 from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.admin import Fieldset
-from adminfoundry.contract.service import (
+from asterion.admin import Fieldset
+from asterion.contract.service import (
     build_fieldset_metadata,
     build_model_contract,
 )
-from adminfoundry.registry import ModelAdmin
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

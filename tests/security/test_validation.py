@@ -1,10 +1,10 @@
-"""Tests for input validators in adminfoundry.security.validation."""
+"""Tests for input validators in asterion.security.validation."""
 
 from __future__ import annotations
 
 import pytest
 
-from adminfoundry.security.validation import (
+from asterion.security.validation import (
     DEFAULT_PAGE_LIMIT,
     MAX_PAGE_LIMIT,
     InvalidActionNameError,

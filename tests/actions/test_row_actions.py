@@ -21,17 +21,17 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import create_admin
-from adminfoundry.actions import AdminAction
-from adminfoundry.admin.context import (
+from asterion import create_admin
+from asterion.actions import AdminAction
+from asterion.admin.context import (
     AdminContext,
     build_admin_context,
     require_admin_context,
 )
-from adminfoundry.core.config import CoreAdminConfig
-from adminfoundry.db.dependencies import get_async_session
-from adminfoundry.providers.base import AdminPrincipal
-from adminfoundry.registry import ModelAdmin
+from asterion.core.config import CoreAdminConfig
+from asterion.db.dependencies import get_async_session
+from asterion.providers.base import AdminPrincipal
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

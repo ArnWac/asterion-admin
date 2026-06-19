@@ -69,7 +69,7 @@ PostgreSQL, not from filters in Python* — rests on three invariants:
    PostgreSQL's schema resolution is the only routing mechanism.
 
 `tests/postgres/` proves all three against a real PG instance (skipped
-without `ADMINFOUNDRY_TEST_POSTGRES_URL`): the `search_path` lifecycle and
+without `ASTERION_TEST_POSTGRES_URL`): the `search_path` lifecycle and
 schema isolation primitives in `test_search_path_lifecycle.py` /
 `test_tenant_isolation.py`, and the full request path — create under one
 tenant, invisible to another — in `test_http_tenant_isolation.py`.
@@ -78,23 +78,23 @@ tenant, invisible to another — in `test_http_tenant_isolation.py`.
 
 ```bash
 # 1. Create the public Tenant row + (optionally) the owner membership.
-adminfoundry tenant create \
+asterion tenant create \
     --name "Acme" --slug acme \
     --owner-email owner@example.com
 
 # 2. PostgreSQL only: provision the tenant schema + run tenant migrations.
-adminfoundry db upgrade-tenant acme
+asterion db upgrade-tenant acme
 
 # 3. Seed default tenant-local roles. Done automatically by `tenant create`
 #    on PostgreSQL; safe to re-run.
-adminfoundry tenant bootstrap acme
+asterion tenant bootstrap acme
 ```
 
 The bootstrap step:
 
 1. Sync `PermissionCatalog` from your registry (only if a registry is
    passed programmatically — the CLI form does not auto-discover, run
-   `adminfoundry permissions sync --app app:app` first for useful
+   `asterion permissions sync --app app:app` first for useful
    defaults).
 2. `CREATE SCHEMA IF NOT EXISTS "tenant_acme"`.
 3. Run `alembic_tenant.ini` against the schema.

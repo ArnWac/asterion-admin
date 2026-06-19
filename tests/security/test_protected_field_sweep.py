@@ -30,16 +30,16 @@ from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.admin import InlineAdmin
-from adminfoundry.audit.service import audit_payload, sanitize_payload
-from adminfoundry.contract.service import build_model_contract
-from adminfoundry.crud.services import (
+from asterion.admin import InlineAdmin
+from asterion.audit.service import audit_payload, sanitize_payload
+from asterion.contract.service import build_model_contract
+from asterion.crud.services import (
     create_record,
     list_records,
     read_record,
     update_record,
 )
-from adminfoundry.registry import ModelAdmin
+from asterion.registry import ModelAdmin
 
 PROTECTED_VALUE = "T0PSECRET-not-supposed-to-leak"
 PROTECTED_FIELD_PER_ADMIN = "api_secret"

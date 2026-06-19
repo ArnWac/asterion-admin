@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry.storage import (
+from asterion.storage import (
     LocalFileStorage,
     ObjectNotFound,
     StorageBackend,

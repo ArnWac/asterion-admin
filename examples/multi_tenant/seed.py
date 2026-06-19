@@ -26,17 +26,17 @@ import uuid
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry.auth.password import hash_password
-from adminfoundry.db.session import DatabaseManager
-from adminfoundry.models import User
-from adminfoundry.models.base import GlobalModel, TenantBase
-from adminfoundry.registry import AdminRegistry
-from adminfoundry.tenancy.bootstrap import (
+from asterion.auth.password import hash_password
+from asterion.db.session import DatabaseManager
+from asterion.models import User
+from asterion.models.base import GlobalModel, TenantBase
+from asterion.registry import AdminRegistry
+from asterion.tenancy.bootstrap import (
     assign_owner_membership,
     bootstrap_tenant,
     create_tenant_record,
 )
-from adminfoundry.tenancy.schema_names import make_tenant_schema_name
+from asterion.tenancy.schema_names import make_tenant_schema_name
 from examples.multi_tenant.admin_config import register as register_admins
 
 # Ensure the example tenant models are registered in TenantBase.metadata
@@ -106,7 +106,7 @@ def _require_postgres(database_url: str) -> None:
         "examples.multi_tenant requires PostgreSQL — schema-per-tenant "
         "isolation cannot be expressed on SQLite. Set DATABASE_URL to a "
         "postgresql+asyncpg:// URL and re-run.\n"
-        "  e.g. DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/adminfoundry"
+        "  e.g. DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/asterion"
     )
 
 
@@ -247,7 +247,7 @@ async def seed(db: DatabaseManager, database_url: str) -> None:
 def print_banner() -> None:
     lines = [
         "",
-        "adminfoundry multi-tenant demo ready",
+        "asterion multi-tenant demo ready",
         "",
         "Admin UI:  http://127.0.0.1:8000/admin",
         "",
@@ -274,7 +274,7 @@ def print_banner() -> None:
 async def _run_standalone() -> None:
     url = os.environ.get(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/adminfoundry",
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/asterion",
     )
     db = DatabaseManager(url)
     try:

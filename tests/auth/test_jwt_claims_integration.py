@@ -14,14 +14,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.tokens import decode_token
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.auth.tokens import decode_token
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 
 SECRET = "test-jwt-claims-integration-secret"
-ISSUER = "adminfoundry"
+ISSUER = "asterion"
 AUDIENCE = "admin-ui"
 PASSWORD = "hunter2-strong"
 
@@ -40,7 +40,7 @@ def app(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:

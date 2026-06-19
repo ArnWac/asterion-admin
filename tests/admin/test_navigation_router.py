@@ -21,9 +21,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.extensions.base import AdminExtension
-from adminfoundry.security.protected_fields import reset_for_tests as reset_protected
+from asterion import CoreAdminConfig, create_admin
+from asterion.extensions.base import AdminExtension
+from asterion.security.protected_fields import reset_for_tests as reset_protected
 from tests._helpers import make_admin_principal, override_admin_context
 
 

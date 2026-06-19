@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from adminfoundry import AdminRegistry, ModelAdmin
-from adminfoundry.actions import BulkDeleteAction
-from adminfoundry.admin.context import AdminContext
-from adminfoundry.admin.fieldset import Fieldset
-from adminfoundry.admin.inline import InlineAdmin
-from adminfoundry.admin.policy import AdminPolicy, FieldPermission
+from asterion import AdminRegistry, ModelAdmin
+from asterion.actions import BulkDeleteAction
+from asterion.admin.context import AdminContext
+from asterion.admin.fieldset import Fieldset
+from asterion.admin.inline import InlineAdmin
+from asterion.admin.policy import AdminPolicy, FieldPermission
 from examples.basic_single.global_admins import register_global_admins
 from examples.basic_single.models import Comment, Post
 

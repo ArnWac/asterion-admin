@@ -17,9 +17,9 @@ import asyncio
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.admin import AdminContext, build_admin_context
-from adminfoundry.providers.base import AdminPrincipal, AdminTenant, AuthIdentity
+from asterion import CoreAdminConfig, create_admin
+from asterion.admin import AdminContext, build_admin_context
+from asterion.providers.base import AdminPrincipal, AdminTenant, AuthIdentity
 
 # --- Fakes ---
 
@@ -202,11 +202,11 @@ def test_default_providers_remain_active_when_not_overridden(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    providers = app.state.adminfoundry.providers
+    providers = app.state.asterion.providers
     assert type(providers.auth).__name__ == "BuiltinJWTAuthProvider"
     assert type(providers.users).__name__ == "BuiltinSQLAlchemyUserProvider"
     assert type(providers.permissions).__name__ == "BuiltinPermissionProvider"
     assert type(providers.tenants).__name__ == "BuiltinTenantProvider"
 
     # cleanup
-    asyncio.run(app.state.adminfoundry.db.dispose())
+    asyncio.run(app.state.asterion.db.dispose())

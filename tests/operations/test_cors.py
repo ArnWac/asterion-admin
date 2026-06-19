@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
+from asterion import CoreAdminConfig, create_admin
 
 
 def _make(tmp_path, **overrides):

@@ -13,11 +13,11 @@ from __future__ import annotations
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import DeclarativeBase, relationship
 
-from adminfoundry.contract.service import (
+from asterion.contract.service import (
     build_model_contract,
     build_relation_metadata,
 )
-from adminfoundry.registry import AdminRegistry, ModelAdmin
+from asterion.registry import AdminRegistry, ModelAdmin
 
 
 class _Base(DeclarativeBase):

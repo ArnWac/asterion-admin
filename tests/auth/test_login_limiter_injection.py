@@ -15,10 +15,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 
 SECRET = "test-limiter-injection-secret"
 PASSWORD = "hunter2-strong"
@@ -58,7 +58,7 @@ def app_and_limiter(tmp_path):
         ),
         login_rate_limiter=limiter,
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:

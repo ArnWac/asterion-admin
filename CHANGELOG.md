@@ -9,8 +9,8 @@ while on `0.x`, a minor release may make breaking changes to the public API
 or the JSON contract — such changes are called out here. From `1.0` onward
 the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The **public API** is the re-exports in `adminfoundry.__all__` plus the
-provider Protocols in `adminfoundry/providers/base.py` (pinned by
+The **public API** is the re-exports in `asterion.__all__` plus the
+provider Protocols in `asterion/providers/base.py` (pinned by
 `tests/public_api/`). The **contract** is `ModelContractMeta`; a breaking
 shape change bumps `CONTRACT_VERSION`.
 
@@ -33,7 +33,7 @@ shape change bumps `CONTRACT_VERSION`.
   README.
 - **Distributed login rate limiter:** `RedisLoginRateLimiter` (duck-typed
   against any async Redis client) behind the existing `RateLimiterBackend`
-  Protocol, shipped as the `adminfoundry.extensions.rate_limit_redis` extension
+  Protocol, shipped as the `asterion.extensions.rate_limit_redis` extension
   (mirrors `storage_s3`), plus a `rate-limit-redis` extra.
   `create_admin(login_rate_limiter=…)` swaps it in; the in-memory default is
   unchanged.

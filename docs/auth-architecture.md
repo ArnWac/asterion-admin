@@ -1,6 +1,6 @@
 # Auth architecture
 
-`adminfoundry` separates **identity** (who is calling) from **the
+`asterion` separates **identity** (who is calling) from **the
 framework's view of that identity** (what it can see) so apps with their
 own user/auth systems can integrate without forking the package.
 
@@ -18,7 +18,7 @@ Request → AuthProvider.authenticate_request   → AuthIdentity (user_id + clai
                        Every route reads exactly this.
 ```
 
-The four providers are the **only** seams between `adminfoundry` and the
+The four providers are the **only** seams between `asterion` and the
 host application's identity layer. Routes never look at JWT internals,
 SQLAlchemy User rows, tenant memberships, or role-permission joins.
 
@@ -47,7 +47,7 @@ class AdminTenant:
     name: str | None = None
 ```
 
-These live in [`adminfoundry/providers/base.py`](../adminfoundry/providers/base.py).
+These live in [`asterion/providers/base.py`](../asterion/providers/base.py).
 The framework only ever sees these — never a concrete `User` ORM row.
 
 ---
@@ -119,7 +119,7 @@ class AdminContext:
 Routes inject it via FastAPI:
 
 ```python
-from adminfoundry.admin import AdminContext, require_admin_context
+from asterion.admin import AdminContext, require_admin_context
 
 @router.get("/widgets")
 async def list_widgets(ctx: AdminContext = Depends(require_admin_context)):
@@ -181,10 +181,10 @@ The `GET /_navigation` endpoint already does this — see
 ## Writing a custom provider
 
 The common case: your app already has an identity system and you want
-`adminfoundry` to defer to it instead of hosting its own user table.
+`asterion` to defer to it instead of hosting its own user table.
 
 ```python
-from adminfoundry.providers.base import (
+from asterion.providers.base import (
     AdminPrincipal, AuthIdentity, AuthProvider, UserProvider,
 )
 
@@ -258,7 +258,7 @@ method they may never use would be wrong. So that capability is its
 own opt-in Protocol that lives in the auth_oauth extension:
 
 ```python
-from adminfoundry.extensions.auth_oauth import OAuthCapableUserProvider
+from asterion.extensions.auth_oauth import OAuthCapableUserProvider
 
 
 class CompanyOAuthUserProvider:

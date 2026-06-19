@@ -18,12 +18,12 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.extensions.auth_oauth import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.extensions.auth_oauth import (
     GoogleOIDCProvider,
     OAuthExtension,
 )
-from adminfoundry.security.protected_fields import reset_for_tests as reset_protected
+from asterion.security.protected_fields import reset_for_tests as reset_protected
 from tests._helpers import make_admin_principal, override_admin_context
 
 
@@ -60,7 +60,7 @@ def test_extension_registers_permission_keys(tmp_path):
         tmp_path,
         providers=[GoogleOIDCProvider(client_id="x", client_secret="y")],
     )
-    keys = app.state.adminfoundry.permission_registry.all()
+    keys = app.state.asterion.permission_registry.all()
     assert "oauth.identities.list" in keys
     assert "oauth.identities.unlink" in keys
 
@@ -76,7 +76,7 @@ def test_extension_does_not_register_speculative_protected_fields(tmp_path):
         tmp_path,
         providers=[GoogleOIDCProvider(client_id="x", client_secret="y")],
     )
-    from adminfoundry.security.protected_fields import get_registry
+    from asterion.security.protected_fields import get_registry
 
     pfr = get_registry().as_frozenset()
     assert "access_token" not in pfr

@@ -9,11 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.core.errors import FORBIDDEN, NOT_FOUND
-from adminfoundry.core.middleware import REQUEST_ID_HEADER
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.tenant import Tenant
+from asterion import CoreAdminConfig, create_admin
+from asterion.core.errors import FORBIDDEN, NOT_FOUND
+from asterion.core.middleware import REQUEST_ID_HEADER
+from asterion.models.base import GlobalModel
+from asterion.models.tenant import Tenant
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def app(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -62,7 +62,7 @@ def app(tmp_path):
 @pytest.fixture
 def client(app):
     # Clear the in-process tenant resolver cache between tests.
-    from adminfoundry.tenancy.resolver import clear_tenant_cache
+    from asterion.tenancy.resolver import clear_tenant_cache
 
     clear_tenant_cache()
     with TestClient(app, raise_server_exceptions=False) as c:

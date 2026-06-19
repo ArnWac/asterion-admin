@@ -16,11 +16,11 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.contract.service import CONTRACT_VERSION
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.auth.password import hash_password
+from asterion.contract.service import CONTRACT_VERSION
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 from tests._helpers import make_admin_principal, override_admin_context
 
 
@@ -63,7 +63,7 @@ def app(tmp_path):
         register=lambda reg: reg.register(ProjectAdmin),
     )
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -149,8 +149,8 @@ def test_full_contract_exposes_extension_contributions(tmp_path):
     """End-to-end proof of Phase 6b: an AdminExtension that adds a
     namespaced fragment via ``register_contract_contributions`` appears
     under the contract's ``extensions`` top-level key."""
-    from adminfoundry import CoreAdminConfig, create_admin
-    from adminfoundry.extensions import AdminExtension
+    from asterion import CoreAdminConfig, create_admin
+    from asterion.extensions import AdminExtension
     from tests._helpers import make_admin_principal, override_admin_context
 
     class _OAuthFake(AdminExtension):
@@ -195,8 +195,8 @@ def test_full_contract_exposes_extension_contributions(tmp_path):
 def test_full_contract_extensions_are_namespaced_per_extension(tmp_path):
     """Two extensions, two namespaces — both fragments appear, neither
     overwrites the other."""
-    from adminfoundry import CoreAdminConfig, create_admin
-    from adminfoundry.extensions import AdminExtension
+    from asterion import CoreAdminConfig, create_admin
+    from asterion.extensions import AdminExtension
     from tests._helpers import make_admin_principal, override_admin_context
 
     class _One(AdminExtension):

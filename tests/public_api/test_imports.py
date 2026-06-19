@@ -6,17 +6,17 @@ breaking change for downstream apps.
 
 The framework has four public entry points:
 
-* ``adminfoundry`` — top-level convenience: ``create_admin``,
+* ``asterion`` — top-level convenience: ``create_admin``,
   ``CoreAdminConfig``, ``ModelAdmin``, ``AdminRegistry`` plus
   ``__version__``.
-* ``adminfoundry.admin`` — primitives for declaring admin behaviour:
+* ``asterion.admin`` — primitives for declaring admin behaviour:
   ``ModelAdmin`` (re-exported), ``AdminContext``, ``AdminPolicy``,
   ``FieldPermission``, ``Fieldset``, ``InlineAdmin``, plus the
   neutral provider DTOs (``AdminPrincipal``, ``AdminTenant``).
-* ``adminfoundry.providers`` — Protocols for replacing the builtin
+* ``asterion.providers`` — Protocols for replacing the builtin
   auth / user / permission / tenant stack, plus the four ``Builtin*``
   default implementations.
-* ``adminfoundry.fields`` — Field adapter SPI so extensions and apps
+* ``asterion.fields`` — Field adapter SPI so extensions and apps
   can plug custom column types.
 
 Everything outside these four packages is internal: stable behaviour
@@ -42,21 +42,21 @@ TOP_LEVEL_PUBLIC: set[str] = {
 
 def test_top_level_public_imports_resolve():
     """Every name in the documented top-level surface must be importable
-    from ``adminfoundry``."""
-    mod = importlib.import_module("adminfoundry")
+    from ``asterion``."""
+    mod = importlib.import_module("asterion")
     for name in TOP_LEVEL_PUBLIC:
-        assert hasattr(mod, name), f"adminfoundry.{name} is missing"
+        assert hasattr(mod, name), f"asterion.{name} is missing"
 
 
 def test_top_level_all_matches_pinned_set():
     """``__all__`` is the contract — adding/removing a public name
     must be deliberate. Pinning the set catches accidental exports."""
-    mod = importlib.import_module("adminfoundry")
+    mod = importlib.import_module("asterion")
     assert set(mod.__all__) == TOP_LEVEL_PUBLIC
 
 
 # ---------------------------------------------------------------------------
-# adminfoundry.admin
+# asterion.admin
 # ---------------------------------------------------------------------------
 
 ADMIN_PUBLIC: set[str] = {
@@ -76,18 +76,18 @@ ADMIN_PUBLIC: set[str] = {
 
 
 def test_admin_public_imports_resolve():
-    mod = importlib.import_module("adminfoundry.admin")
+    mod = importlib.import_module("asterion.admin")
     for name in ADMIN_PUBLIC:
-        assert hasattr(mod, name), f"adminfoundry.admin.{name} is missing"
+        assert hasattr(mod, name), f"asterion.admin.{name} is missing"
 
 
 def test_admin_all_matches_pinned_set():
-    mod = importlib.import_module("adminfoundry.admin")
+    mod = importlib.import_module("asterion.admin")
     assert set(mod.__all__) == ADMIN_PUBLIC
 
 
 # ---------------------------------------------------------------------------
-# adminfoundry.providers
+# asterion.providers
 # ---------------------------------------------------------------------------
 
 PROVIDERS_PUBLIC: set[str] = {
@@ -113,18 +113,18 @@ PROVIDERS_PUBLIC: set[str] = {
 
 
 def test_providers_public_imports_resolve():
-    mod = importlib.import_module("adminfoundry.providers")
+    mod = importlib.import_module("asterion.providers")
     for name in PROVIDERS_PUBLIC:
-        assert hasattr(mod, name), f"adminfoundry.providers.{name} is missing"
+        assert hasattr(mod, name), f"asterion.providers.{name} is missing"
 
 
 def test_providers_all_matches_pinned_set():
-    mod = importlib.import_module("adminfoundry.providers")
+    mod = importlib.import_module("asterion.providers")
     assert set(mod.__all__) == PROVIDERS_PUBLIC
 
 
 # ---------------------------------------------------------------------------
-# adminfoundry.fields
+# asterion.fields
 # ---------------------------------------------------------------------------
 
 FIELDS_PUBLIC: set[str] = {
@@ -151,13 +151,13 @@ FIELDS_PUBLIC: set[str] = {
 
 
 def test_fields_public_imports_resolve():
-    mod = importlib.import_module("adminfoundry.fields")
+    mod = importlib.import_module("asterion.fields")
     for name in FIELDS_PUBLIC:
-        assert hasattr(mod, name), f"adminfoundry.fields.{name} is missing"
+        assert hasattr(mod, name), f"asterion.fields.{name} is missing"
 
 
 def test_fields_all_matches_pinned_set():
-    mod = importlib.import_module("adminfoundry.fields")
+    mod = importlib.import_module("asterion.fields")
     assert set(mod.__all__) == FIELDS_PUBLIC
 
 
@@ -168,7 +168,7 @@ def test_fields_all_matches_pinned_set():
 
 def test_quickstart_imports_resolve():
     """The minimal documented quickstart import shape."""
-    from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
+    from asterion import CoreAdminConfig, ModelAdmin, create_admin
 
     assert callable(create_admin)
     assert CoreAdminConfig is not None
@@ -177,9 +177,9 @@ def test_quickstart_imports_resolve():
 
 def test_external_provider_imports_resolve():
     """What an app integrating an external auth system imports."""
-    from adminfoundry import create_admin
-    from adminfoundry.admin import AdminContext, AdminPrincipal, AdminTenant
-    from adminfoundry.providers import (
+    from asterion import create_admin
+    from asterion.admin import AdminContext, AdminPrincipal, AdminTenant
+    from asterion.providers import (
         AuthProvider,
         PermissionProvider,
         TenantProvider,
@@ -200,13 +200,13 @@ def test_external_provider_imports_resolve():
 
 def test_extension_developer_imports_resolve():
     """What an extension author / custom field-type author imports."""
-    from adminfoundry.admin import (
+    from asterion.admin import (
         AdminPolicy,
         FieldPermission,
         Fieldset,
         InlineAdmin,
     )
-    from adminfoundry.fields import (
+    from asterion.fields import (
         FieldAdapter,
         FieldContract,
         FieldRegistry,

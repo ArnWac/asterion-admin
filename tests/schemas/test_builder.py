@@ -5,8 +5,8 @@ from __future__ import annotations
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.registry import ModelAdmin
-from adminfoundry.schemas.builder import build_model_schema
+from asterion.registry import ModelAdmin
+from asterion.schemas.builder import build_model_schema
 
 
 class _Base(DeclarativeBase):

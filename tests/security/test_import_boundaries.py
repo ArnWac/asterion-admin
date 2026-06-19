@@ -3,15 +3,15 @@
 Hard architectural invariant from the v1-providers refactor:
 
 * **Core code does NOT import from concrete extensions.**
-  Allowed: ``from adminfoundry.extensions import AdminExtension`` (the
+  Allowed: ``from asterion.extensions import AdminExtension`` (the
   package-level Protocol / DTO surface).
-  Forbidden: ``from adminfoundry.extensions.import_export...``,
-  ``from adminfoundry.extensions.auth_oauth...``, etc.
+  Forbidden: ``from asterion.extensions.import_export...``,
+  ``from asterion.extensions.auth_oauth...``, etc.
 
 * Extensions may import freely from Core. That direction is what makes
   optional features actually optional.
 
-The check parses every .py file under ``adminfoundry/`` (excluding the
+The check parses every .py file under ``asterion/`` (excluding the
 ``extensions/`` subtree itself) and asserts each ``import`` /
 ``from ... import ...`` statement does not target an extension submodule.
 
@@ -27,11 +27,11 @@ from pathlib import Path
 
 import pytest
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "adminfoundry"
+PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "asterion"
 EXTENSIONS_ROOT = PACKAGE_ROOT / "extensions"
 
 
-#: Submodule names directly under ``adminfoundry.extensions/`` count as
+#: Submodule names directly under ``asterion.extensions/`` count as
 #: concrete extensions. Discovered at test time so new extensions are
 #: covered automatically.
 def _concrete_extension_names() -> set[str]:
@@ -47,7 +47,7 @@ ALLOWED_EXCEPTIONS: set[tuple[str, str]] = set()
 
 
 def _iter_core_python_files() -> list[Path]:
-    """Every .py file under adminfoundry/ that is NOT inside extensions/."""
+    """Every .py file under asterion/ that is NOT inside extensions/."""
     files: list[Path] = []
     for path in PACKAGE_ROOT.rglob("*.py"):
         if "__pycache__" in path.parts:
@@ -87,12 +87,12 @@ def _imports_in(path: Path) -> list[tuple[int, str]]:
 
 
 def _is_forbidden(import_target: str, concrete: set[str]) -> bool:
-    """``adminfoundry.extensions.<name>(.something)*`` where ``<name>`` is
+    """``asterion.extensions.<name>(.something)*`` where ``<name>`` is
     a concrete extension package — forbidden in core."""
     parts = import_target.split(".")
     if len(parts) < 3:
         return False
-    if parts[0] != "adminfoundry" or parts[1] != "extensions":
+    if parts[0] != "asterion" or parts[1] != "extensions":
         return False
     return parts[2] in concrete
 
@@ -135,7 +135,7 @@ def test_extensions_can_import_core():
     core_imports = [
         target
         for _, target in imports
-        if target.startswith("adminfoundry.") and not target.startswith("adminfoundry.extensions")
+        if target.startswith("asterion.") and not target.startswith("asterion.extensions")
     ]
     assert core_imports, "import_export extension is expected to import from core"
 

@@ -29,12 +29,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.contract.service import (
+from asterion.contract.service import (
     build_field_metadata,
     build_model_contract,
 )
-from adminfoundry.fields import FieldRegistry, build_default_registry
-from adminfoundry.registry import ModelAdmin
+from asterion.fields import FieldRegistry, build_default_registry
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):
@@ -143,7 +143,7 @@ def test_extension_supplied_adapter_propagates_to_contract():
             return isinstance(model_attr, Column) and model_attr.name == "title"
 
         def build_contract(self, model_attr, ctx=None):
-            from adminfoundry.fields.base import FieldContract
+            from asterion.fields.base import FieldContract
 
             return FieldContract(
                 name=model_attr.name,

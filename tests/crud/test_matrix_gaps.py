@@ -36,15 +36,15 @@ from sqlalchemy import Column, Integer, String, UniqueConstraint, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.admin.context import AdminContext
-from adminfoundry.crud.services import (
+from asterion.admin.context import AdminContext
+from asterion.crud.services import (
     create_record,
     delete_record,
     read_record,
     update_record,
 )
-from adminfoundry.providers.base import AdminPrincipal
-from adminfoundry.registry import ModelAdmin
+from asterion.providers.base import AdminPrincipal
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):
@@ -204,7 +204,7 @@ async def test_list_default_pagination_returns_envelope(session):
     """Sanity: a fresh list call without any params returns the
     envelope shape with empty items. Pins the "no records, no error"
     contract because it's the first thing an empty admin sees."""
-    from adminfoundry.crud.services import list_records
+    from asterion.crud.services import list_records
 
     admin = _WidgetAdmin()
     result = await list_records(session, admin)
@@ -216,7 +216,7 @@ async def test_list_offset_beyond_total_returns_empty_items(session):
     """``offset=999`` on a table with 1 row → empty items + non-zero
     total. Ensures the count query doesn't get clamped by the
     pagination limit."""
-    from adminfoundry.crud.services import list_records
+    from asterion.crud.services import list_records
 
     admin = _WidgetAdmin()
     await create_record(session, admin, {"sku": "A", "name": "x"})

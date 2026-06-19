@@ -9,19 +9,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from typer.testing import CliRunner
 
-from adminfoundry.cli.main import app as cli_app
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.tenant import Tenant
+from asterion.cli.main import app as cli_app
+from asterion.models.base import GlobalModel
+from asterion.models.tenant import Tenant
 
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     db_path = tmp_path / "tenant-lifecycle.db"
     url = f"sqlite+aiosqlite:///{db_path}"
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", url)
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "test-tenant-lifecycle-secret")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_MULTI_TENANT", "false")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_BUILTIN_UI", "false")
+    monkeypatch.setenv("ASTERION_DATABASE_URL", url)
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "test-tenant-lifecycle-secret")
+    monkeypatch.setenv("ASTERION_ENABLE_MULTI_TENANT", "false")
+    monkeypatch.setenv("ASTERION_ENABLE_BUILTIN_UI", "false")
 
     async def _setup():
         engine = create_async_engine(

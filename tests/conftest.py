@@ -1,4 +1,4 @@
-"""Shared fixtures for the adminfoundry test suite.
+"""Shared fixtures for the asterion test suite.
 
 Uses SQLite async (aiosqlite) for fast in-process tests.
 PostgreSQL-specific behaviour (schema search_path) is unit-tested via
@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from adminfoundry.models.base import GlobalModel
+from asterion.models.base import GlobalModel
 
 DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 

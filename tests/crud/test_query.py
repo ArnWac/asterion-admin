@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.crud.query import (
+from asterion.crud.query import (
     _parse_date_hierarchy,
     apply_date_hierarchy,
     apply_ordering,
@@ -15,7 +15,7 @@ from adminfoundry.crud.query import (
     normalize_limit_offset,
     primary_key_column,
 )
-from adminfoundry.registry import ModelAdmin
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

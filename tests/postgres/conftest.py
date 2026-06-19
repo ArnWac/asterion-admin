@@ -1,11 +1,11 @@
 """Shared fixtures for the PostgreSQL integration test suite.
 
 These tests prove the schema-per-tenant isolation invariants that SQLite
-cannot reproduce. They run only when ``ADMINFOUNDRY_TEST_POSTGRES_URL`` is
+cannot reproduce. They run only when ``ASTERION_TEST_POSTGRES_URL`` is
 set in the environment. Locally::
 
     docker-compose up -d db
-    export ADMINFOUNDRY_TEST_POSTGRES_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/adminfoundry
+    export ASTERION_TEST_POSTGRES_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/asterion
     pytest -m postgres
 
 Each test creates its own pair of tenant schemas with a unique suffix so
@@ -22,9 +22,9 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from adminfoundry.models.base import GlobalModel, TenantBase
+from asterion.models.base import GlobalModel, TenantBase
 
-POSTGRES_URL_ENV = "ADMINFOUNDRY_TEST_POSTGRES_URL"
+POSTGRES_URL_ENV = "ASTERION_TEST_POSTGRES_URL"
 
 
 def _postgres_url() -> str | None:

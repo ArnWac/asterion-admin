@@ -4,7 +4,7 @@ Validates:
 * Default value is ``"builtin"``.
 * Both ``"builtin"`` and ``"external"`` validate cleanly.
 * Unknown values raise.
-* ``from_env`` picks up ``ADMINFOUNDRY_USER_MODE``.
+* ``from_env`` picks up ``ASTERION_USER_MODE``.
 * ``to_safe_dict`` surfaces the value (it's not a secret).
 * ``create_admin`` boots in ``"builtin"`` mode without explicit
   providers (the legacy default path).
@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry import create_admin
-from adminfoundry.core.config import CoreAdminConfig
+from asterion import create_admin
+from asterion.core.config import CoreAdminConfig
 
 
 def _cfg(**kwargs) -> CoreAdminConfig:
@@ -61,18 +61,18 @@ def test_to_safe_dict_includes_user_mode():
 
 
 def test_from_env_picks_up_user_mode(monkeypatch):
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "x" * 64)
-    monkeypatch.setenv("ADMINFOUNDRY_USER_MODE", "external")
+    monkeypatch.setenv("ASTERION_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "x" * 64)
+    monkeypatch.setenv("ASTERION_USER_MODE", "external")
     cfg = CoreAdminConfig.from_env()
     assert cfg.user_mode == "external"
 
 
 def test_from_env_rejects_unknown_user_mode(monkeypatch):
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "x" * 64)
-    monkeypatch.setenv("ADMINFOUNDRY_USER_MODE", "nonsense")
-    with pytest.raises(ValueError, match="ADMINFOUNDRY_USER_MODE"):
+    monkeypatch.setenv("ASTERION_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "x" * 64)
+    monkeypatch.setenv("ASTERION_USER_MODE", "nonsense")
+    with pytest.raises(ValueError, match="ASTERION_USER_MODE"):
         CoreAdminConfig.from_env()
 
 
@@ -110,7 +110,7 @@ def test_external_mode_accepts_with_auth_provider():
         config=_cfg(user_mode="external"),
         auth_provider=_FakeAuthProvider(),
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     # Confirm the fake provider made it onto the runtime, not the
     # builtin one — proves the override chain ran.
     assert runtime.providers.auth.__class__.__name__ == "_FakeAuthProvider"

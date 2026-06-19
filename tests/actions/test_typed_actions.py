@@ -20,10 +20,10 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import create_admin
-from adminfoundry.actions import AdminAction, uses_typed_run
-from adminfoundry.core.config import CoreAdminConfig
-from adminfoundry.registry import ModelAdmin
+from asterion import create_admin
+from asterion.actions import AdminAction, uses_typed_run
+from asterion.core.config import CoreAdminConfig
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):
@@ -126,19 +126,19 @@ async def session_factory():
 
 
 def _build_app_with_action(action: AdminAction, monkeypatch, session_factory):
-    """Construct a minimal adminfoundry app whose only registered admin
+    """Construct a minimal asterion app whose only registered admin
     points at ``_Widget`` and carries the given action.
 
     Auth dependencies are overridden to make every request pass the
     permission gate; the production wiring is exercised in
     ``tests/actions/test_router.py`` already."""
 
-    from adminfoundry.admin.context import (
+    from asterion.admin.context import (
         AdminContext,
         build_admin_context,
         require_admin_context,
     )
-    from adminfoundry.db.dependencies import get_async_session
+    from asterion.db.dependencies import get_async_session
 
     class _WidgetAdmin(ModelAdmin):
         model = _Widget
@@ -163,7 +163,7 @@ def _build_app_with_action(action: AdminAction, monkeypatch, session_factory):
                 yield session
 
     async def _override_ctx() -> AdminContext:
-        from adminfoundry.providers.base import AdminPrincipal
+        from asterion.providers.base import AdminPrincipal
 
         return AdminContext(
             request=None,

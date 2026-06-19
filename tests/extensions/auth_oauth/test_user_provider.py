@@ -23,9 +23,9 @@ from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.extensions.auth_oauth import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.extensions.auth_oauth import (
     BuiltinOAuthUserProvider,
     ExternalIdentity,
     ExternalIdentityData,
@@ -37,9 +37,9 @@ from adminfoundry.extensions.auth_oauth import (
     OAuthExtension,
     OAuthUserInactiveError,
 )
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
-from adminfoundry.security.protected_fields import reset_for_tests as reset_protected
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
+from asterion.security.protected_fields import reset_for_tests as reset_protected
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +63,7 @@ def app(tmp_path):
             OAuthExtension(providers=[GoogleOIDCProvider(client_id="x", client_secret="y")])
         ],
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -77,7 +77,7 @@ def app(tmp_path):
 def _fake_request(app) -> Request:
     """Build a minimal Request whose only role is to carry app.state.
 
-    The provider only reads ``request.app.state.adminfoundry`` — no
+    The provider only reads ``request.app.state.asterion`` — no
     headers, no body, no path matter.
     """
 
@@ -138,7 +138,7 @@ def test_lookup_only_refuses_unknown_identity(app):
 
 def test_lookup_finds_existing_link(app):
     """allow_create=False + existing link → returns the linked user."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _seed() -> str:
@@ -178,7 +178,7 @@ def test_lookup_finds_existing_link(app):
 def test_inactive_linked_user_raises_inactive_error(app):
     """Deactivated users behind a verified identity must NOT sign in —
     matches the legacy get_current_user 403 behaviour."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _seed():
@@ -231,7 +231,7 @@ def test_auto_create_makes_user_and_identity(app):
     assert principal.display_name == "Alice"
 
     # Verify both rows actually landed in the DB.
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _check() -> tuple[int, int]:
@@ -280,7 +280,7 @@ def test_auto_create_links_picture_and_domain(app):
         )
     )
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _fetch() -> ExternalIdentity:
@@ -338,7 +338,7 @@ def test_auto_create_refuses_email_already_taken(app):
 
     Refuse silent linking — the safe fallback is 'no login', not 'log
     me in as whoever owns this email'."""
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
 
     async def _seed():

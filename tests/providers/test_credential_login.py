@@ -22,12 +22,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
-from adminfoundry.providers.auth import BuiltinJWTAuthProvider
-from adminfoundry.providers.base import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
+from asterion.providers.auth import BuiltinJWTAuthProvider
+from asterion.providers.base import (
     AuthProvider,
     AuthSession,
     CredentialAuthProvider,
@@ -79,7 +79,7 @@ def app(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -234,7 +234,7 @@ def test_route_login_501_when_provider_has_no_login(tmp_path):
         ),
         auth_provider=_ExternalAuth(),
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:

@@ -1,4 +1,4 @@
-"""CLI smoke tests for ``adminfoundry permissions ...`` commands."""
+"""CLI smoke tests for ``asterion permissions ...`` commands."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from typer.testing import CliRunner
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.cli.main import app as cli_app
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.permission_catalog import PermissionCatalog
-from adminfoundry.registry import ModelAdmin
+from asterion import CoreAdminConfig, create_admin
+from asterion.cli.main import app as cli_app
+from asterion.models.base import GlobalModel
+from asterion.models.permission_catalog import PermissionCatalog
+from asterion.registry import ModelAdmin
 
 
 class _AppBase(DeclarativeBase):
@@ -36,7 +36,7 @@ class PostAdmin(ModelAdmin):
 def _make_app_module(db_url: str) -> str:
     """Create a synthetic module exposing ``app = create_admin(...)`` and
     return its dotted name so the CLI can import it."""
-    module_name = "_adminfoundry_test_app_for_permissions"
+    module_name = "_asterion_test_app_for_permissions"
     module = types.ModuleType(module_name)
 
     fastapi_app = create_admin(
@@ -58,10 +58,10 @@ def _make_app_module(db_url: str) -> str:
 def env(tmp_path, monkeypatch):
     db_path = tmp_path / "permissions-cli.db"
     url = f"sqlite+aiosqlite:///{db_path}"
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", url)
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "test-cli-secret-perms")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_MULTI_TENANT", "false")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_BUILTIN_UI", "false")
+    monkeypatch.setenv("ASTERION_DATABASE_URL", url)
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "test-cli-secret-perms")
+    monkeypatch.setenv("ASTERION_ENABLE_MULTI_TENANT", "false")
+    monkeypatch.setenv("ASTERION_ENABLE_BUILTIN_UI", "false")
 
     async def _setup():
         engine = create_async_engine(
@@ -120,7 +120,7 @@ def test_permissions_check_rejects_invalid(env):
 
 
 def test_permissions_sync_requires_app_spec(env, monkeypatch):
-    monkeypatch.delenv("ADMINFOUNDRY_APP", raising=False)
+    monkeypatch.delenv("ASTERION_APP", raising=False)
     result = _runner().invoke(cli_app, ["permissions", "sync"])
     assert result.exit_code == 2
 
@@ -154,7 +154,7 @@ def test_permissions_sync_idempotent(env):
 
 def test_permissions_sync_uses_env_var(env, monkeypatch):
     spec = _make_app_module(env)
-    monkeypatch.setenv("ADMINFOUNDRY_APP", spec)
+    monkeypatch.setenv("ASTERION_APP", spec)
     result = _runner().invoke(cli_app, ["permissions", "sync"])
     assert result.exit_code == 0, result.output
 

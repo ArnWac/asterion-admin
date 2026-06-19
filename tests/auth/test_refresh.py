@@ -9,15 +9,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.tokens import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.auth.tokens import (
     create_refresh_token,
     decode_token,
 )
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.revoked_token import RevokedToken
-from adminfoundry.models.user import User
+from asterion.models.base import GlobalModel
+from asterion.models.revoked_token import RevokedToken
+from asterion.models.user import User
 
 SECRET = "test-refresh-secret"
 ALG = "HS256"
@@ -35,7 +35,7 @@ def app_with_user(tmp_path):
             enable_builtin_admins=False,
         )
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup() -> User:
         async with runtime.db.engine.begin() as conn:

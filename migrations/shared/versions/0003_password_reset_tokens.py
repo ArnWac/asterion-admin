@@ -13,7 +13,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-from adminfoundry.models.base import GUID
+from asterion.models.base import GUID
 
 # Alembic identifiers
 revision = "0003_password_reset_tokens"

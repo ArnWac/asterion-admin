@@ -1,6 +1,6 @@
-# adminfoundry — Roadmap & Hardening (konsolidiert)
+# asterion — Roadmap & Hardening (konsolidiert)
 
-Stand: 2026-06-18 · bezieht sich auf `adminfoundry` 0.1.0
+Stand: 2026-06-18 · bezieht sich auf `asterion` 0.1.0
 
 Dieses Dokument konsolidiert die frühere `roadmap.md` (Feature-Phasen,
 Non-Goals) und `stabilization.md` (Pre-1.0-Härtung) und führt sie mit den
@@ -60,10 +60,10 @@ R14–R17 offen. Phasen 6/7 bleiben geparkt.
 ## P0 — R1: `search_path` auf der Request-Session
 
 **Problem:** Die CRUD-Endpunkte beziehen ihre Session über
-`get_async_session` ([db/dependencies.py](../adminfoundry/db/dependencies.py)),
+`get_async_session` ([db/dependencies.py](../asterion/db/dependencies.py)),
 die eine Transaktion öffnet, aber **kein** `SET LOCAL search_path` setzt.
 `require_admin_context` → `build_admin_context` → `BuiltinPermissionProvider.get_permissions`
-([providers/permissions.py:59](../adminfoundry/providers/permissions.py))
+([providers/permissions.py:59](../asterion/providers/permissions.py))
 öffnet dafür eine **eigene** Session (`async_sessionmaker(runtime.db.engine)`)
 und setzt `search_path` nur dort. Es gibt keinen Engine-`connect`-Hook und
 keinen ContextVar, der die Request-Session scoped.
@@ -75,13 +75,13 @@ Wahrscheinlichster Effekt: `relation "..." does not exist` (500), da
 Tenant-Tabellen nur in `tenant_<slug>` existieren. Worst Case bei einer
 gleichnamigen `public`-Tabelle: stiller tenant-übergreifender Zugriff. Auf
 SQLite unsichtbar (`schema_translate_map {"public": None}`,
-[db/session.py:50](../adminfoundry/db/session.py)) — deshalb trotz Bug grüne
+[db/session.py:50](../asterion/db/session.py)) — deshalb trotz Bug grüne
 Suite.
 
 **Betroffene Dateien:**
-- [adminfoundry/db/dependencies.py](../adminfoundry/db/dependencies.py) (`get_async_session`)
-- [adminfoundry/tenancy/schema_strategy.py](../adminfoundry/tenancy/schema_strategy.py) (`set_search_path`, `make_tenant_schema_name`)
-- ggf. [adminfoundry/providers/permissions.py](../adminfoundry/providers/permissions.py) (Doppel-Session entfernen)
+- [asterion/db/dependencies.py](../asterion/db/dependencies.py) (`get_async_session`)
+- [asterion/tenancy/schema_strategy.py](../asterion/tenancy/schema_strategy.py) (`set_search_path`, `make_tenant_schema_name`)
+- ggf. [asterion/providers/permissions.py](../asterion/providers/permissions.py) (Doppel-Session entfernen)
 
 **Änderung:** In `get_async_session` nach `session.begin()` prüfen, ob
 `request.state.tenant` gesetzt ist und der Backend PostgreSQL ist; dann
@@ -174,7 +174,7 @@ Test-Stufe; sie darf den Build nicht *nicht* blockieren.
 
 **Änderung:** `test-postgres` in `build.needs` aufnehmen. Sicherstellen, dass
 die Postgres-Service-Stufe die neuen HTTP-Isolationstests (R2) tatsächlich
-ausführt (Env-Var `ADMINFOUNDRY_TEST_POSTGRES_URL` ist gesetzt, ci.yml:93).
+ausführt (Env-Var `ASTERION_TEST_POSTGRES_URL` ist gesetzt, ci.yml:93).
 
 **Test:** Ein bewusst gebrochener Isolationsfall lässt den `build`-Job rot
 werden (manuell verifizieren).
@@ -213,7 +213,7 @@ Isolations-/Negativpfade).
 **Betroffene Dateien:** [.github/workflows/ci.yml](../.github/workflows/ci.yml),
 [README.md](../README.md), `pyproject.toml` (pytest-cov in `dev`).
 
-**Änderung:** `pytest --cov=adminfoundry` im `test`-Job, Coverage-Report als
+**Änderung:** `pytest --cov=asterion` im `test`-Job, Coverage-Report als
 Artefakt; CI-Status-Badge im README. Optional Schwellwert ohne Hard-Fail
 (Reporting, kein Gate).
 
@@ -224,7 +224,7 @@ Artefakt; CI-Status-Badge im README. Optional Schwellwert ohne Hard-Fail
 ## P2 — R7: Verteilter Rate-Limiter
 
 **Problem:** `InMemoryLoginRateLimiter`
-([auth/rate_limiter.py:37](../adminfoundry/auth/rate_limiter.py)) ist
+([auth/rate_limiter.py:37](../asterion/auth/rate_limiter.py)) ist
 pro-Prozess, verliert Zähler bei Neustart und skaliert nicht über Worker.
 Schlüssel ist nur die lowercase-E-Mail → kein IP-Bezug (kein Schutz gegen
 Password-Spraying über viele Konten; Victim-Lockout möglich). **Sauber
@@ -234,7 +234,7 @@ dokumentiert und über `RateLimiterBackend`-Protocol austauschbar.**
 Single-Worker/MVP.
 
 **Betroffene Dateien:** neues Backend als Extension (analog `storage_s3`):
-`adminfoundry/extensions/rate_limit_redis/` hinter dem vorhandenen Protocol;
+`asterion/extensions/rate_limit_redis/` hinter dem vorhandenen Protocol;
 Verdrahtung über `create_admin(login_rate_limiter=...)` + Runtime-Feld; ggf.
 Keying-Strategie `(email, ip)`.
 
@@ -254,7 +254,7 @@ Clear-Verhalten.
 ## P2 — R8: JWT-Härtung: aud/iss
 
 **Problem:** `decode_token`
-([auth/tokens.py:218-225](../adminfoundry/auth/tokens.py)) validiert weder
+([auth/tokens.py:218-225](../asterion/auth/tokens.py)) validiert weder
 `aud` noch `iss`; die Tokens setzen diese Claims nicht. `alg` ist gepinnt
 (`algorithms=[algorithm]`), `exp` prüft jose by default, `type` wird je
 Decoder erzwungen.
@@ -262,8 +262,8 @@ Decoder erzwungen.
 **Risiko:** Niedrig im symmetrischen Ein-Secret-Setup; relevant, sobald
 Tokens über mehrere Dienste/Audiences geteilt werden.
 
-**Betroffene Dateien:** [auth/tokens.py](../adminfoundry/auth/tokens.py),
-[core/config.py](../adminfoundry/core/config.py) (konfigurierbare
+**Betroffene Dateien:** [auth/tokens.py](../asterion/auth/tokens.py),
+[core/config.py](../asterion/core/config.py) (konfigurierbare
 `issuer`/`audience`).
 
 **Änderung:** `iss`/`aud` beim Erzeugen setzen und in `decode_token`
@@ -280,14 +280,14 @@ unverändertes Verhalten.
 ## P2 — R9: Tenant-Cache-Invalidierung
 
 **Problem:** `_TENANT_TTL = 30` In-Memory-Cache pro Prozess
-([tenancy/resolver.py:14](../adminfoundry/tenancy/resolver.py)). Ein
+([tenancy/resolver.py:14](../asterion/tenancy/resolver.py)). Ein
 deaktivierter/gelöschter Tenant oder geänderte `allowed_cidrs` wird bis zu
 30 s aus dem Cache weiterbedient (Middleware liest `is_active`/CIDR aus dem
 `TenantContext`).
 
 **Risiko:** Mittel bei „Tenant sofort sperren"-Anforderungen.
 
-**Betroffene Dateien:** [tenancy/resolver.py](../adminfoundry/tenancy/resolver.py).
+**Betroffene Dateien:** [tenancy/resolver.py](../asterion/tenancy/resolver.py).
 
 **Änderung:** Cache-Bust beim Tenant-Statuswechsel (im Root-/CLI-Pfad
 `clear_tenant_cache()` aufrufen) oder den status-/CIDR-sensitiven Teil nicht
@@ -312,7 +312,7 @@ Wheel wird nicht in einer frischen Umgebung getestet.
 
 **Änderung:** Tag-getriggerter Release-Job mit Trusted Publishing
 (PyPI/TestPyPI); Smoke-Schritt: Wheel in frischer venv installieren,
-`python -c "import adminfoundry"` + `adminfoundry --help`.
+`python -c "import asterion"` + `asterion --help`.
 
 **Status:** ✅ erledigt (`.github/workflows/release.yml`).
 
@@ -338,7 +338,7 @@ Pure-Logic-Tests bleiben per Datei-Direktive auf dem node-Environment.
 ## P3 — R12: Slug-Normalisierung
 
 **Problem:** Slug-Auflösung ist case-sensitiv/exakt
-([tenancy/resolver.py:65](../adminfoundry/tenancy/resolver.py)), Subdomain-
+([tenancy/resolver.py:65](../asterion/tenancy/resolver.py)), Subdomain-
 Strategie nimmt `parts[0]` ungetrimmt. Kein Case-/Unicode-Folding.
 
 **Risiko:** Niedrig — Korrektheits-, kein Sicherheitsthema (kein Bypass, nur
@@ -369,7 +369,7 @@ ausgeführt werden konnte.
 PG.
 
 **Betroffene Dateien:** [tests/postgres/test_http_tenant_isolation.py](../tests/postgres/test_http_tenant_isolation.py),
-[db/dependencies.py](../adminfoundry/db/dependencies.py),
+[db/dependencies.py](../asterion/db/dependencies.py),
 [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 
 **Ursache (gefunden 2026-06-18):** **kein Produktbug.** Der Dependency-Override
@@ -389,8 +389,8 @@ damit FastAPI das Request-Objekt injiziert statt es zu validieren.
 
 ## P1 — R14: XSS-Härtung: CSP + Token-Storage
 
-**Problem:** Kein CSP ([core/middleware.py:109-113](../adminfoundry/core/middleware.py))
-und Bearer-Token im `localStorage` ([ui/static/admin/api.js:14](../adminfoundry/ui/static/admin/api.js))
+**Problem:** Kein CSP ([core/middleware.py:109-113](../asterion/core/middleware.py))
+und Bearer-Token im `localStorage` ([ui/static/admin/api.js:14](../asterion/ui/static/admin/api.js))
 → eine einzige XSS im Admin-UI = Token-Diebstahl ohne HttpOnly-Schutz.
 
 **Risiko:** Hoch (clientseitig der größte Hebel).
@@ -410,8 +410,8 @@ der Inline-Skripte der Bundled-UI bzw. HttpOnly-Cookie-Token-Option.
 ## P2 — R15: Login-Enumeration + Default-Limiter-Keying
 
 **Problem:** (a) `inactive_user`→403 vs. `invalid_credentials`→401
-([auth/router.py](../adminfoundry/auth/router.py)) plus bcrypt-Timing-Short-
-Circuit ([providers/auth.py:133](../adminfoundry/providers/auth.py)) erlauben
+([auth/router.py](../asterion/auth/router.py)) plus bcrypt-Timing-Short-
+Circuit ([providers/auth.py:133](../asterion/providers/auth.py)) erlauben
 User-Enumeration. (b) Der Default-Limiter ist per-Worker und nur per E-Mail
 gekeyt (kein IP) → schwacher Brute-Force-/Spraying-Schutz im Default.
 
@@ -431,8 +431,8 @@ R16-Client-IP (`tests/auth/test_login_limiter_keying.py`).
 
 ## P2 — R16: Proxy- / Client-IP
 
-**Problem:** Tenant-CIDR-Allowlist ([tenancy/middleware.py:42](../adminfoundry/tenancy/middleware.py))
-und Audit-IP ([audit/service.py:66](../adminfoundry/audit/service.py)) nutzen
+**Problem:** Tenant-CIDR-Allowlist ([tenancy/middleware.py:42](../asterion/tenancy/middleware.py))
+und Audit-IP ([audit/service.py:66](../asterion/audit/service.py)) nutzen
 `request.client.host` direkt — kein `X-Forwarded-For`. Hinter dem üblichen
 Reverse-Proxy ist die CIDR-Allowlist faktisch wirkungslos/umgehbar, Audit-IPs
 sind die Proxy-IP.
@@ -455,9 +455,9 @@ verdrahtet in Tenant-CIDR-Allowlist + Audit-IP (Default 0 = unverändert).
 - `resolve_impersonation_tenant` in `tenancy/resolver.py` war **tot** (keine
   Aufrufer) — **entfernt** (samt ungenutztem `uuid`-Import).
 - `clear()`-Inkonsistenz im Login (nutzte den Modul-Default statt des
-  injizierten Limiters) — **gefixt** ([auth/router.py](../adminfoundry/auth/router.py)).
+  injizierten Limiters) — **gefixt** ([auth/router.py](../asterion/auth/router.py)).
 - `BuiltinPermissionProvider.get_permissions` öffnet pro Request eine zweite
-  Session ([providers/permissions.py:59](../adminfoundry/providers/permissions.py));
+  Session ([providers/permissions.py:59](../asterion/providers/permissions.py));
   seit R1 ist die Request-Session bereits gescoped → ließe sich
   zusammenführen (zweiter Pool-Hop entfällt). **Bewusst aufgeschoben** —
   würde die `PermissionProvider`-Protocol-Signatur ändern und den gerade
@@ -480,7 +480,7 @@ Provider-Doppel-Session bewusst als separater Folgeschritt offen.
 
 | Vorschlag (aus Review/Original) | Entscheidung | Begründung |
 |---|---|---|
-| Dedizierte CSRF-Schicht | abgelehnt | UI nutzt Bearer-Token aus `localStorage` ([ui/static/admin/api.js:14,58](../adminfoundry/ui/static/admin/api.js)), keine Cookie-Ambient-Auth → kein CSRF-Vektor. Falls je eine Cookie-Session kommt, neu bewerten. |
+| Dedizierte CSRF-Schicht | abgelehnt | UI nutzt Bearer-Token aus `localStorage` ([ui/static/admin/api.js:14,58](../asterion/ui/static/admin/api.js)), keine Cookie-Ambient-Auth → kein CSRF-Vektor. Falls je eine Cookie-Session kommt, neu bewerten. |
 | Separate Impersonation-Session-Tabelle | abgelehnt | Bausteine existieren: `RevokedToken.jti` + `ImpersonationLog.jti` + Token an `target.token_version` gebunden. Einzeln widerrufbar. |
 | Zusätzliches JSON-Schema-Dokument | aufgeschoben | Pydantic-`ModelContractMeta` + gepinnter Snapshot + `CONTRACT_VERSION` decken den Bedarf vorerst. |
 
@@ -491,7 +491,7 @@ Provider-Doppel-Session bewusst als separater Folgeschritt offen.
 ### mypy aufs Gesamtpaket
 
 **Ziel:** mypy von der Vertragsschicht (`providers/` + `core/config.py`) auf
-`adminfoundry/` insgesamt ausweiten.
+`asterion/` insgesamt ausweiten.
 
 **Befund:** ~80 Fehler, überwiegend Framework-Typing-Nits (`var-annotated`
 an SQLAlchemy-Statements, `type[ModelAdmin]`-vs-Instanz in CRUD/Contract-
@@ -513,9 +513,9 @@ Signaturen; FastAPI-Quirks gezielt `# type: ignore` mit Begründung), dann
 Public API oder den Contract brechen — Breaking Changes werden im
 Commit/Changelog markiert. Ab `1.0` gilt SemVer:
 
-- **Public API** = die Re-Exports in `adminfoundry/__init__.__all__`
+- **Public API** = die Re-Exports in `asterion/__init__.__all__`
   (`create_admin`, `CoreAdminConfig`, `AdminRegistry`, `ModelAdmin`) plus
-  die Provider-Protocols in `adminfoundry/providers/base.py`. Breaking
+  die Provider-Protocols in `asterion/providers/base.py`. Breaking
   Changes daran → **Major**. Gepinnt durch `tests/public_api/`.
 - **Contract** = `ModelContractMeta`. Formänderungen ziehen den
   Snapshot-Test (`tests/contract/test_contract_snapshot.py`); eine

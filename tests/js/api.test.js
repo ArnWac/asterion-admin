@@ -8,7 +8,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { APIError, tokenStore } from "../../adminfoundry/ui/static/admin/api.js";
+import { APIError, tokenStore } from "../../asterion/ui/static/admin/api.js";
 
 afterEach(() => {
   localStorage.clear();
@@ -35,7 +35,7 @@ describe("tokenStore", () => {
 });
 
 describe("APIError", () => {
-  it("parses the adminfoundry error envelope", () => {
+  it("parses the asterion error envelope", () => {
     const err = new APIError(422, {
       error: {
         code: "validation_error",

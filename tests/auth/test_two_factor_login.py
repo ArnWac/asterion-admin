@@ -15,15 +15,15 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.tokens import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.password import hash_password
+from asterion.auth.tokens import (
     create_access_token,
     create_mfa_challenge_token,
     decode_token,
 )
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 
 SECRET = "test-2fa-login-secret"
 ALG = "HS256"
@@ -87,7 +87,7 @@ def _login(app, email: str = "alice@example.com"):
 @pytest.fixture
 def app_with_2fa_user(tmp_path):
     app = _build_app(tmp_path, db_name="2fa_login.db")
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     user_id, secret = _enroll_user(runtime, "alice@example.com", enabled=True)
     yield app, runtime, user_id, secret
     asyncio.run(runtime.db.dispose())
@@ -127,7 +127,7 @@ def test_login_for_non_2fa_user_returns_token_pair_unchanged(tmp_path):
     """Regression guard: a user without 2FA still gets access+refresh
     directly. The step-up branch must not affect them."""
     app = _build_app(tmp_path, db_name="non2fa.db")
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
     _enroll_user(runtime, "bob@example.com", enabled=False)
     body = (
         _client(app)
@@ -365,7 +365,7 @@ def test_2fa_login_accepts_backup_code(tmp_path):
     """A user enrolls 2FA via the regular flow (to get real backup
     codes), then uses one at /auth/2fa/login. The code is single-use."""
     app = _build_app(tmp_path, db_name="backup.db")
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:

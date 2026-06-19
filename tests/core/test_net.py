@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from adminfoundry.core.net import client_ip
+from asterion.core.net import client_ip
 
 
 def _req(peer: str | None, xff: str | None = None):

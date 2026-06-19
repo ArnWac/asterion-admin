@@ -12,11 +12,11 @@ from fastapi import HTTPException
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.contract.service import build_field_metadata, build_model_contract
-from adminfoundry.crud.payload import clean_write_payload
-from adminfoundry.registry import ModelAdmin
-from adminfoundry.schemas.builder import build_model_schema
-from adminfoundry.schemas.serialization.serializer import serialize_record
+from asterion.contract.service import build_field_metadata, build_model_contract
+from asterion.crud.payload import clean_write_payload
+from asterion.registry import ModelAdmin
+from asterion.schemas.builder import build_model_schema
+from asterion.schemas.serialization.serializer import serialize_record
 
 
 class _Base(DeclarativeBase):

@@ -19,18 +19,18 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.admin.context import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.admin.context import (
     AdminContext,
     build_admin_context,
     require_admin_context,
 )
-from adminfoundry.admin.policy import ReadOnlyPolicy
-from adminfoundry.builtins.admin import AuditLogAdmin
-from adminfoundry.db.dependencies import get_async_session
-from adminfoundry.models.audit_log import AuditLog
-from adminfoundry.models.base import GLOBAL_METADATA
-from adminfoundry.providers.base import AdminPrincipal
+from asterion.admin.policy import ReadOnlyPolicy
+from asterion.builtins.admin import AuditLogAdmin
+from asterion.db.dependencies import get_async_session
+from asterion.models.audit_log import AuditLog
+from asterion.models.base import GLOBAL_METADATA
+from asterion.providers.base import AdminPrincipal
 
 SECRET = "x" * 64
 
@@ -55,7 +55,7 @@ async def audit_app(tmp_path):
             enable_multi_tenant=False,
         ),
     )
-    engine = app.state.adminfoundry.db.engine
+    engine = app.state.asterion.db.engine
     async with engine.begin() as conn:
         await conn.run_sync(GLOBAL_METADATA.create_all)
     factory = async_sessionmaker(engine, expire_on_commit=False)

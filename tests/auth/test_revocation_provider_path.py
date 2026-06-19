@@ -18,11 +18,11 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.tokens import create_access_token, decode_token, get_token_jti
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.auth.password import hash_password
+from asterion.auth.tokens import create_access_token, decode_token, get_token_jti
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 
 SECRET = "test-revocation-provider-secret"
 ALG = "HS256"
@@ -56,7 +56,7 @@ def app_with_user(tmp_path):
         ),
         register=lambda reg: reg.register(_WidgetAdmin),
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup() -> User:
         async with runtime.db.engine.begin() as conn:

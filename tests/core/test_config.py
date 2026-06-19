@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry.core.config import CoreAdminConfig
+from asterion.core.config import CoreAdminConfig
 
 
 def _make(**kwargs):
@@ -40,8 +40,8 @@ def test_to_safe_dict_excludes_secrets():
 
 
 def test_from_env(monkeypatch):
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "env-secret")
+    monkeypatch.setenv("ASTERION_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "env-secret")
     cfg = CoreAdminConfig.from_env()
     assert cfg.database_url == "sqlite+aiosqlite:///:memory:"
     assert cfg.secret_key == "env-secret"

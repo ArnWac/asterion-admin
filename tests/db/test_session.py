@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import pytest_asyncio
 
-from adminfoundry.db.session import DatabaseManager
+from asterion.db.session import DatabaseManager
 
 
 @pytest_asyncio.fixture()

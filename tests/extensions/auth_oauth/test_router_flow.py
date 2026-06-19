@@ -34,19 +34,19 @@ from fastapi.testclient import TestClient
 from jose import jwk as jose_jwk
 from jose import jwt as jose_jwt
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.tokens import decode_access_token
-from adminfoundry.extensions.auth_oauth import (
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.tokens import decode_access_token
+from asterion.extensions.auth_oauth import (
     GoogleOIDCProvider,
     OAuthExtension,
 )
-from adminfoundry.extensions.auth_oauth.jwks import JWKSClient
-from adminfoundry.extensions.auth_oauth.state import (
+from asterion.extensions.auth_oauth.jwks import JWKSClient
+from asterion.extensions.auth_oauth.state import (
     OAuthFlowState,
     seal_state,
 )
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.security.protected_fields import reset_for_tests as reset_protected
+from asterion.models.base import GlobalModel
+from asterion.security.protected_fields import reset_for_tests as reset_protected
 
 _CLIENT_ID = "test-client-id"
 _KID = "test-kid"
@@ -140,7 +140,7 @@ def _build_app(tmp_path, *, auto_create_users: bool = True):
         ),
         extensions=[ext],
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -182,7 +182,7 @@ def _seal_cookie(
         return_to=return_to,
         created_at=int(time.time()),
     )
-    return seal_state(payload, app.state.adminfoundry.config.secret_key)
+    return seal_state(payload, app.state.asterion.config.secret_key)
 
 
 # ---- /login ----
@@ -219,7 +219,7 @@ def test_login_open_redirect_attempt_is_dropped(tmp_path):
     # ultimate redirect goes to /admin/login-complete (with safe
     # return_to in the fragment) rather than an absolute URL.
     cookie_header = resp.headers["set-cookie"]
-    assert "adminfoundry_oauth_state=" in cookie_header
+    assert "asterion_oauth_state=" in cookie_header
     # We can't easily decode the sealed cookie here without secret —
     # but the next test (test_callback_happy_path) confirms the safe
     # default propagates through.
@@ -254,7 +254,7 @@ def test_callback_happy_path_mints_jwt_and_redirects_with_fragment(tmp_path):
 
     with TestClient(app, raise_server_exceptions=False) as c:
         _patch_http(ext, handler)
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             f"/api/v1/oauth/google/callback?state={state}&code=mocked-code",
             follow_redirects=False,
@@ -276,7 +276,7 @@ def test_callback_happy_path_mints_jwt_and_redirects_with_fragment(tmp_path):
     decoded = decode_access_token(
         jwt_str,
         secret_key="test-flow-secret",
-        algorithm=app.state.adminfoundry.config.jwt_algorithm,
+        algorithm=app.state.asterion.config.jwt_algorithm,
     )
     assert decoded["type"] == "access"
     assert decoded["sub"]  # user id of the freshly-created user
@@ -289,7 +289,7 @@ def test_callback_state_query_mismatch_rejected(tmp_path):
     app, ext, _prov = _build_app(tmp_path)
     cookie = _seal_cookie(app, state="real-state", nonce="n", code_verifier="v")
     with TestClient(app, raise_server_exceptions=False) as c:
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             "/api/v1/oauth/google/callback?state=wrong-state&code=any",
             follow_redirects=False,
@@ -302,7 +302,7 @@ def test_callback_idp_reported_error_surfaces_as_oauth_error(tmp_path):
     app, ext, _prov = _build_app(tmp_path)
     cookie = _seal_cookie(app, state="s", nonce="n", code_verifier="v")
     with TestClient(app, raise_server_exceptions=False) as c:
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             "/api/v1/oauth/google/callback?state=s&error=access_denied",
             follow_redirects=False,
@@ -314,7 +314,7 @@ def test_callback_missing_code_rejected(tmp_path):
     app, ext, _prov = _build_app(tmp_path)
     cookie = _seal_cookie(app, state="s", nonce="n", code_verifier="v")
     with TestClient(app, raise_server_exceptions=False) as c:
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             "/api/v1/oauth/google/callback?state=s",
             follow_redirects=False,
@@ -331,7 +331,7 @@ def test_callback_token_exchange_http_failure_rejected(tmp_path):
 
     with TestClient(app, raise_server_exceptions=False) as c:
         _patch_http(ext, handler)
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             "/api/v1/oauth/google/callback?state=s&code=any",
             follow_redirects=False,
@@ -355,7 +355,7 @@ def test_callback_id_token_signature_failure_rejected(tmp_path):
 
     with TestClient(app, raise_server_exceptions=False) as c:
         _patch_http(ext, handler)
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             "/api/v1/oauth/google/callback?state=s&code=any",
             follow_redirects=False,
@@ -383,7 +383,7 @@ def test_callback_unverified_email_rejected_when_auto_create(tmp_path):
 
     with TestClient(app, raise_server_exceptions=False) as c:
         _patch_http(ext, handler)
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             "/api/v1/oauth/google/callback?state=s&code=any",
             follow_redirects=False,
@@ -406,7 +406,7 @@ def test_callback_lookup_only_unknown_user_rejected(tmp_path):
 
     with TestClient(app, raise_server_exceptions=False) as c:
         _patch_http(ext, handler)
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             "/api/v1/oauth/google/callback?state=s&code=any",
             follow_redirects=False,

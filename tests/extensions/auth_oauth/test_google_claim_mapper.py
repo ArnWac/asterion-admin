@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry.extensions.auth_oauth import GoogleOIDCClaimMapper
-from adminfoundry.extensions.auth_oauth.base import InvalidClaimsError
+from asterion.extensions.auth_oauth import GoogleOIDCClaimMapper
+from asterion.extensions.auth_oauth.base import InvalidClaimsError
 
 
 def _google_claims(**overrides):

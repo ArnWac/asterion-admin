@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry.auth.tokens import (
+from asterion.auth.tokens import (
     TokenError,
     create_access_token,
     decode_access_token,
@@ -37,24 +37,24 @@ def test_default_tokens_carry_no_iss_or_aud():
 
 
 def test_configured_iss_aud_round_trip():
-    token = _make(issuer="adminfoundry", audience="admin-ui")
+    token = _make(issuer="asterion", audience="admin-ui")
     payload = decode_access_token(
-        token, secret_key=SECRET, algorithm=ALG, issuer="adminfoundry", audience="admin-ui"
+        token, secret_key=SECRET, algorithm=ALG, issuer="asterion", audience="admin-ui"
     )
-    assert payload["iss"] == "adminfoundry"
+    assert payload["iss"] == "asterion"
     assert payload["aud"] == "admin-ui"
 
 
 def test_wrong_audience_is_rejected():
-    token = _make(issuer="adminfoundry", audience="admin-ui")
+    token = _make(issuer="asterion", audience="admin-ui")
     with pytest.raises(TokenError):
         decode_access_token(
-            token, secret_key=SECRET, algorithm=ALG, issuer="adminfoundry", audience="other-app"
+            token, secret_key=SECRET, algorithm=ALG, issuer="asterion", audience="other-app"
         )
 
 
 def test_wrong_issuer_is_rejected():
-    token = _make(issuer="adminfoundry", audience="admin-ui")
+    token = _make(issuer="asterion", audience="admin-ui")
     with pytest.raises(TokenError):
         decode_access_token(
             token, secret_key=SECRET, algorithm=ALG, issuer="someone-else", audience="admin-ui"
@@ -72,6 +72,6 @@ def test_token_without_aud_is_rejected_when_audience_required():
 def test_unconfigured_decode_ignores_present_iss():
     """An ``iss`` in the token but no issuer expectation on decode is fine —
     iss is informational unless explicitly required."""
-    token = _make(issuer="adminfoundry")
+    token = _make(issuer="asterion")
     payload = decode_access_token(token, secret_key=SECRET, algorithm=ALG)
-    assert payload["iss"] == "adminfoundry"
+    assert payload["iss"] == "asterion"

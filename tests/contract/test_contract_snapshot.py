@@ -14,10 +14,10 @@ from __future__ import annotations
 from sqlalchemy import Column, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.actions import AdminAction
-from adminfoundry.admin.fieldset import Fieldset
-from adminfoundry.contract.service import CONTRACT_VERSION, build_model_contract
-from adminfoundry.registry import ModelAdmin
+from asterion.actions import AdminAction
+from asterion.admin.fieldset import Fieldset
+from asterion.contract.service import CONTRACT_VERSION, build_model_contract
+from asterion.registry import ModelAdmin
 
 
 class _Base(DeclarativeBase):

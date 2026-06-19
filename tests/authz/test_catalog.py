@@ -1,4 +1,4 @@
-"""Tests for adminfoundry.authz.catalog — permission generation + sync."""
+"""Tests for asterion.authz.catalog — permission generation + sync."""
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.actions import AdminAction, BulkDeleteAction
-from adminfoundry.authz.catalog import (
+from asterion.actions import AdminAction, BulkDeleteAction
+from asterion.authz.catalog import (
     REGISTRY_SOURCE,
     generate_permission_keys,
     load_permission_keys,
     sync_permission_catalog,
 )
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.permission_catalog import PermissionCatalog
-from adminfoundry.registry import AdminRegistry, ModelAdmin
+from asterion.models.base import GlobalModel
+from asterion.models.permission_catalog import PermissionCatalog
+from asterion.registry import AdminRegistry, ModelAdmin
 
 
 class _AppBase(DeclarativeBase):
@@ -127,7 +127,7 @@ def test_generate_does_not_yield_wildcards():
 def test_generate_merges_extension_permission_registry():
     """Keys contributed by extensions via PermissionRegistry must show
     up in the catalog alongside the admin CRUD keys."""
-    from adminfoundry.authz.registry import PermissionRegistry
+    from asterion.authz.registry import PermissionRegistry
 
     admin_reg = AdminRegistry()
     admin_reg.register(ProjectAdmin)
@@ -146,7 +146,7 @@ def test_generate_merges_extension_permission_registry():
 
 def test_generate_works_with_only_permission_registry():
     """Empty AdminRegistry + non-empty PermissionRegistry = only extension keys."""
-    from adminfoundry.authz.registry import PermissionRegistry
+    from asterion.authz.registry import PermissionRegistry
 
     perm_reg = PermissionRegistry()
     perm_reg.register("oauth.identities.list")

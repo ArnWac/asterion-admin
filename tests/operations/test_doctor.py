@@ -1,4 +1,4 @@
-"""Tests for the enhanced ``adminfoundry doctor`` command (plan §PR-10)."""
+"""Tests for the enhanced ``asterion doctor`` command (plan §PR-10)."""
 
 from __future__ import annotations
 
@@ -10,20 +10,20 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from typer.testing import CliRunner
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.cli.main import app as cli_app
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.permission_catalog import PermissionCatalog
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.cli.main import app as cli_app
+from asterion.models.base import GlobalModel
+from asterion.models.permission_catalog import PermissionCatalog
 
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     db_path = tmp_path / "doctor.db"
     url = f"sqlite+aiosqlite:///{db_path}"
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", url)
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "test-doctor-secret")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_MULTI_TENANT", "false")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_BUILTIN_UI", "false")
+    monkeypatch.setenv("ASTERION_DATABASE_URL", url)
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "test-doctor-secret")
+    monkeypatch.setenv("ASTERION_ENABLE_MULTI_TENANT", "false")
+    monkeypatch.setenv("ASTERION_ENABLE_BUILTIN_UI", "false")
 
     async def _setup():
         engine = create_async_engine(
@@ -71,7 +71,7 @@ def test_doctor_succeeds_with_minimal_env(env):
 
 
 def test_doctor_reports_environment_from_config(env, monkeypatch):
-    monkeypatch.setenv("ADMINFOUNDRY_ENVIRONMENT", "development")
+    monkeypatch.setenv("ASTERION_ENVIRONMENT", "development")
     result = CliRunner().invoke(cli_app, ["doctor"])
     assert result.exit_code == 0
     assert "environment=development" in result.output
@@ -101,7 +101,7 @@ def test_doctor_reports_multi_tenant_disabled(env):
 
 
 def test_doctor_warns_multi_tenant_on_sqlite(env, monkeypatch):
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_MULTI_TENANT", "true")
+    monkeypatch.setenv("ASTERION_ENABLE_MULTI_TENANT", "true")
     result = CliRunner().invoke(cli_app, ["doctor"])
     assert "[MT]  WARN" in result.output
     assert "PostgreSQL" in result.output
@@ -116,9 +116,7 @@ def test_doctor_reports_no_cors_origins(env):
 
 
 def test_doctor_reports_configured_cors(env, monkeypatch):
-    monkeypatch.setenv(
-        "ADMINFOUNDRY_CORS_ORIGINS", "https://app.example.com,https://api.example.com"
-    )
+    monkeypatch.setenv("ASTERION_CORS_ORIGINS", "https://app.example.com,https://api.example.com")
     result = CliRunner().invoke(cli_app, ["doctor"])
     assert "[CORS] OK (2 origin(s))" in result.output
 
@@ -132,7 +130,7 @@ def test_doctor_skips_registry_check_without_app_spec(env):
 
 
 def test_doctor_reports_registered_resources_with_app(env, monkeypatch):
-    # Build a synthetic module exposing a real adminfoundry FastAPI app.
+    # Build a synthetic module exposing a real asterion FastAPI app.
     from sqlalchemy import Column, Integer, String
     from sqlalchemy.orm import DeclarativeBase
 
@@ -171,10 +169,10 @@ def test_doctor_reports_registered_resources_with_app(env, monkeypatch):
 
 def test_doctor_exits_nonzero_when_db_unreachable(tmp_path, monkeypatch):
     bad_url = f"sqlite+aiosqlite:///{tmp_path}/no/such/dir/x.db"
-    monkeypatch.setenv("ADMINFOUNDRY_DATABASE_URL", bad_url)
-    monkeypatch.setenv("ADMINFOUNDRY_SECRET_KEY", "test-doctor-bad-secret")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_MULTI_TENANT", "false")
-    monkeypatch.setenv("ADMINFOUNDRY_ENABLE_BUILTIN_UI", "false")
+    monkeypatch.setenv("ASTERION_DATABASE_URL", bad_url)
+    monkeypatch.setenv("ASTERION_SECRET_KEY", "test-doctor-bad-secret")
+    monkeypatch.setenv("ASTERION_ENABLE_MULTI_TENANT", "false")
+    monkeypatch.setenv("ASTERION_ENABLE_BUILTIN_UI", "false")
 
     result = CliRunner().invoke(cli_app, ["doctor"])
     assert result.exit_code != 0

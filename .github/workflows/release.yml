@@ -45,8 +45,8 @@ jobs:
           # Install the built wheel (not the source tree) so packaging gaps
           # — missing templates/static, bad entry point — surface here.
           /tmp/smoke/bin/pip install dist/*.whl
-          /tmp/smoke/bin/python -c "import adminfoundry; print('adminfoundry', adminfoundry.__version__)"
-          /tmp/smoke/bin/adminfoundry --help
+          /tmp/smoke/bin/python -c "import asterion; print('asterion', asterion.__version__)"
+          /tmp/smoke/bin/asterion --help
 
   publish:
     name: Publish to PyPI (Trusted Publishing)

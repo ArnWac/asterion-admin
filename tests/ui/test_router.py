@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from adminfoundry import CoreAdminConfig, create_admin
+from asterion import CoreAdminConfig, create_admin
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "adminfoundry"
+PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "asterion"
 
 
 @pytest.fixture

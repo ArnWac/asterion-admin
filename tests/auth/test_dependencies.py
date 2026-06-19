@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from adminfoundry.auth.tokens import create_access_token, is_impersonation_token
+from asterion.auth.tokens import create_access_token, is_impersonation_token
 
 SECRET = "test-secret"
 ALGO = "HS256"
@@ -13,7 +13,7 @@ ALGO = "HS256"
 def _make_token(user_id=None, impersonated_by=None):
     uid = user_id or uuid.uuid4()
     if impersonated_by:
-        from adminfoundry.auth.tokens import create_impersonation_token
+        from asterion.auth.tokens import create_impersonation_token
 
         return create_impersonation_token(
             uid,
@@ -35,7 +35,7 @@ def _make_token(user_id=None, impersonated_by=None):
 
 def test_normal_token_not_impersonation():
     token = _make_token()
-    from adminfoundry.auth.tokens import decode_access_token
+    from asterion.auth.tokens import decode_access_token
 
     payload = decode_access_token(token, secret_key=SECRET, algorithm=ALGO)
     assert is_impersonation_token(payload) is False
@@ -43,7 +43,7 @@ def test_normal_token_not_impersonation():
 
 def test_impersonation_token_flagged():
     token = _make_token(impersonated_by=True)
-    from adminfoundry.auth.tokens import decode_access_token
+    from asterion.auth.tokens import decode_access_token
 
     payload = decode_access_token(token, secret_key=SECRET, algorithm=ALGO)
     assert is_impersonation_token(payload) is True

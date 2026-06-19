@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from adminfoundry.tenancy.schema_strategy import _validate_schema_name
+from asterion.tenancy.schema_strategy import _validate_schema_name
 
 
 def test_valid_schema_name():

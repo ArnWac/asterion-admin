@@ -17,11 +17,11 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.extensions.import_export import ImportExportExtension
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.auth.password import hash_password
+from asterion.extensions.import_export import ImportExportExtension
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 from tests._helpers import make_admin_principal, make_admin_tenant, override_admin_context
 
 
@@ -68,7 +68,7 @@ def app(tmp_path):
         register=lambda reg: reg.register(_FilterableWidgetAdmin),
         extensions=[ImportExportExtension()],
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -93,7 +93,7 @@ def app(tmp_path):
 
 
 def _seed(app, rows: list[dict]) -> None:
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _go():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
@@ -221,14 +221,14 @@ def test_export_with_ids_ignores_filter_params(app):
 def test_export_audit_records_filters(app):
     from sqlalchemy import select
 
-    from adminfoundry.models.audit_log import AuditLog
+    from asterion.models.audit_log import AuditLog
 
     _grant(app)
     _seed(app, [{"name": "a", "color": "red"}])
     resp = _client(app).get("/api/v1/admin/d4_widgets/_export?format=csv&filter_color=red")
     assert resp.status_code == 200
 
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _read():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)

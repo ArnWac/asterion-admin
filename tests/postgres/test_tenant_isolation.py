@@ -4,7 +4,7 @@ These tests prove that schema-per-tenant with ``SET LOCAL search_path``
 actually isolates tenant data. SQLite cannot model PostgreSQL schemas, so
 these invariants are not exercised by the rest of the test suite.
 
-Skipped automatically unless ``ADMINFOUNDRY_TEST_POSTGRES_URL`` is set.
+Skipped automatically unless ``ASTERION_TEST_POSTGRES_URL`` is set.
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from adminfoundry.models.tenant_rbac import TenantRole
-from adminfoundry.tenancy.schema_strategy import set_search_path
+from asterion.models.tenant_rbac import TenantRole
+from asterion.tenancy.schema_strategy import set_search_path
 
 pytestmark = pytest.mark.postgres
 

@@ -28,22 +28,22 @@ from sqlalchemy import Boolean, Column, Integer, String
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry import CoreAdminConfig, ModelAdmin, create_admin
-from adminfoundry.auth.password import hash_password
-from adminfoundry.auth.tokens import (
+from asterion import CoreAdminConfig, ModelAdmin, create_admin
+from asterion.auth.password import hash_password
+from asterion.auth.tokens import (
     create_access_token,
     create_impersonation_token,
 )
-from adminfoundry.authz.permissions import (
+from asterion.authz.permissions import (
     assert_permission,
     has_permission,
     permission_key,
 )
-from adminfoundry.crud.payload import clean_write_payload
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
-from adminfoundry.schemas.builder import build_model_schema
-from adminfoundry.schemas.serialization.serializer import serialize_record
+from asterion.crud.payload import clean_write_payload
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
+from asterion.schemas.builder import build_model_schema
+from asterion.schemas.serialization.serializer import serialize_record
 from tests._helpers import make_admin_principal, make_admin_tenant, override_admin_context
 
 SECRET = "test-s5-invariant-secret"
@@ -95,7 +95,7 @@ def app_with_user(tmp_path):
         ),
         register=lambda reg: reg.register(AccountAdmin),
     )
-    runtime = application.state.adminfoundry
+    runtime = application.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:

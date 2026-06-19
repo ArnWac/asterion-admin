@@ -25,13 +25,13 @@ from jose import jwk as jose_jwk
 from jose import jwt as jose_jwt
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry import CoreAdminConfig, create_admin
-from adminfoundry.auth.tokens import decode_access_token, decode_refresh_token
-from adminfoundry.extensions.auth_oauth import GoogleOIDCProvider, OAuthExtension
-from adminfoundry.extensions.auth_oauth.state import OAuthFlowState, seal_state
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
-from adminfoundry.security.protected_fields import reset_for_tests as reset_protected
+from asterion import CoreAdminConfig, create_admin
+from asterion.auth.tokens import decode_access_token, decode_refresh_token
+from asterion.extensions.auth_oauth import GoogleOIDCProvider, OAuthExtension
+from asterion.extensions.auth_oauth.state import OAuthFlowState, seal_state
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
+from asterion.security.protected_fields import reset_for_tests as reset_protected
 
 _CLIENT_ID = "test-client-id"
 _KID = "test-kid"
@@ -98,7 +98,7 @@ def _build_app(tmp_path):
         ),
         extensions=[ext],
     )
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     async def _setup():
         async with runtime.db.engine.begin() as conn:
@@ -126,7 +126,7 @@ def _seal_cookie(app, *, state, nonce, code_verifier):
         return_to="/admin/dashboard",
         created_at=int(time.time()),
     )
-    return seal_state(payload, app.state.adminfoundry.config.secret_key)
+    return seal_state(payload, app.state.asterion.config.secret_key)
 
 
 def _do_callback(tmp_path, *, email: str = "alice@example.com"):
@@ -151,7 +151,7 @@ def _do_callback(tmp_path, *, email: str = "alice@example.com"):
 
     with TestClient(app, raise_server_exceptions=False) as c:
         _patch_http(ext, handler)
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             f"/api/v1/oauth/google/callback?state={state}&code=mocked-code",
             follow_redirects=False,
@@ -233,14 +233,14 @@ def test_callback_uses_users_actual_token_version(tmp_path):
     immortal across /logout-all. After 3.5 the callback reads the live
     value from the User row."""
     app, ext = _build_app(tmp_path)
-    runtime = app.state.adminfoundry
+    runtime = app.state.asterion
 
     # Seed a user with a pre-bumped token_version BEFORE the OAuth callback
     # finds them. The auto-create branch normally creates fresh users with
     # tkv=0; this test pre-creates one + the external_identity link so the
     # callback hits the "found existing" branch.
-    from adminfoundry.auth.password import hash_password
-    from adminfoundry.extensions.auth_oauth.models import ExternalIdentity
+    from asterion.auth.password import hash_password
+    from asterion.extensions.auth_oauth.models import ExternalIdentity
 
     user_id: dict = {}
 
@@ -291,7 +291,7 @@ def test_callback_uses_users_actual_token_version(tmp_path):
 
     with TestClient(app, raise_server_exceptions=False) as c:
         _patch_http(ext, handler)
-        c.cookies.set("adminfoundry_oauth_state", cookie)
+        c.cookies.set("asterion_oauth_state", cookie)
         resp = c.get(
             f"/api/v1/oauth/google/callback?state={state}&code=mocked-code",
             follow_redirects=False,

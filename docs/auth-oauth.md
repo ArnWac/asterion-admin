@@ -55,8 +55,8 @@ Copy the `client_id` and `client_secret` — the extension needs both.
 ### 2. Wire the extension into `create_admin`
 
 ```python
-from adminfoundry import create_admin, CoreAdminConfig
-from adminfoundry.extensions.auth_oauth import (
+from asterion import create_admin, CoreAdminConfig
+from asterion.extensions.auth_oauth import (
     OAuthExtension,
     GoogleOIDCProvider,
 )
@@ -90,7 +90,7 @@ your project:
 # Make sure migrations/shared/env.py imports the extension so
 # autogenerate sees its tables. Add this line near the top:
 #
-#     import adminfoundry.extensions.auth_oauth  # noqa: F401
+#     import asterion.extensions.auth_oauth  # noqa: F401
 
 alembic -c alembic_shared.ini revision --autogenerate -m "add external_identities"
 alembic -c alembic_shared.ini upgrade head
@@ -104,7 +104,7 @@ existing user table, an IAM service), implement the
 `OAuthCapableUserProvider` Protocol and pass it in:
 
 ```python
-from adminfoundry.extensions.auth_oauth import OAuthCapableUserProvider
+from asterion.extensions.auth_oauth import OAuthCapableUserProvider
 
 class MyOAuthUserProvider:
     async def find_or_create_by_external_identity(self, **kwargs):

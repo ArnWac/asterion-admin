@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from adminfoundry import CoreAdminConfig
-from adminfoundry.db.session import DatabaseManager
+from asterion import CoreAdminConfig
+from asterion.db.session import DatabaseManager
 
 
 def test_pool_kwargs_passed_to_postgres_engine():
@@ -21,7 +21,7 @@ def test_pool_kwargs_passed_to_postgres_engine():
 
         return create_async_engine(url, **kw)
 
-    with patch("adminfoundry.db.session.create_async_engine", side_effect=_spy):
+    with patch("asterion.db.session.create_async_engine", side_effect=_spy):
         DatabaseManager(
             "postgresql+asyncpg://postgres:postgres@localhost:5432/x",
             pool_size=42,
@@ -47,7 +47,7 @@ def test_pool_kwargs_NOT_forwarded_for_sqlite():
 
         return create_async_engine(url, **kw)
 
-    with patch("adminfoundry.db.session.create_async_engine", side_effect=_spy):
+    with patch("asterion.db.session.create_async_engine", side_effect=_spy):
         DatabaseManager(
             "sqlite+aiosqlite:///:memory:",
             pool_size=99,

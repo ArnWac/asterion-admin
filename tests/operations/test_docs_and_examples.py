@@ -61,13 +61,13 @@ def test_readme_exists_and_mentions_v1_api():
 
 def test_readme_does_not_reference_dropped_apis():
     """The historical README referenced `admin_site`, `AuthProvider`,
-    `adminfoundry.settings` etc. PR-7 rewrites it; this test guards the
+    `asterion.settings` etc. PR-7 rewrites it; this test guards the
     rewrite from drifting back."""
     content = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     # Use word-boundary checks so unrelated occurrences aren't false hits.
     assert not re.search(r"\badmin_site\b", content)
     assert not re.search(r"\bAuthProvider\b", content)
-    assert not re.search(r"adminfoundry\.settings\b", content)
+    assert not re.search(r"asterion\.settings\b", content)
 
 
 # --- deployment artifacts ---
@@ -85,8 +85,8 @@ def test_deployment_artifact_exists(filename):
 
 def test_env_example_lists_required_vars():
     content = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
-    assert "ADMINFOUNDRY_DATABASE_URL" in content
-    assert "ADMINFOUNDRY_SECRET_KEY" in content
+    assert "ASTERION_DATABASE_URL" in content
+    assert "ASTERION_SECRET_KEY" in content
 
 
 # --- example app ---
@@ -103,7 +103,7 @@ def test_basic_single_example_uses_only_supported_attrs():
     """Any ModelAdmin subclass declared in the example must only set
     attributes that ``ModelAdmin`` actually supports. Catches dropped
     attrs like ``filter_fields``, ``fieldsets``, ``computed_fields``."""
-    from adminfoundry import ModelAdmin
+    from asterion import ModelAdmin
     from examples.basic_single.admin_config import PostAdmin
 
     supported = set(vars(ModelAdmin).keys())
@@ -122,7 +122,7 @@ def test_basic_single_example_uses_only_supported_attrs():
 def test_basic_single_example_registers_against_real_registry():
     """Round-trip: invoking `register(AdminRegistry())` must not raise
     and must produce at least one registered admin."""
-    from adminfoundry import AdminRegistry
+    from asterion import AdminRegistry
     from examples.basic_single.admin_config import register
 
     registry = AdminRegistry()
@@ -148,7 +148,7 @@ def test_multi_tenant_example_uses_only_supported_admin_attrs():
     """Any ModelAdmin subclass in the multi_tenant example must only
     set attrs ModelAdmin supports. Parity with the basic_single
     guard."""
-    from adminfoundry import ModelAdmin
+    from asterion import ModelAdmin
     from examples.multi_tenant import admin_config as mod
 
     supported = set(vars(ModelAdmin).keys())
@@ -168,7 +168,7 @@ def test_multi_tenant_example_registers_against_real_registry():
     real AdminRegistry. Pinning this catches the same class of
     breakage that ``test_basic_single_example_registers...`` catches
     for the simpler example."""
-    from adminfoundry import AdminRegistry
+    from asterion import AdminRegistry
     from examples.multi_tenant.admin_config import register
 
     registry = AdminRegistry()

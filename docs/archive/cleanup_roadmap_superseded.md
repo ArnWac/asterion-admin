@@ -1,4 +1,4 @@
-# adminfoundry Cleanup-Roadmap
+# asterion Cleanup-Roadmap
 
 > **SUPERSEDED / ARCHIVIERT (2026-06-15).**
 > Dieses Dokument schlug vor, das Extension-System abzubauen. Die
@@ -9,11 +9,11 @@
 > Stellen technisch beschädigt.)
 
 Stand: 2026-05-30  
-Repo: `https://github.com/ArnWac/adminfoundry`
+Repo: `https://github.com/ArnWac/asterion-admin`
 
 ## Zielbild
 
-`adminfoundry` soll kein breit aufgeblähtes Admin-/SaaS-Framework werden, sondern ein stabiles, contract-driven FastAPI Admin-Package.
+`asterion` soll kein breit aufgeblähtes Admin-/SaaS-Framework werden, sondern ein stabiles, contract-driven FastAPI Admin-Package.
 
 **Gesetzte Kernfeatures:**
 
@@ -122,7 +122,7 @@ Die importierbare API darf keine falschen Erwartungen erzeugen.
 
 ### Aufgaben
 
-- [ ] `adminfoundry/__init__.py` prüfen:
+- [ ] `asterion/__init__.py` prüfen:
   - [ ] Nur stabile Kern-Objekte exportieren
   - [ ] Keine Feature-Extension-Klassen für entfernte Produktlinien exportieren
   - [ ] Keine Jobs/Workflow/Webhook/Observability-Typen exportieren
@@ -170,7 +170,7 @@ register_contract_contributions | None = None,
 
 ### Akzeptanzkriterien
 
-- [ ] `from adminfoundry import ...` enthält nur Kern-stabile API.
+- [ ] `from asterion import ...` enthält nur Kern-stabile API.
 - [ ] `create_admin()` enthält keine offene Feature-Extension-API für entfernte Produktlinien.
 - [ ] Keine Lifecycle-Imports für Jobs/Workflows/Webhooks/Observability in `core/app_factory.py`.
 - [ ] Tests schlagen fehl, wenn entfernte öffentliche API weiter importierbar ist.
@@ -185,7 +185,7 @@ Wenn Jobs/Workflows/Webhooks/Observability gelöscht sind, darf das Extension-Mo
 
 ### Aufgaben
 
-- [ ] Ordner `adminfoundry/extensions/` prüfen:
+- [ ] Ordner `asterion/extensions/` prüfen:
   - [ ] Als Core-Modul behalten
   - [ ] Jobs/Workflows/Webhooks/Observability-Reste vollständig entfernen
   - [ ] Nur generische, admin-relevante Contribution-Mechanik behalten
@@ -391,7 +391,7 @@ POST /api/v1/auth/2fa/verify
   - [ ] `/auth/me` zeigt nur `two_factor_enabled`
   - [ ] niemals Secret oder Backup-Code-Hashes ausgeben
 - [ ] CLI:
-  - [ ] Optional: `adminfoundry user disable-2fa <email>` für Superadmin/Recovery
+  - [ ] Optional: `asterion user disable-2fa <email>` für Superadmin/Recovery
 
 ### Was nicht passieren darf
 
@@ -619,7 +619,7 @@ register_contract_contributions` ist Core-SPI.
 Dann gilt:
 
 - `storage` aus `create_admin()` entfernen.
-- `adminfoundry/storage` entfernen oder nach `obsolete/` verschieben.
+- `asterion/storage` entfernen oder nach `obsolete/` verschieben.
 - FileField-Doku entfernen.
 - Tests entfernen oder parken.
 
@@ -725,7 +725,7 @@ Die Außendarstellung soll kleiner, glaubwürdiger und nutzbarer werden.
 ### README-Struktur
 
 ```text
-# adminfoundry
+# asterion
 
 ## What it is
 Contract-driven FastAPI admin framework for SQLAlchemy.

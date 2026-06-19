@@ -1,4 +1,4 @@
-"""Unit tests for adminfoundry.audit.service.
+"""Unit tests for asterion.audit.service.
 
 Verifies the audit writer: it persists rows in an isolated session, it
 sanitizes payloads through sanitize_payload, and it never re-raises on
@@ -14,7 +14,7 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from adminfoundry.audit import (
+from asterion.audit import (
     ADMIN_ACTION,
     CRUD_CREATE,
     LOGIN_SUCCESS,
@@ -22,10 +22,10 @@ from adminfoundry.audit import (
     record_audit,
     record_audit_in_session,
 )
-from adminfoundry.db.session import DatabaseManager
-from adminfoundry.models.audit_log import AuditLog
-from adminfoundry.models.base import GlobalModel
-from adminfoundry.models.user import User
+from asterion.db.session import DatabaseManager
+from asterion.models.audit_log import AuditLog
+from asterion.models.base import GlobalModel
+from asterion.models.user import User
 
 
 @pytest_asyncio.fixture
@@ -88,7 +88,7 @@ async def test_record_audit_captures_actor_user_id(db):
     factory = async_sessionmaker(db.engine, expire_on_commit=False)
     async with factory() as session:
         async with session.begin():
-            from adminfoundry.auth.password import hash_password
+            from asterion.auth.password import hash_password
 
             user = User(
                 email="alice@example.com",
@@ -180,7 +180,7 @@ def test_audit_payload_handles_external_string_actor_id():
     with an arbitrary string id (external auth providers). UUID-shaped
     ids round-trip to ``actor_user_id``; opaque ids fall back to
     ``actor_label`` instead of raising."""
-    from adminfoundry.providers.base import AdminPrincipal
+    from asterion.providers.base import AdminPrincipal
 
     # UUID-shaped string id → keeps in actor_user_id.
     pid = str(uuid.uuid4())
@@ -205,7 +205,7 @@ def test_audit_payload_handles_uuid_actor_id_directly():
     """Builtin path: ``AdminPrincipal.id`` can already carry a
     ``uuid.UUID`` (when the BuiltinSQLAlchemyUserProvider hydrates a
     principal). Must round-trip unchanged."""
-    from adminfoundry.providers.base import AdminPrincipal
+    from asterion.providers.base import AdminPrincipal
 
     pid = uuid.uuid4()
     row = audit_payload(

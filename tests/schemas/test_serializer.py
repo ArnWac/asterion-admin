@@ -7,8 +7,8 @@ import uuid
 from sqlalchemy import Column, String
 from sqlalchemy.orm import DeclarativeBase
 
-from adminfoundry.registry import ModelAdmin
-from adminfoundry.schemas.serialization.serializer import serialize_record, serialize_records
+from asterion.registry import ModelAdmin
+from asterion.schemas.serialization.serializer import serialize_record, serialize_records
 
 
 class _Base(DeclarativeBase):
