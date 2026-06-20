@@ -114,6 +114,24 @@ asterion db upgrade-tenants
 `db upgrade-tenants` iterates every active tenant. Run it after every
 deploy that introduces a tenant schema migration.
 
+### Where the migrations live
+
+asterion's **shared** (public) migrations ship inside the wheel
+(`asterion/_migrations/shared`). `db upgrade-public` runs them
+package-relatively, so it works from a pip-installed asterion in any working
+directory — no repo checkout or `alembic_shared.ini` required.
+
+The **tenant** tree is owned by your app (your domain tables live alongside
+asterion's `tenant_rbac`). `db upgrade-tenant` / `db upgrade-tenants` resolve
+the tenant migrations in this order:
+
+1. an explicit `--config/-c <path>` (or `ASTERION_ALEMBIC_TENANT_INI`),
+2. a project-local `alembic_tenant.ini` in the current directory (your app),
+3. asterion's bundled tenant migrations (pure-asterion / asterion's own tests).
+
+So an embedding app drops its own `alembic_tenant.ini` (pointing at its
+`migrations/tenant`) next to where it runs the CLI, and it wins automatically.
+
 ## Multi-worker considerations
 
 - `uvicorn --workers N` runs `N` independent processes. Each gets its

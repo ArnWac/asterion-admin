@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable
 
 from fastapi import FastAPI
 
+from asterion.authz.registry import PermissionRegistry
 from asterion.builtins import install_builtin_admins
 from asterion.core.config import CoreAdminConfig
 from asterion.core.errors import register_error_handlers
@@ -41,6 +42,7 @@ def create_admin(
     password_reset_notifier=None,
     storage=None,
     login_rate_limiter=None,
+    permissions: Iterable[str] | Callable[[PermissionRegistry], None] | None = None,
     **fastapi_kwargs,
 ) -> FastAPI:
     config = config or CoreAdminConfig.from_env()
@@ -137,6 +139,22 @@ def create_admin(
 
     if register is not None:
         register(runtime.registry)
+
+    # App-declared permission keys — the extension-free path for an embedding
+    # app (e.g. Simpletimes) to publish its own keys without writing an
+    # AdminExtension. Registered into the permission registry BEFORE
+    # ``run_setup_phase`` freezes it, so they merge with extension-registered
+    # keys and flow through ``generate_permission_keys()`` into the catalog on
+    # ``asterion permissions sync``. Order: app keys first, then each
+    # extension's ``register_permissions`` hook. Duplicates are idempotent
+    # (the registry is a set), so a key declared by both app and extension is
+    # fine; ``PermissionRegistry.register`` validates the key shape and raises
+    # on a malformed key.
+    if permissions is not None:
+        if callable(permissions):
+            permissions(runtime.permission_registry)
+        else:
+            runtime.permission_registry.register(*permissions)
 
     # Build the per-app ExtensionContext and walk every extension through
     # the documented lifecycle hooks. Extension routes are mounted INSIDE

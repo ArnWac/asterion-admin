@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import os
 import subprocess
 import sys
 from datetime import UTC
@@ -284,6 +285,70 @@ def _alembic_ini(env: str) -> str:
     return "alembic_shared.ini" if env == "shared" else "alembic_tenant.ini"
 
 
+def _bundled_migrations_path(env: str) -> Path:
+    """Filesystem path to asterion's bundled Alembic migrations for ``env``
+    (``"shared"`` or ``"tenant"``), resolved **package-relatively**.
+
+    Works from any cwd and from a pip-installed wheel — not just the repo
+    checkout — because the migrations ship as package data under
+    ``asterion/_migrations/`` (see ``[tool.setuptools.package-data]``).
+    """
+    from importlib.resources import files
+
+    return Path(str(files("asterion").joinpath("_migrations", env)))
+
+
+def _shared_alembic_config():
+    """Alembic ``Config`` for asterion's bundled SHARED (public) migrations.
+
+    asterion owns the shared tree (users, tenants, audit, tokens, 2FA,
+    password_reset), so this always points at the bundled migrations regardless
+    of cwd. ``env.py`` reads the DB URL from ``ASTERION_DATABASE_URL`` /
+    ``DATABASE_URL``.
+    """
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_bundled_migrations_path("shared")))
+    return cfg
+
+
+def _tenant_alembic_config(explicit_ini: str | None = None):
+    """Resolve the Alembic ``Config`` for the TENANT tree.
+
+    The tenant tree is owned by the **downstream app** (its domain tables live
+    alongside asterion's ``tenant_rbac``), so we do NOT hard-wire asterion's
+    bundled tenant migrations. Resolution order:
+
+    1. an explicit ``--config`` / ``-c`` path, or ``ASTERION_ALEMBIC_TENANT_INI``;
+    2. a project-local ``alembic_tenant.ini`` in the current directory
+       (the app owns the tenant migrations tree);
+    3. fall back to asterion's bundled tenant migrations (pure-asterion
+       deployments and asterion's own tests).
+    """
+    from alembic.config import Config
+
+    candidate = explicit_ini or os.environ.get("ASTERION_ALEMBIC_TENANT_INI")
+    if candidate:
+        return Config(candidate)
+    local = Path.cwd() / "alembic_tenant.ini"
+    if local.exists():
+        return Config(str(local))
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_bundled_migrations_path("tenant")))
+    return cfg
+
+
+def _set_x_schema(cfg, schema: str) -> None:
+    """Pass ``-x schema=<schema>`` to the in-process alembic ``env.py``."""
+    from argparse import Namespace
+
+    existing = getattr(cfg, "cmd_opts", None)
+    x = list(getattr(existing, "x", None) or [])
+    x.append(f"schema={schema}")
+    cfg.cmd_opts = Namespace(x=x)
+
+
 @migrate_app.command("generate")
 def migrate_generate(
     message: str = typer.Option("auto", "-m", "--message", help="Migration message"),
@@ -367,21 +432,38 @@ def db_upgrade(
 
 @db_app.command("upgrade-public")
 def db_upgrade_public():
-    """Apply all pending public-schema migrations (``alembic_shared.ini``)."""
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", "alembic_shared.ini", "upgrade", "head"],
-    )
-    raise typer.Exit(code=result.returncode)
+    """Apply all pending public/shared-schema migrations bundled with asterion.
+
+    Runs asterion's own (bundled) shared migrations package-relatively, so it
+    works from any cwd and from a pip-installed wheel. The DB URL comes from
+    ``ASTERION_DATABASE_URL`` / ``DATABASE_URL``.
+    """
+    from alembic import command
+
+    try:
+        command.upgrade(_shared_alembic_config(), "head")
+    except Exception as exc:
+        typer.echo(f"[db] upgrade-public failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 @db_app.command("upgrade-tenant")
 def db_upgrade_tenant(
     slug: str = typer.Argument(..., help="Tenant slug"),
+    config: str | None = typer.Option(
+        None,
+        "-c",
+        "--config",
+        help="Path to a tenant alembic .ini (overrides auto-resolution).",
+    ),
 ):
     """Apply pending tenant-schema migrations for one tenant.
 
-    Resolves the tenant's schema_name via the registered slug and passes it
-    to alembic as ``-x schema=<schema_name>``.
+    Resolves the tenant's schema_name via the slug and passes it to alembic as
+    ``-x schema=<schema_name>``. The tenant migrations tree is owned by the
+    downstream app — see :func:`_tenant_alembic_config` for the resolution
+    order (explicit ``-c`` > local ``alembic_tenant.ini`` > asterion's bundled
+    tenant migrations).
     """
     try:
         validated = validate_tenant_slug(slug)
@@ -389,33 +471,59 @@ def db_upgrade_tenant(
         typer.echo(f"Invalid slug: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
+    from alembic import command
+
     from asterion.tenancy.schema_names import make_tenant_schema_name
 
     schema_name = make_tenant_schema_name(validated)
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "alembic",
-            "-c",
-            "alembic_tenant.ini",
-            "-x",
-            f"schema={schema_name}",
-            "upgrade",
-            "head",
-        ],
-    )
-    raise typer.Exit(code=result.returncode)
+    cfg = _tenant_alembic_config(config)
+    _set_x_schema(cfg, schema_name)
+    try:
+        command.upgrade(cfg, "head")
+    except Exception as exc:
+        typer.echo(f"[db] upgrade-tenant failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 @db_app.command("upgrade-tenants")
-def db_upgrade_tenants():
+def db_upgrade_tenants(
+    config: str | None = typer.Option(
+        None,
+        "-c",
+        "--config",
+        help="Path to a tenant alembic .ini (overrides auto-resolution).",
+    ),
+):
     """Apply pending tenant-schema migrations for every active tenant."""
-    asyncio.run(_upgrade_all_tenant_schemas())
+    tenants = asyncio.run(_fetch_active_tenants())
+    if not tenants:
+        typer.echo("No active tenants found.")
+        return
+
+    from alembic import command
+
+    failures: list[str] = []
+    for slug, schema_name in tenants:
+        typer.echo(f"[upgrade] {slug} ({schema_name})")
+        cfg = _tenant_alembic_config(config)
+        _set_x_schema(cfg, schema_name)
+        try:
+            command.upgrade(cfg, "head")
+        except Exception as exc:
+            typer.echo(f"  FAILED: {exc}", err=True)
+            failures.append(slug)
+
+    if failures:
+        typer.echo(f"FAILED: {', '.join(failures)}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"Upgraded {len(tenants)} tenant(s).")
 
 
-async def _upgrade_all_tenant_schemas() -> None:
+async def _fetch_active_tenants() -> list[tuple[str, str]]:
+    """Return ``(slug, schema_name)`` for every active tenant, detached from
+    the session so the caller can run alembic synchronously afterwards (the
+    alembic env runs its own event loop, so it must not be nested inside this
+    one)."""
     config = _load_config()
     db = _make_db(config)
     try:
@@ -423,37 +531,9 @@ async def _upgrade_all_tenant_schemas() -> None:
             result = await session.execute(
                 select(Tenant).where(Tenant.is_active == True)  # noqa: E712
             )
-            tenants = list(result.scalars().all())
+            return [(t.slug, t.schema_name) for t in result.scalars().all()]
     finally:
         await db.dispose()
-
-    if not tenants:
-        typer.echo("No active tenants found.")
-        return
-
-    failures: list[str] = []
-    for tenant in tenants:
-        typer.echo(f"[upgrade] {tenant.slug} ({tenant.schema_name})")
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "alembic",
-                "-c",
-                "alembic_tenant.ini",
-                "-x",
-                f"schema={tenant.schema_name}",
-                "upgrade",
-                "head",
-            ],
-        )
-        if result.returncode != 0:
-            failures.append(tenant.slug)
-
-    if failures:
-        typer.echo(f"FAILED: {', '.join(failures)}", err=True)
-        raise typer.Exit(code=1)
-    typer.echo(f"Upgraded {len(tenants)} tenant(s).")
 
 
 @db_app.command("current")

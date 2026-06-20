@@ -32,8 +32,8 @@ RUN apt-get update \
 
 COPY pyproject.toml README.md ./
 COPY asterion ./asterion
-COPY alembic_shared.ini alembic_tenant.ini ./
-COPY migrations ./migrations
+# asterion's Alembic migrations live inside the package (asterion/_migrations)
+# and ship in the wheel via package-data — no separate copy needed.
 
 RUN pip install build && python -m build --wheel --outdir /dist
 
@@ -54,8 +54,11 @@ RUN pip install /tmp/*.whl[postgres] "uvicorn[standard]>=0.29.0" \
 # Application code (the wheel ships the framework; this is your app).
 # Mount or COPY your app.py + models as a separate layer.
 COPY app.py ./
-COPY alembic_shared.ini alembic_tenant.ini ./
-COPY migrations ./migrations
+# `asterion db upgrade-public` runs asterion's bundled (packaged) migrations
+# package-relatively, so no alembic .ini / migrations dir is needed here. A
+# downstream app that owns tenant migrations adds its own alembic_tenant.ini +
+# migrations/tenant in this layer; `db upgrade-tenant` prefers a local
+# alembic_tenant.ini over asterion's bundled tenant tree.
 
 # Non-root user
 RUN useradd --create-home --uid 10001 asterion \

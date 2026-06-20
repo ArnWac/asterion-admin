@@ -86,6 +86,38 @@ def register_permissions(self, registry):
     registry.register("billing.invoices.list", "billing.invoices.refund")
 ```
 
+#### Declaring permission keys WITHOUT an extension
+
+An app that only *embeds* asterion doesn't need to write an extension just to
+publish its own permission keys. Pass them to `create_admin(permissions=...)` —
+either a list of keys or a callback that receives the `PermissionRegistry`:
+
+```python
+from asterion import create_admin
+
+app = create_admin(
+    config=...,
+    register=register_admins,
+    # custom keys in your own namespace (auto-derived admin.<resource>.* keys
+    # still come from your ModelAdmins automatically):
+    permissions=[
+        "timeclock.employee.read",
+        "timeclock.employee.write",
+        "timeclock.shift.close",
+    ],
+    # or, equivalently, a callback:
+    # permissions=lambda reg: reg.register("timeclock.shift.close"),
+)
+```
+
+These keys are registered into `runtime.permission_registry` **before**
+extensions' `register_permissions` hooks run, and are merged by
+`generate_permission_keys(...)` exactly like extension keys — so
+`asterion permissions sync` writes them into the `PermissionCatalog` and they
+become assignable to tenant roles. Keys are validated (`namespace.resource.action`
+shape) on registration, and duplicates — including a key also declared by an
+extension — are idempotent (the registry is a set).
+
 ### `ProtectedFieldRegistry` — `runtime.protected_fields`
 
 Singleton seeded from `DEFAULT_PROTECTED_FIELDS` (passwords, secrets,
@@ -207,11 +239,18 @@ The framework ships **no** migrations for extension-owned tables.
 Apps that wire an extension are responsible for generating their own
 revisions:
 
-1. Import the extension at the top of `migrations/shared/env.py` so
-   `GlobalBase.metadata` sees the table.
+1. Import the extension at the top of your Alembic shared `env.py` so
+   `GlobalBase.metadata` sees the table. In the asterion repo that env is
+   `asterion/_migrations/shared/env.py`; an **embedding app** keeps its own
+   shared migrations env (it must not edit asterion's bundled, pip-installed
+   one) that imports `asterion.models` plus the extension.
 2. Run `alembic --autogenerate` against the env. The new revision
    creates the extension's tables.
 3. Run `alembic upgrade head` in deployments.
+
+(asterion's *own* shared migrations — users, tenants, audit, tokens, 2FA,
+password_reset — ship inside the wheel and are applied package-relatively by
+`asterion db upgrade-public`, so you don't manage those.)
 
 This is intentional: bundling migrations for extension tables would
 inflate every asterion installation with tables the host might

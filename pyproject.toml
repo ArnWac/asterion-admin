@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asterion-admin"
-version = "0.1.0"
+version = "0.1.1"
 description = "FastAPI admin framework with built-in UI, JWT auth, RBAC, and multi-tenancy"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -35,6 +35,9 @@ dependencies = [
     "pyotp>=2.9.0",                      # TOTP 2FA (auth/totp.py)
     "typer>=0.12.0",                     # CLI (cli/main.py)
     "jinja2>=3.1.0",                     # UI templates (ui/templates/*.html)
+    "python-multipart>=0.0.9",           # file-upload routes (storage + import_export);
+    #                                      the storage router is always mounted, so FastAPI
+    #                                      requires this at import — must be a core dep, not dev-only.
 ]
 
 [project.urls]
@@ -73,7 +76,7 @@ dev = [
     "aiosqlite>=0.20.0",
     "asyncpg>=0.29.0",
     "openpyxl>=3.1.0",      # tests for the xlsx import_export branch
-    "python-multipart>=0.0.9",  # FastAPI file uploads (import endpoint)
+    # python-multipart is now a core runtime dependency (file-upload routes).
     "boto3>=1.34",          # tests for the storage_s3 extension (with moto)
     "moto>=5.0",            # in-process S3 mock for storage_s3 tests
     "fakeredis>=2.20",      # in-process Redis mock for the redis rate-limiter tests
@@ -103,6 +106,10 @@ asterion = [
     "py.typed",
     "ui/templates/**/*",
     "ui/static/**/*",
+    # Alembic migrations ship inside the wheel so a pip-installed asterion can
+    # run `asterion db upgrade-public` (and provision tenant schemas) without
+    # the repo checkout. Includes env.py, script.py.mako and versions/*.py.
+    "_migrations/**/*",
 ]
 
 [tool.pytest.ini_options]
@@ -138,8 +145,8 @@ warn_unused_ignores = true
 line-length = 100
 target-version = "py311"
 extend-exclude = [
-    "migrations/shared/versions",
-    "migrations/tenant/versions",
+    "asterion/_migrations/shared/versions",
+    "asterion/_migrations/tenant/versions",
 ]
 
 [tool.ruff.lint]
@@ -170,7 +177,7 @@ ignore = [
     "E402",
     "RUF059",
 ]
-"migrations/**" = ["E501"]
+"asterion/_migrations/**" = ["E501"]
 "**/__init__.py" = ["F401"]
 # ModelAdmin / InlineAdmin use class-level lists/dicts as user-facing API
 # surface; subclasses get fresh copies via __init_subclass__.
