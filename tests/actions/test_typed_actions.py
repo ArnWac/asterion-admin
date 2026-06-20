@@ -167,7 +167,7 @@ def _build_app_with_action(action: AdminAction, monkeypatch, session_factory):
 
         return AdminContext(
             request=None,
-            principal=AdminPrincipal(id="test-user", email="t@x"),
+            principal=AdminPrincipal(id="test-user", email="t@x", is_superadmin=True),
             tenant=None,
             permissions=frozenset({"admin.*"}),
         )

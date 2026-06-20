@@ -43,7 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.admin.context import AdminContext, require_admin_context
 from asterion.audit import record_audit_in_session, request_audit_kwargs
-from asterion.authz.permissions import permission_key
+from asterion.authz.permissions import require_resource_access
 from asterion.crud.payload import clean_write_payload
 from asterion.crud.query import (
     apply_filters,
@@ -121,14 +121,7 @@ def _resolve_admin(request: Request, resource: str) -> type[ModelAdmin]:
 
 
 def _require_list_permission(ctx: AdminContext, resource: str) -> None:
-    if ctx.tenant is None:
-        return  # superadmin / no tenant context — handled by the request-time gate
-    required = permission_key(resource, "list")
-    if not ctx.has_permission(required):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Missing required permission: {required}",
-        )
+    require_resource_access(ctx, resource, "list")
 
 
 def _columns_for(admin: ModelAdmin, sample_row: dict[str, Any] | None) -> list[str]:
@@ -316,14 +309,7 @@ async def export_records(
 
 
 def _require_create_permission(ctx: AdminContext, resource: str) -> None:
-    if ctx.tenant is None:
-        return
-    required = permission_key(resource, "create")
-    if not ctx.has_permission(required):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Missing required permission: {required}",
-        )
+    require_resource_access(ctx, resource, "create")
 
 
 def _detect_import_format(filename: str) -> str:

@@ -209,6 +209,13 @@ class CoreAdminConfig:
     #: source can't lock a victim out everywhere. Opt-in because it also resets
     #: the counter per IP. The IP honours ``trusted_proxy_count``.
     login_rate_limit_by_ip: bool = False
+    #: Gate the admin surface by superadmin when there is no tenant context
+    #: (single-tenant deployments / root scope). ``True`` (default, secure):
+    #: without a tenant-role system to authorize against, only superadmins may
+    #: use the admin CRUD/actions/import-export endpoints — any other
+    #: authenticated, active account is rejected with 403. ``False`` restores
+    #: the legacy behaviour where any authenticated caller has full access.
+    single_tenant_require_superadmin: bool = True
 
     # --- PR-10: production guards ---
     environment: Environment = "development"
@@ -329,6 +336,9 @@ class CoreAdminConfig:
             content_security_policy=os.getenv("ASTERION_CONTENT_SECURITY_POLICY") or None,
             trusted_proxy_count=_env_int("ASTERION_TRUSTED_PROXY_COUNT", 0),
             login_rate_limit_by_ip=_env_bool("ASTERION_LOGIN_RATE_LIMIT_BY_IP", False),
+            single_tenant_require_superadmin=_env_bool(
+                "ASTERION_SINGLE_TENANT_REQUIRE_SUPERADMIN", True
+            ),
             environment=_env_literal(
                 "ASTERION_ENVIRONMENT",
                 "development",

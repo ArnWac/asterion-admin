@@ -58,6 +58,23 @@ The CRUD router computes the required key per endpoint and calls
 `AdminContext.has_permission(required)` which delegates to the
 wildcard-aware helper.
 
+### Single-tenant / no-tenant scope
+
+Permission keys are a *tenant-role* concept. With no tenant context
+(single-tenant deployments, or root scope) there is no role system to gate
+by, so the admin surface (CRUD, actions, import/export) requires a
+**superadmin** by default — otherwise any authenticated, active account
+could manage everything. Controlled by
+`CoreAdminConfig.single_tenant_require_superadmin` (default `True`); set it
+`False` only if you deliberately want every authenticated caller to have
+full access.
+
+Note on revocation: clearing `is_superadmin` is re-evaluated on the next
+request, but it does **not** invalidate an already-issued JWT (the token
+stays valid until it expires). To cut existing sessions immediately, bump the
+user's `token_version` (logout-all) or set `is_active=False` (rejected on the
+next request).
+
 ## Input validation
 
 Every external identifier passes through

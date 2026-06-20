@@ -14,7 +14,7 @@ from asterion.audit import (
     record_audit_in_session,
     request_audit_kwargs,
 )
-from asterion.authz.permissions import permission_key
+from asterion.authz.permissions import require_resource_access
 from asterion.crud.services import (
     create_record,
     delete_record,
@@ -55,20 +55,9 @@ def _require_resource_permission(
     resource: str,
     action: str,
 ) -> None:
-    """Gate on ``ctx.permissions`` via the wildcard matcher.
-
-    No-op when there is no tenant context (single-tenant mode or
-    superadmin/root scope) — preserves the legacy behaviour where the
-    framework only enforces per-resource keys inside a tenant.
-    """
-    if ctx.tenant is None:
-        return
-    required = permission_key(resource, action)
-    if not ctx.has_permission(required):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Missing required permission: {required}",
-        )
+    """Authorize ``action`` on ``resource`` — see
+    :func:`asterion.authz.permissions.require_resource_access`."""
+    require_resource_access(ctx, resource, action)
 
 
 async def _audit_crud(

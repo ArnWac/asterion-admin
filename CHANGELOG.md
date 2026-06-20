@@ -17,6 +17,15 @@ shape change bumps `CONTRACT_VERSION`.
 ## [Unreleased]
 
 ### Fixed
+- **Single-tenant authorization:** with no tenant context (single-tenant
+  deployments / root scope) the admin CRUD/actions/import-export endpoints
+  previously allowed **any** authenticated, active account — `is_superadmin`
+  did not gate access. They now require a superadmin by default; the new
+  `single_tenant_require_superadmin` config (default `True`,
+  `ASTERION_SINGLE_TENANT_REQUIRE_SUPERADMIN`) opts back into the legacy
+  open behaviour. (Note: revoking `is_superadmin` does not retroactively
+  invalidate an already-issued token — bump the user's `token_version` or set
+  `is_active=False` to cut existing sessions.)
 - **Tenant isolation (PostgreSQL):** the request-scoped CRUD session
   (`get_async_session`) now issues `SET LOCAL search_path` to the resolved
   tenant's schema for the transaction. Previously only the

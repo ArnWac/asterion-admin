@@ -31,7 +31,7 @@ from asterion.audit import (
     record_audit_in_session,
     request_audit_kwargs,
 )
-from asterion.authz.permissions import permission_key
+from asterion.authz.permissions import require_resource_access
 from asterion.crud.query import coerce_primary_key_value, primary_key_column
 from asterion.db.dependencies import get_async_session
 from asterion.registry import ModelAdmin
@@ -93,14 +93,7 @@ def _require_permission(
     resource: str,
     action: str,
 ) -> None:
-    if ctx.tenant is None:
-        return  # root panel (superadmin) or no tenant context
-    required = permission_key(resource, action)
-    if not ctx.has_permission(required):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Missing required permission: {required}",
-        )
+    require_resource_access(ctx, resource, action)
 
 
 async def _resolve_records(

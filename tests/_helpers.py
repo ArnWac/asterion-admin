@@ -49,11 +49,17 @@ def override_admin_context(
 ) -> None:
     """Inject an :class:`AdminContext` into ``app`` for the duration of a test.
 
-    Defaults give an authenticated non-superadmin principal with no tenant
-    and no permissions, which is enough to clear the auth gate on every
-    migrated router. Pass ``tenant=…`` to exercise the permission-key path.
+    Defaults give an authenticated **superadmin** principal with no tenant and
+    no permissions — the authorized caller for the no-tenant (single-tenant)
+    admin surface, which now requires superadmin
+    (``single_tenant_require_superadmin``). Pass ``tenant=…`` (+ ``permissions``)
+    to exercise the per-resource permission-key path, or
+    ``principal=make_admin_principal(is_superadmin=False)`` to assert the
+    single-tenant 403.
     """
-    effective_principal = principal if principal is not None else make_admin_principal()
+    effective_principal = (
+        principal if principal is not None else make_admin_principal(is_superadmin=True)
+    )
 
     async def _override() -> AdminContext:
         return AdminContext(

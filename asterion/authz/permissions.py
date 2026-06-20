@@ -67,3 +67,59 @@ def assert_permission(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Missing required permission: {required_permission}",
         )
+
+
+def single_tenant_superadmin_required(ctx) -> bool:
+    """Whether admin access in *no-tenant* scope must be superadmin-gated.
+
+    With no tenant context (single-tenant deployments, or root scope) there is
+    no tenant-role/permission-key system to gate by, so by default the admin
+    surface requires a superadmin — otherwise any authenticated, active account
+    could manage everything. Controlled by
+    ``CoreAdminConfig.single_tenant_require_superadmin`` (default True); set it
+    False to restore the legacy "any authenticated caller" behaviour.
+
+    ``ctx`` is duck-typed (avoids importing :class:`AdminContext` here). The
+    flag is read from the request on the context; when no request/config is
+    reachable (e.g. a manually-built context in a unit test) it fails **safe**
+    to True.
+    """
+    req = getattr(ctx, "request", None)
+    if req is None:
+        return True
+    runtime = getattr(getattr(req, "app", None), "state", None)
+    runtime = getattr(runtime, "asterion", None)
+    cfg = getattr(runtime, "config", None)
+    return bool(getattr(cfg, "single_tenant_require_superadmin", True))
+
+
+def require_resource_access(ctx, resource: str, action: str) -> None:
+    """Central per-resource authorization gate for the admin endpoints.
+
+    * **Inside a tenant**: require the per-resource permission key
+      (``admin.<resource>.<action>``).
+    * **No tenant context** (single-tenant deployments / root scope): there is
+      no tenant-role system, so require a superadmin **or** an explicitly
+      granted permission key. The default permission provider grants
+      non-superadmins nothing in single-tenant, so this is effectively
+      superadmin-only there — which is the point: a logged-in account is not an
+      admin just by existing. Set ``single_tenant_require_superadmin=False`` to
+      restore the legacy "any authenticated caller" behaviour.
+
+    ``ctx`` is duck-typed (``tenant``, ``is_superadmin``, ``has_permission``).
+    """
+    required = permission_key(resource, action)
+    if ctx.tenant is None:
+        if not single_tenant_superadmin_required(ctx):
+            return
+        if getattr(ctx, "is_superadmin", False) or ctx.has_permission(required):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Superadmin privileges required.",
+        )
+    if not ctx.has_permission(required):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Missing required permission: {required}",
+        )

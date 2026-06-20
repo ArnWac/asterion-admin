@@ -101,7 +101,7 @@ async def client():
     async def _override_ctx() -> AdminContext:
         return AdminContext(
             request=None,
-            principal=AdminPrincipal(id="u1", email="t@x"),
+            principal=AdminPrincipal(id="u1", email="t@x", is_superadmin=True),
             tenant=None,
             permissions=frozenset({"admin.*"}),
         )
