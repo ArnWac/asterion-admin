@@ -26,7 +26,6 @@ from alembic import op
 
 from asterion.models.base import GUID
 
-
 # Alembic identifiers
 revision = "0001_initial_tenant"
 down_revision = None

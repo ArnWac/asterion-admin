@@ -21,14 +21,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 def _public_cfg(db_url: str) -> Config:
     cfg = Config(str(PROJECT_ROOT / "alembic_shared.ini"))
     cfg.set_main_option("sqlalchemy.url", db_url)
-    cfg.set_main_option("script_location", str(PROJECT_ROOT / "migrations" / "shared"))
+    cfg.set_main_option(
+        "script_location", str(PROJECT_ROOT / "asterion" / "_migrations" / "shared")
+    )
     return cfg
 
 
 def _tenant_cfg(db_url: str) -> Config:
     cfg = Config(str(PROJECT_ROOT / "alembic_tenant.ini"))
     cfg.set_main_option("sqlalchemy.url", db_url)
-    cfg.set_main_option("script_location", str(PROJECT_ROOT / "migrations" / "tenant"))
+    cfg.set_main_option(
+        "script_location", str(PROJECT_ROOT / "asterion" / "_migrations" / "tenant")
+    )
     return cfg
 
 

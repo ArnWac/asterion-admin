@@ -16,7 +16,19 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-20
+
+First tagged release — the dependency-installable cut. Notably, asterion's
+Alembic migrations now ship inside the wheel, so a pip-installed asterion can
+run `asterion db upgrade-public` (the prerequisite for embedding it as a
+non-editable dependency in a downstream app). Pin it via
+`asterion-admin[postgres] @ git+https://github.com/ArnWac/asterion-admin@v0.1.1`.
+
 ### Fixed
+- **Packaging:** `python-multipart` is now a **core** runtime dependency (was
+  dev-only). The always-mounted storage upload route requires it at import, so
+  a clean `pip install asterion-admin` previously failed to even `import
+  asterion`. This blocked the non-editable/dependency install path.
 - **Single-tenant authorization:** with no tenant context (single-tenant
   deployments / root scope) the admin CRUD/actions/import-export endpoints
   previously allowed **any** authenticated, active account — `is_superadmin`
@@ -34,6 +46,19 @@ shape change bumps `CONTRACT_VERSION`.
   on SQLite by `schema_translate_map`.
 
 ### Added
+- **Bundled migrations + cwd-independent CLI:** asterion's Alembic migrations
+  now live inside the package (`asterion/_migrations/{shared,tenant}`) and ship
+  in the wheel via `package-data`, so a pip-installed asterion (no repo
+  checkout) can run them. `asterion db upgrade-public` resolves and applies the
+  bundled **shared** migrations package-relatively from any cwd.
+  `db upgrade-tenant`/`upgrade-tenants` keep the tenant tree app-owned and
+  resolve it as: explicit `--config/-c` (or `ASTERION_ALEMBIC_TENANT_INI`) →
+  project-local `alembic_tenant.ini` → asterion's bundled tenant migrations.
+- **Extension-free custom permissions:** `create_admin(permissions=...)` accepts
+  an iterable of keys or a `Callable[[PermissionRegistry], None]`, registered
+  before the registries freeze. The keys merge with extension-registered ones in
+  `generate_permission_keys()` and land in the catalog on `permissions sync` —
+  no `AdminExtension` required. Duplicates (incl. with extensions) are idempotent.
 - `tests/postgres/test_http_tenant_isolation.py` — end-to-end tenant
   isolation test over the HTTP CRUD path (create under tenant A is invisible
   to tenant B).

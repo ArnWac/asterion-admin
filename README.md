@@ -130,7 +130,31 @@ tests, never for production.
 
 ---
 
+## Custom permissions (no extension needed)
+
+An app that embeds asterion can declare its own permission keys directly on
+`create_admin` — no `AdminExtension` required. They're merged with the
+auto-derived `admin.<resource>.*` keys and picked up by `permissions sync`:
+
+```python
+app = create_admin(
+    config=CoreAdminConfig.from_env(),
+    register=register,
+    permissions=["timeclock.employee.read", "timeclock.shift.close"],
+    # or a callback: permissions=lambda reg: reg.register("timeclock.shift.close")
+)
+```
+
+See [`docs/extensions.md`](docs/extensions.md#declaring-permission-keys-without-an-extension).
+
+---
+
 ## CLI
+
+asterion's own migrations ship inside the wheel, so `db upgrade-public` works
+from a pip-installed package (no repo checkout, any cwd). The tenant tree is
+owned by your app: `db upgrade-tenant` prefers a local `alembic_tenant.ini`,
+falling back to asterion's bundled tenant migrations.
 
 ```bash
 asterion --help

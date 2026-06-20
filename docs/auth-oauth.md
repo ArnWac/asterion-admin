@@ -87,8 +87,9 @@ The framework ships no migration for the extension's table — see
 your project:
 
 ```bash
-# Make sure migrations/shared/env.py imports the extension so
-# autogenerate sees its tables. Add this line near the top:
+# Make sure your shared env.py imports the extension so autogenerate sees
+# its tables (asterion/_migrations/shared/env.py in the asterion repo, or
+# your app's own shared migrations env when embedding). Add near the top:
 #
 #     import asterion.extensions.auth_oauth  # noqa: F401
 
