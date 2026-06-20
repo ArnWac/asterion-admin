@@ -10,11 +10,14 @@ from sqlalchemy.orm import DeclarativeBase
 
 from asterion.actions import AdminAction, BulkDeleteAction
 from asterion.authz.catalog import (
+    BUILTIN_PERMISSION_KEYS,
     REGISTRY_SOURCE,
     generate_permission_keys,
     load_permission_keys,
     sync_permission_catalog,
 )
+
+_BUILTINS = set(BUILTIN_PERMISSION_KEYS)
 from asterion.models.base import GlobalModel
 from asterion.models.permission_catalog import PermissionCatalog
 from asterion.registry import AdminRegistry, ModelAdmin
@@ -64,15 +67,18 @@ class WidgetWithCustomAction(ModelAdmin):
 # --- generate_permission_keys ---
 
 
-def test_generate_empty_for_empty_registry():
-    assert generate_permission_keys(AdminRegistry()) == set()
+def test_generate_yields_builtin_keys_for_empty_registry():
+    # Even with no ModelAdmins, the framework-owned keys (tenant member-
+    # management) are always present so they're assignable + seeded.
+    assert generate_permission_keys(AdminRegistry()) == _BUILTINS
+    assert "admin.tenant_members.create" in _BUILTINS
 
 
 def test_generate_yields_five_crud_keys_per_resource():
     registry = AdminRegistry()
     registry.register(ProjectAdmin)
     keys = generate_permission_keys(registry)
-    assert keys == {
+    assert keys - _BUILTINS == {
         "admin.projects.list",
         "admin.projects.read",
         "admin.projects.create",
@@ -86,7 +92,7 @@ def test_generate_includes_declared_admin_actions():
     registry.register(WidgetAdmin)
     keys = generate_permission_keys(registry)
     # BulkDeleteAction.name == "delete" → already in CRUD set, so 5 unique keys
-    assert keys == {
+    assert keys - _BUILTINS == {
         "admin.widgets.list",
         "admin.widgets.read",
         "admin.widgets.create",
@@ -110,7 +116,7 @@ def test_generate_multiple_resources():
     keys = generate_permission_keys(registry)
     assert "admin.projects.list" in keys
     assert "admin.widgets.list" in keys
-    assert len(keys) == 10  # 5 + 5
+    assert len(keys - _BUILTINS) == 10  # 5 + 5
 
 
 def test_generate_does_not_yield_wildcards():
@@ -152,7 +158,7 @@ def test_generate_works_with_only_permission_registry():
     perm_reg.register("oauth.identities.list")
 
     keys = generate_permission_keys(AdminRegistry(), perm_reg)
-    assert keys == {"oauth.identities.list"}
+    assert keys - _BUILTINS == {"oauth.identities.list"}
 
 
 def test_generate_unchanged_when_permission_registry_omitted():

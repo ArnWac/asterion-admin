@@ -108,6 +108,60 @@ The bootstrap step:
 Steps 4–6 are idempotent; step 2–3 use `IF NOT EXISTS` / Alembic
 versioning so re-running is safe.
 
+## Member management (tenant-scoped)
+
+Once a tenant exists, its operators onboard further admin users themselves —
+no superadmin or CLI round-trip per member. The endpoints live under the admin
+API prefix and are strictly scoped to the caller's tenant:
+
+| Method | Path | Permission key |
+|---|---|---|
+| `GET` | `/api/v1/admin/_members` | `admin.tenant_members.list` |
+| `POST` | `/api/v1/admin/_members` | `admin.tenant_members.create` |
+| `PATCH` | `/api/v1/admin/_members/{membership_id}` | `admin.tenant_members.update` |
+| `DELETE` | `/api/v1/admin/_members/{membership_id}` | `admin.tenant_members.delete` |
+
+These keys are built-in (always in the catalog) and bootstrap seeds them onto
+`owner` (via `admin.*`) and `admin`; `viewer` gets only `.list`.
+
+`POST` takes `{email, full_name?, role_ids?}`:
+
+- **Existing global user** → the membership is created/reactivated
+  (idempotent), roles assigned. Response `{"invited": false, ...}`.
+- **Unknown email** → an **inactive, passwordless** global `User` is created,
+  the membership is added, and a single-use **invite token** is issued. The
+  raw token is handed to the configured `InviteNotifier` (see below). Response
+  `{"invited": true, ...}`.
+
+The invitee completes onboarding at the existing
+`POST /api/v1/auth/password-reset/confirm` with their token + a new password —
+which sets the password **and activates** the account.
+
+Cross-tenant isolation: a `membership_id` from another tenant resolves to
+`404` (never `403`), so the endpoint never confirms out-of-tenant rows exist.
+`DELETE` removes the membership and its role links but leaves the global
+`User` intact — it may belong to other tenants.
+
+### Invite delivery
+
+The framework owns the invite token lifecycle but not delivery (email/SMS is
+app-specific), so it goes through an `InviteNotifier` you supply:
+
+```python
+from asterion import create_admin
+
+class EmailInviteNotifier:
+    async def send_invite(self, *, email, token, tenant_slug=None, request=None):
+        link = f"https://app.example.com/accept-invite?token={token}"
+        await send_email(to=email, subject="You're invited", body=link)
+
+app = create_admin(invite_notifier=EmailInviteNotifier())
+```
+
+The default `LoggingInviteNotifier` logs the token at WARNING for local
+development — **unsafe for production** (tokens in logs are a credential leak).
+Invite tokens last `ASTERION_INVITE_TOKEN_EXPIRE_MINUTES` (default 7 days).
+
 ## SQLite caveat
 
 SQLite has no schemas. On SQLite:

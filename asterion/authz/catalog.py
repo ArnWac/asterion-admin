@@ -26,6 +26,22 @@ from asterion.security.validation import (
 REGISTRY_SOURCE = "registry"
 DEFAULT_CRUD_ACTIONS: tuple[str, ...] = ("list", "read", "create", "update", "delete")
 
+#: Framework-owned permission keys with no backing ``ModelAdmin``. Tenant
+#: member-management (``asterion.admin.member_router``) acts on the global
+#: ``TenantMembership`` table — deliberately NOT exposed as a generic CRUD
+#: admin (that would leak cross-tenant rows through ``/{resource}``), so its
+#: keys are injected into the catalog here. This keeps them assignable in the
+#: permission matrix and seeded onto the default ``admin`` role by bootstrap
+#: (``owner`` already covers them via ``admin.*``; ``viewer`` gets only
+#: ``.list``).
+BUILTIN_PERMISSION_KEYS: tuple[str, ...] = (
+    "admin.tenant_members.list",
+    "admin.tenant_members.read",
+    "admin.tenant_members.create",
+    "admin.tenant_members.update",
+    "admin.tenant_members.delete",
+)
+
 
 @dataclass(frozen=True)
 class SyncResult:
@@ -80,6 +96,10 @@ def generate_permission_keys(
     the catalog is the list of concrete permissions a UI might display.
     """
     keys: set[str] = set()
+    # Framework-owned keys that have no ModelAdmin (e.g. tenant member-
+    # management) — always present so they're assignable + seeded.
+    for key in BUILTIN_PERMISSION_KEYS:
+        keys.add(validate_permission_key(key))
     for admin in registry.all():
         resource = admin.model_name
         for key in _crud_keys(resource):

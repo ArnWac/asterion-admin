@@ -40,6 +40,7 @@ def create_admin(
     permission_provider: PermissionProvider | None = None,
     tenant_provider: TenantProvider | None = None,
     password_reset_notifier=None,
+    invite_notifier=None,
     storage=None,
     login_rate_limiter=None,
     permissions: Iterable[str] | Callable[[PermissionRegistry], None] | None = None,
@@ -85,6 +86,13 @@ def create_admin(
 
         password_reset_notifier = LoggingPasswordResetNotifier()
 
+    # Member-invite delivery (tenant member-management). Same dev-default /
+    # production-override split as the password-reset notifier.
+    if invite_notifier is None:
+        from asterion.auth.invite import LoggingInviteNotifier
+
+        invite_notifier = LoggingInviteNotifier()
+
     # Storage backend (Roadmap P4). Three paths:
     #   1. explicit ``storage=`` wins (e.g. S3 from an extension)
     #   2. ``CoreAdminConfig.storage_root`` set → auto-wire LocalFileStorage
@@ -106,6 +114,7 @@ def create_admin(
         ),
         providers=providers,
         password_reset_notifier=password_reset_notifier,
+        invite_notifier=invite_notifier,
         storage=storage,
         login_rate_limiter=login_rate_limiter,
     )
@@ -117,6 +126,10 @@ def create_admin(
     from asterion.auth.password_reset import PasswordResetNotifier
 
     runtime.notifiers.register(PasswordResetNotifier, password_reset_notifier)
+
+    from asterion.auth.invite import InviteNotifier
+
+    runtime.notifiers.register(InviteNotifier, invite_notifier)
 
     # Register extensions up front so the lifespan composer can see them.
     runtime.extensions.register_all(extensions)

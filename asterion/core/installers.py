@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from asterion.actions.router import router as actions_router
 from asterion.admin.login_contract_router import router as login_contract_router
+from asterion.admin.member_router import router as member_router
 from asterion.admin.navigation_router import router as navigation_router
 from asterion.admin.permission_matrix_router import (
     router as permission_matrix_router,
@@ -176,6 +177,14 @@ def install_routes(
         permission_matrix_router,
         prefix=config.admin_api_prefix,
         tags=["admin-permission-matrix"],
+    )
+
+    # Tenant member-management. Same static-prefix-before-dynamic-CRUD
+    # constraint — ``_members`` must beat ``/{resource}``.
+    app.include_router(
+        member_router,
+        prefix=config.admin_api_prefix,
+        tags=["admin-members"],
     )
 
     # Actions before CRUD so /{resource}/_actions/{action} is matched first.

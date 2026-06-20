@@ -16,6 +16,44 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-21
+
+Adds tenant **member management** so a tenant operator can onboard admin users
+themselves, instead of every new member having to go through a superadmin or
+the CLI.
+
+### Added
+- **Tenant member-management endpoints** (`asterion.admin.member_router`),
+  mounted under the admin API prefix and strictly scoped to the caller's
+  tenant:
+  - `GET /api/v1/admin/_members` — list the tenant's members + their roles.
+  - `POST /api/v1/admin/_members` — add a member by email. An existing global
+    user is linked (idempotent); an unknown email creates an **inactive,
+    passwordless** user and issues a single-use **invite** token. Optional
+    `role_ids` assign tenant roles on add.
+  - `PATCH /api/v1/admin/_members/{id}` — activate/deactivate the membership
+    and/or replace its tenant-role set.
+  - `DELETE /api/v1/admin/_members/{id}` — remove the membership (the global
+    user is left intact — it may belong to other tenants).
+  Gated by new built-in permission keys `admin.tenant_members.{list,read,
+  create,update,delete}`, seeded onto the default `owner`/`admin` roles by
+  bootstrap. Cross-tenant ids resolve to 404, never leaking other tenants'
+  rows.
+- **Invite delivery SPI** (`asterion.auth.invite.InviteNotifier`,
+  `LoggingInviteNotifier` default), wired via
+  `create_admin(invite_notifier=...)` — same "framework owns the token, app
+  owns delivery" split as the password-reset notifier. Invites reuse the
+  single-use `password_reset_tokens` machinery.
+- `CoreAdminConfig.invite_token_expire_minutes`
+  (`ASTERION_INVITE_TOKEN_EXPIRE_MINUTES`, default 7 days).
+
+### Changed
+- `POST /auth/password-reset/confirm` now **activates** the account on a
+  successful password set. For a normal reset this is a no-op (the request
+  endpoint only issues tokens to already-active users); for an invited user it
+  is what completes onboarding. This is the invite-acceptance path — an invited
+  user redeems their token at the existing confirm endpoint.
+
 ## [0.1.2] - 2026-06-20
 
 Completes the dependency-install story for **tenant provisioning**. v0.1.1

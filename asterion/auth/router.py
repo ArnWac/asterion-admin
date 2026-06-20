@@ -472,6 +472,13 @@ async def password_reset_confirm(
         )
 
     user.hashed_password = hash_password(payload.new_password)
+    # Activate the account on a successful password set. For a normal reset
+    # the user is already active (the request endpoint only issues tokens to
+    # active users), so this is a no-op. For a member **invite** — where the
+    # only way to obtain a token is an authorized tenant operator inviting a
+    # freshly-created, inactive user — completing the flow is what onboards
+    # them, so activation belongs here.
+    user.is_active = True
     # Invalidate every existing session — a reset implies the old
     # credentials may be compromised.
     user.token_version = (user.token_version or 0) + 1
