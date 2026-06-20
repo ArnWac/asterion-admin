@@ -16,6 +16,32 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-20
+
+Completes the dependency-install story for **tenant provisioning**. v0.1.1
+made `db upgrade-public` work from a pip-installed wheel; this release does
+the same for `asterion tenant create` / `bootstrap_tenant`, which previously
+broke outside a repo checkout.
+
+### Fixed
+- **Tenant bootstrap on a pip-installed asterion:** `bootstrap_tenant` ran the
+  tenant migrations via a subprocess pointed at a hard-coded repo-root
+  `alembic_tenant.ini` (`Path(__file__).parent.parent.parent`), which does not
+  exist for a non-editable install — tenant provisioning raised
+  `FileNotFoundError`. It now resolves the tenant tree with the same
+  package-relative / cwd-aware logic as the `db upgrade-tenant(s)` CLI
+  (project-local `alembic_tenant.ini` wins, else asterion's bundled tenant
+  migrations) and applies it **in-process** via `alembic.command.upgrade` run
+  off the event loop with `asyncio.to_thread` (no subprocess, no nested event
+  loop).
+
+### Changed
+- The Alembic resolution helpers (`bundled_migrations_path`,
+  `shared_alembic_config`, `tenant_alembic_config`, `set_x_schema`) moved from
+  `asterion.cli.main` (where they were private `_`-prefixed) to a shared
+  `asterion.db.alembic_support` module, now used by both the CLI and tenant
+  bootstrap. No public-API change (the CLI helpers were always private).
+
 ## [0.1.1] - 2026-06-20
 
 First tagged release — the dependency-installable cut. Notably, asterion's

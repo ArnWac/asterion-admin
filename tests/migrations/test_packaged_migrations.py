@@ -15,7 +15,7 @@ from sqlalchemy import create_engine, inspect
 from typer.testing import CliRunner
 
 from asterion.cli import app
-from asterion.cli.main import _bundled_migrations_path, _tenant_alembic_config
+from asterion.db.alembic_support import bundled_migrations_path, tenant_alembic_config
 
 runner = CliRunner()
 
@@ -24,13 +24,13 @@ runner = CliRunner()
 
 
 def test_shared_migrations_are_packaged():
-    versions = _bundled_migrations_path("shared") / "versions"
+    versions = bundled_migrations_path("shared") / "versions"
     names = {p.name for p in versions.glob("*.py")}
     assert "0001_initial.py" in names, f"shared versions not packaged: {names}"
 
 
 def test_tenant_migrations_are_packaged():
-    versions = _bundled_migrations_path("tenant") / "versions"
+    versions = bundled_migrations_path("tenant") / "versions"
     names = {p.name for p in versions.glob("*.py")}
     assert "0001_initial.py" in names, f"tenant versions not packaged: {names}"
 
@@ -76,7 +76,7 @@ def test_tenant_config_prefers_explicit_ini(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)  # even with a local one present, explicit wins
     (tmp_path / "alembic_tenant.ini").write_text("[alembic]\n", encoding="utf-8")
 
-    cfg = _tenant_alembic_config(str(explicit))
+    cfg = tenant_alembic_config(str(explicit))
     assert cfg.config_file_name == str(explicit)
 
 
@@ -85,7 +85,7 @@ def test_tenant_config_prefers_local_ini(tmp_path, monkeypatch):
     local.write_text("[alembic]\nscript_location = migrations/tenant\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
-    cfg = _tenant_alembic_config(None)
+    cfg = tenant_alembic_config(None)
     assert cfg.config_file_name == str(local)
 
 
@@ -93,9 +93,9 @@ def test_tenant_config_falls_back_to_bundled(tmp_path, monkeypatch):
     monkeypatch.delenv("ASTERION_ALEMBIC_TENANT_INI", raising=False)
     monkeypatch.chdir(tmp_path)  # no local alembic_tenant.ini here
 
-    cfg = _tenant_alembic_config(None)
+    cfg = tenant_alembic_config(None)
     assert cfg.config_file_name is None  # built programmatically, no ini
-    assert cfg.get_main_option("script_location") == str(_bundled_migrations_path("tenant"))
+    assert cfg.get_main_option("script_location") == str(bundled_migrations_path("tenant"))
 
 
 def test_tenant_config_explicit_env_var(tmp_path, monkeypatch):
@@ -104,5 +104,5 @@ def test_tenant_config_explicit_env_var(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTERION_ALEMBIC_TENANT_INI", str(explicit))
     monkeypatch.chdir(tmp_path)
 
-    cfg = _tenant_alembic_config(None)
+    cfg = tenant_alembic_config(None)
     assert cfg.config_file_name == str(explicit)

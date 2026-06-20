@@ -8,11 +8,15 @@ by the integration tests against a real Postgres instance.
 
 from __future__ import annotations
 
+import threading
+
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+import asterion.tenancy.bootstrap as bootstrap_mod
 from asterion.auth.password import hash_password
+from asterion.db.alembic_support import bundled_migrations_path
 from asterion.models.base import GlobalModel, TenantBase
 from asterion.models.permission_catalog import PermissionCatalog
 from asterion.models.tenant_rbac import (
@@ -265,6 +269,49 @@ async def test_seed_assignment_idempotent(session):
         )
     ).fetchall()
     assert len(rows) == 1
+
+
+# --- bootstrap_tenant on non-Postgres is a no-op ---
+
+
+# --- _run_tenant_migrations resolves the bundled tenant tree in-process ---
+
+
+@pytest.mark.asyncio
+async def test_run_tenant_migrations_in_process(tmp_path, monkeypatch):
+    """The tenant provisioning step runs Alembic in-process (no subprocess,
+    no hard-coded repo path), off the event loop, against the resolved tenant
+    tree. With no project-local ``alembic_tenant.ini`` it falls back to
+    asterion's bundled migrations — the pip-install story the old subprocess
+    path broke."""
+    monkeypatch.delenv("ASTERION_ALEMBIC_TENANT_INI", raising=False)
+    monkeypatch.chdir(tmp_path)  # no local alembic_tenant.ini -> bundled
+
+    captured: dict = {}
+    main_thread = threading.get_ident()
+
+    def fake_upgrade(cfg, revision):
+        captured["thread"] = threading.get_ident()
+        captured["revision"] = revision
+        captured["script_location"] = cfg.get_main_option("script_location")
+        captured["url"] = cfg.get_main_option("sqlalchemy.url")
+        captured["x"] = list(cfg.cmd_opts.x)
+
+    import alembic.command as alembic_command
+
+    monkeypatch.setattr(alembic_command, "upgrade", fake_upgrade)
+
+    await bootstrap_mod._run_tenant_migrations(
+        "tenant_acme",
+        database_url="postgresql+asyncpg://u:p@h/db",
+    )
+
+    assert captured["revision"] == "head"
+    assert captured["url"] == "postgresql+asyncpg://u:p@h/db"
+    assert "schema=tenant_acme" in captured["x"]
+    assert captured["script_location"] == str(bundled_migrations_path("tenant"))
+    # alembic.command calls asyncio.run internally, so it must run off-loop.
+    assert captured["thread"] != main_thread
 
 
 # --- bootstrap_tenant on non-Postgres is a no-op ---

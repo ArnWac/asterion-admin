@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-import os
 import subprocess
 import sys
 from datetime import UTC
@@ -24,6 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.auth.password import hash_password
 from asterion.core.config import CoreAdminConfig
+from asterion.db.alembic_support import (
+    set_x_schema,
+    shared_alembic_config,
+    tenant_alembic_config,
+)
 from asterion.db.session import DatabaseManager
 from asterion.models.tenant import Tenant
 from asterion.models.user import User
@@ -285,70 +289,6 @@ def _alembic_ini(env: str) -> str:
     return "alembic_shared.ini" if env == "shared" else "alembic_tenant.ini"
 
 
-def _bundled_migrations_path(env: str) -> Path:
-    """Filesystem path to asterion's bundled Alembic migrations for ``env``
-    (``"shared"`` or ``"tenant"``), resolved **package-relatively**.
-
-    Works from any cwd and from a pip-installed wheel — not just the repo
-    checkout — because the migrations ship as package data under
-    ``asterion/_migrations/`` (see ``[tool.setuptools.package-data]``).
-    """
-    from importlib.resources import files
-
-    return Path(str(files("asterion").joinpath("_migrations", env)))
-
-
-def _shared_alembic_config():
-    """Alembic ``Config`` for asterion's bundled SHARED (public) migrations.
-
-    asterion owns the shared tree (users, tenants, audit, tokens, 2FA,
-    password_reset), so this always points at the bundled migrations regardless
-    of cwd. ``env.py`` reads the DB URL from ``ASTERION_DATABASE_URL`` /
-    ``DATABASE_URL``.
-    """
-    from alembic.config import Config
-
-    cfg = Config()
-    cfg.set_main_option("script_location", str(_bundled_migrations_path("shared")))
-    return cfg
-
-
-def _tenant_alembic_config(explicit_ini: str | None = None):
-    """Resolve the Alembic ``Config`` for the TENANT tree.
-
-    The tenant tree is owned by the **downstream app** (its domain tables live
-    alongside asterion's ``tenant_rbac``), so we do NOT hard-wire asterion's
-    bundled tenant migrations. Resolution order:
-
-    1. an explicit ``--config`` / ``-c`` path, or ``ASTERION_ALEMBIC_TENANT_INI``;
-    2. a project-local ``alembic_tenant.ini`` in the current directory
-       (the app owns the tenant migrations tree);
-    3. fall back to asterion's bundled tenant migrations (pure-asterion
-       deployments and asterion's own tests).
-    """
-    from alembic.config import Config
-
-    candidate = explicit_ini or os.environ.get("ASTERION_ALEMBIC_TENANT_INI")
-    if candidate:
-        return Config(candidate)
-    local = Path.cwd() / "alembic_tenant.ini"
-    if local.exists():
-        return Config(str(local))
-    cfg = Config()
-    cfg.set_main_option("script_location", str(_bundled_migrations_path("tenant")))
-    return cfg
-
-
-def _set_x_schema(cfg, schema: str) -> None:
-    """Pass ``-x schema=<schema>`` to the in-process alembic ``env.py``."""
-    from argparse import Namespace
-
-    existing = getattr(cfg, "cmd_opts", None)
-    x = list(getattr(existing, "x", None) or [])
-    x.append(f"schema={schema}")
-    cfg.cmd_opts = Namespace(x=x)
-
-
 @migrate_app.command("generate")
 def migrate_generate(
     message: str = typer.Option("auto", "-m", "--message", help="Migration message"),
@@ -441,7 +381,7 @@ def db_upgrade_public():
     from alembic import command
 
     try:
-        command.upgrade(_shared_alembic_config(), "head")
+        command.upgrade(shared_alembic_config(), "head")
     except Exception as exc:
         typer.echo(f"[db] upgrade-public failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -461,7 +401,7 @@ def db_upgrade_tenant(
 
     Resolves the tenant's schema_name via the slug and passes it to alembic as
     ``-x schema=<schema_name>``. The tenant migrations tree is owned by the
-    downstream app — see :func:`_tenant_alembic_config` for the resolution
+    downstream app — see :func:`asterion.db.alembic_support.tenant_alembic_config` for the resolution
     order (explicit ``-c`` > local ``alembic_tenant.ini`` > asterion's bundled
     tenant migrations).
     """
@@ -476,8 +416,8 @@ def db_upgrade_tenant(
     from asterion.tenancy.schema_names import make_tenant_schema_name
 
     schema_name = make_tenant_schema_name(validated)
-    cfg = _tenant_alembic_config(config)
-    _set_x_schema(cfg, schema_name)
+    cfg = tenant_alembic_config(config)
+    set_x_schema(cfg, schema_name)
     try:
         command.upgrade(cfg, "head")
     except Exception as exc:
@@ -505,8 +445,8 @@ def db_upgrade_tenants(
     failures: list[str] = []
     for slug, schema_name in tenants:
         typer.echo(f"[upgrade] {slug} ({schema_name})")
-        cfg = _tenant_alembic_config(config)
-        _set_x_schema(cfg, schema_name)
+        cfg = tenant_alembic_config(config)
+        set_x_schema(cfg, schema_name)
         try:
             command.upgrade(cfg, "head")
         except Exception as exc:

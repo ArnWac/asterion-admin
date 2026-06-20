@@ -8,10 +8,8 @@ it can be exercised against SQLite in unit tests.
 
 from __future__ import annotations
 
-import subprocess
-import sys
+import asyncio
 import uuid
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select, text
@@ -208,27 +206,25 @@ async def provision_tenant_schema(
     await public_db.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}"'))
 
 
-def _run_tenant_migrations(schema_name: str) -> None:
-    ini_path = Path(__file__).parent.parent.parent / "alembic_tenant.ini"
-    if not ini_path.exists():
-        raise FileNotFoundError(f"alembic_tenant.ini not found at {ini_path}")
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "alembic",
-            "-c",
-            str(ini_path),
-            "-x",
-            f"schema={schema_name}",
-            "upgrade",
-            "head",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Tenant migration failed for schema {schema_name!r}:\n{result.stderr}")
+async def _run_tenant_migrations(schema_name: str, *, database_url: str) -> None:
+    """Apply the tenant Alembic migrations against ``schema_name``.
+
+    Runs in-process (no subprocess) via the shared resolver, so a
+    pip-installed asterion with no repo checkout still provisions tenants:
+    the tenant tree is resolved package-relatively / cwd-aware exactly like
+    the ``db upgrade-tenant(s)`` CLI (project-local ``alembic_tenant.ini``
+    wins, else asterion's bundled tenant migrations). ``alembic.command``
+    calls ``asyncio.run`` internally, so it must run off the event loop —
+    hence ``asyncio.to_thread``.
+    """
+    from alembic import command
+
+    from asterion.db.alembic_support import set_x_schema, tenant_alembic_config
+
+    cfg = tenant_alembic_config()
+    cfg.set_main_option("sqlalchemy.url", database_url)
+    set_x_schema(cfg, schema_name)
+    await asyncio.to_thread(command.upgrade, cfg, "head")
 
 
 async def bootstrap_tenant(
@@ -283,7 +279,7 @@ async def bootstrap_tenant(
     await provision_tenant_schema(public_db, schema_name=schema_name)
     await public_db.commit()
 
-    _run_tenant_migrations(schema_name)
+    await _run_tenant_migrations(schema_name, database_url=database_url)
 
     db = DatabaseManager(database_url)
     try:
