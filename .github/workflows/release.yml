@@ -2,7 +2,16 @@ name: Release
 
 # Tag-triggered release (Review R10). Push an annotated tag like ``v0.1.0`` to
 # build the distribution, smoke-test the built wheel in a clean environment,
-# and publish to PyPI via Trusted Publishing (no API token stored).
+# and (opt-in) publish to PyPI via Trusted Publishing (no API token stored).
+#
+# PyPI publishing is OFF by default: downstream apps pin asterion via the git
+# tag (``... @ git+https://github.com/ArnWac/asterion-admin@vX.Y.Z``), so no
+# PyPI release is required. The build + clean-venv smoke jobs are the real
+# release gate. To turn publishing on later, set up Trusted Publishing for the
+# ``asterion-admin`` project on PyPI and add a repository variable
+# ``PUBLISH_TO_PYPI = true`` (Settings → Secrets and variables → Actions →
+# Variables). Until then the publish job is skipped, so a tag push shows a
+# clean (green) Release run.
 on:
   push:
     tags:
@@ -52,6 +61,11 @@ jobs:
     name: Publish to PyPI (Trusted Publishing)
     needs: [build, smoke]
     runs-on: ubuntu-latest
+    # Opt-in: skipped unless the repo variable PUBLISH_TO_PYPI is "true".
+    if: ${{ vars.PUBLISH_TO_PYPI == 'true' }}
+    # Belt-and-suspenders: even when enabled before Trusted Publishing is fully
+    # configured, a publish failure must not turn the whole Release run red.
+    continue-on-error: true
     environment: pypi
     permissions:
       # Required for PyPI Trusted Publishing (OIDC); no API token needed.
