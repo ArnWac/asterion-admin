@@ -76,6 +76,10 @@ class AdminRuntime:
     #: Also auto-registered into :attr:`notifiers` so generic lookups
     #: (Roadmap P4.5) find it.
     password_reset_notifier: Any = None
+    #: Delivers member-invite links (tenant member-management). Defaults to
+    #: the dev-only logging notifier; apps pass a real one to
+    #: ``create_admin``. Also auto-registered into :attr:`notifiers`.
+    invite_notifier: Any = None
     #: Login rate-limiter backend (Review R7). ``None`` → the auth router
     #: falls back to its in-memory, single-process default. Multi-worker
     #: deployments pass a shared backend (e.g.

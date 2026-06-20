@@ -129,6 +129,12 @@ class CoreAdminConfig:
     #: Password-reset token lifetime (Roadmap 3.3). Default 30 minutes
     #: — short because the link grants account access.
     password_reset_token_expire_minutes: int = 30
+    #: Member-invite token lifetime. Default 7 days — an invited user
+    #: needs longer than a reset to notice the email and set a password.
+    #: Shares the single-use ``password_reset_tokens`` machinery; the
+    #: invitee completes onboarding at ``/auth/password-reset/confirm``,
+    #: which also activates the account.
+    invite_token_expire_minutes: int = 60 * 24 * 7
     password_min_length: int = 8
 
     #: Filesystem root for :class:`LocalFileStorage` (Roadmap P4).
@@ -271,6 +277,10 @@ class CoreAdminConfig:
                 "ASTERION_PASSWORD_RESET_TOKEN_EXPIRE_MINUTES",
                 30,
             ),
+            invite_token_expire_minutes=_env_int(
+                "ASTERION_INVITE_TOKEN_EXPIRE_MINUTES",
+                60 * 24 * 7,
+            ),
             password_min_length=_env_int(
                 "ASTERION_PASSWORD_MIN_LENGTH",
                 8,
@@ -387,6 +397,9 @@ class CoreAdminConfig:
         if self.password_reset_token_expire_minutes <= 0:
             raise ValueError("password_reset_token_expire_minutes must be greater than 0")
 
+        if self.invite_token_expire_minutes <= 0:
+            raise ValueError("invite_token_expire_minutes must be greater than 0")
+
         if self.password_min_length < 8:
             raise ValueError("password_min_length must be at least 8")
 
@@ -489,6 +502,7 @@ class CoreAdminConfig:
             "access_token_expire_minutes": self.access_token_expire_minutes,
             "refresh_token_expire_minutes": self.refresh_token_expire_minutes,
             "password_reset_token_expire_minutes": self.password_reset_token_expire_minutes,
+            "invite_token_expire_minutes": self.invite_token_expire_minutes,
             "password_min_length": self.password_min_length,
             "enable_builtin_ui": self.enable_builtin_ui,
             "enable_builtin_admins": self.enable_builtin_admins,
