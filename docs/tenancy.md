@@ -162,6 +162,58 @@ The default `LoggingInviteNotifier` logs the token at WARNING for local
 development — **unsafe for production** (tokens in logs are a credential leak).
 Invite tokens last `ASTERION_INVITE_TOKEN_EXPIRE_MINUTES` (default 7 days).
 
+For real delivery the framework bundles an optional SMTP notifier
+(`asterion-admin[email]`) that satisfies **both** the invite and
+password-reset Protocols — wire one instance into both keywords:
+
+```python
+from asterion import create_admin
+from asterion.extensions.email import SmtpEmailNotifier
+
+mailer = SmtpEmailNotifier.from_env()  # ASTERION_SMTP_HOST / _FROM / ...
+app = create_admin(
+    config=...,
+    password_reset_notifier=mailer,
+    invite_notifier=mailer,
+)
+```
+
+Set `ASTERION_INVITE_URL` / `ASTERION_RESET_URL` (link templates with a
+`{token}` placeholder) so the emails carry a real link. To brand the emails,
+subclass `SmtpEmailNotifier` and override `render_invite` / `render_reset`
+(they return an `EmailContent` with subject + plaintext + optional HTML).
+Apps with a transactional-email provider (SES/Postmark/SendGrid) instead pass
+their own notifier — or a `transport=` callable to route the built message
+through their own pipeline.
+
+#### Custom email events
+
+Beyond reset + invite, the app can send its own emails (welcome, receipt,
+"export ready", …) through the same SMTP transport — register a renderer per
+event and call `send`:
+
+```python
+from asterion.extensions.email import EmailContent
+
+mailer.register_template(
+    "welcome",
+    lambda to, ctx: EmailContent(
+        subject="Welcome!",
+        text=f"Hi {ctx.get('name', to)}, glad you're here.",
+    ),
+)
+
+# anywhere in your app (e.g. after creating an account):
+await mailer.send("welcome", "newuser@example.com", context={"name": "Sam"})
+```
+
+`send(event, to, context=...)` renders the registered template and delivers it
+the same way as reset/invite. Renderers can be passed up front via
+`SmtpEmailNotifier(templates={...})`, and a subclass can override
+`render_event(event, to, context)` to dispatch through a template engine.
+Reset and invite keep their dedicated `send_reset` / `send_invite` (they're
+framework SPI methods) but share the identical build + transport path.
+
 ## SQLite caveat
 
 SQLite has no schemas. On SQLite:

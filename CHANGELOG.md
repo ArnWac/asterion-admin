@@ -16,6 +16,32 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-21
+
+Adds an optional bundled **SMTP email extension** so the password-reset and
+member-invite tokens (v0.1.3) can actually be delivered without the host app
+writing its own notifier — plus a generic hook for app-defined email events.
+
+### Added
+- **`asterion.extensions.email.SmtpEmailNotifier`** (optional extra
+  `asterion-admin[email]`, pulls in `aiosmtplib`). One instance satisfies both
+  `PasswordResetNotifier` and `InviteNotifier`, so it wires into both
+  `create_admin(password_reset_notifier=..., invite_notifier=...)` keywords.
+  Build it explicitly or via `SmtpEmailNotifier.from_env()` (reads
+  `ASTERION_SMTP_*` + `ASTERION_RESET_URL` / `ASTERION_INVITE_URL`).
+  - **App-customisable templates:** override `render_reset` / `render_invite`
+    in a subclass to brand the emails (each returns an `EmailContent` with
+    subject + plaintext + optional HTML).
+  - **Custom email events:** `register_template(event, renderer)` +
+    `await mailer.send(event, to, context=...)` let the app send arbitrary
+    emails (welcome, receipt, …) through the same transport. Renderers can be
+    passed via `SmtpEmailNotifier(templates={...})`, or a subclass can override
+    `render_event`.
+  - **Pluggable transport:** pass `transport=` (a callable receiving the built
+    `EmailMessage`) to route through an app's own mail pipeline or to test
+    without a real SMTP server. The `aiosmtplib` dependency is imported lazily,
+    so importing the module without the extra is safe.
+
 ## [0.1.3] - 2026-06-21
 
 Adds tenant **member management** so a tenant operator can onboard admin users

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asterion-admin"
-version = "0.1.3"
+version = "0.1.4"
 description = "FastAPI admin framework with built-in UI, JWT auth, RBAC, and multi-tenancy"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -67,6 +67,11 @@ storage-s3 = ["boto3>=1.34"]
 # RateLimiterBackend Protocol; RedisLoginRateLimiter is duck-typed against
 # any async Redis client. This extra provides one.
 rate-limit-redis = ["redis>=5.0"]
+
+# SMTP delivery for password-reset + member-invite emails. Core ships only the
+# notifier Protocols + dev-only logging defaults; SmtpEmailNotifier pulls in
+# aiosmtplib only when the host app wants real email delivery.
+email = ["aiosmtplib>=3.0"]
 
 dev = [
     "pytest>=8.0.0",
