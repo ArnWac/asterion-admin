@@ -229,6 +229,12 @@ def test_unhandled_exception_becomes_internal_error(app):
 
 
 def test_crud_unknown_resource_uses_envelope(tmp_path):
+    # As of 0.1.6 the CRUD routes are registered explicitly per registered
+    # resource — there is no greedy ``/{resource}`` catch-all. An unknown
+    # admin path therefore matches no route and gets the framework's standard
+    # 404 envelope (a generic "Not Found" message, not a resource-specific one).
+    # This is deliberate: those paths are now free for an embedding app to
+    # claim via ``app.include_router``.
     db_url = f"sqlite+aiosqlite:///{tmp_path / 'crud-envelope.db'}"
     app = create_admin(
         config=CoreAdminConfig(
@@ -281,4 +287,5 @@ def test_crud_unknown_resource_uses_envelope(tmp_path):
     assert resp.status_code == 404
     err = _envelope(resp)
     assert err["code"] == NOT_FOUND
-    assert "no_such_resource" in err["message"] or "not registered" in err["message"].lower()
+    # Still the standard error envelope, just a generic message now.
+    assert err["message"]

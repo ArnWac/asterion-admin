@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -30,7 +31,6 @@ from asterion.security.validation import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
 
 
 def _get_admin_class(request: Request, resource: str) -> ModelAdmin:
@@ -99,17 +99,24 @@ async def _audit_crud(
         )
 
 
-@router.get("/{resource}")
-async def crud_list(
+# ---------------------------------------------------------------------------
+# Handler implementations — the resource is a plain argument (bound per route
+# by ``build_crud_router``), NOT a path parameter. This keeps the dispatch
+# logic in one place while the path registration becomes explicit.
+# ---------------------------------------------------------------------------
+
+
+async def _list_impl(
     resource: str,
     request: Request,
-    limit: int = 100,
-    offset: int = 0,
-    search: str | None = None,
-    ordering: str | None = None,
-    dh: str | None = None,
-    session: AsyncSession = Depends(get_async_session),
-    ctx: AdminContext = Depends(require_admin_context),
+    *,
+    limit: int,
+    offset: int,
+    search: str | None,
+    ordering: str | None,
+    dh: str | None,
+    session: AsyncSession,
+    ctx: AdminContext,
 ) -> dict[str, Any]:
     from asterion.crud.query import parse_filter_query
 
@@ -129,12 +136,12 @@ async def crud_list(
     )
 
 
-@router.post("/{resource}", status_code=status.HTTP_201_CREATED)
-async def crud_create(
+async def _create_impl(
     resource: str,
     request: Request,
-    session: AsyncSession = Depends(get_async_session),
-    ctx: AdminContext = Depends(require_admin_context),
+    *,
+    session: AsyncSession,
+    ctx: AdminContext,
 ) -> dict[str, Any]:
     admin_class = _get_admin_class(request, resource)
     _require_resource_permission(ctx, admin_class.model_name, "create")
@@ -153,26 +160,26 @@ async def crud_create(
     return result
 
 
-@router.get("/{resource}/{record_id}")
-async def crud_read(
+async def _read_impl(
     resource: str,
     record_id: str,
     request: Request,
-    session: AsyncSession = Depends(get_async_session),
-    ctx: AdminContext = Depends(require_admin_context),
+    *,
+    session: AsyncSession,
+    ctx: AdminContext,
 ) -> dict[str, Any]:
     admin_class = _get_admin_class(request, resource)
     _require_resource_permission(ctx, admin_class.model_name, "read")
     return await read_record(session, admin_class, record_id, ctx=ctx)
 
 
-@router.patch("/{resource}/{record_id}")
-async def crud_update(
+async def _update_impl(
     resource: str,
     record_id: str,
     request: Request,
-    session: AsyncSession = Depends(get_async_session),
-    ctx: AdminContext = Depends(require_admin_context),
+    *,
+    session: AsyncSession,
+    ctx: AdminContext,
 ) -> dict[str, Any]:
     admin_class = _get_admin_class(request, resource)
     _require_resource_permission(ctx, admin_class.model_name, "update")
@@ -191,13 +198,13 @@ async def crud_update(
     return result
 
 
-@router.delete("/{resource}/{record_id}")
-async def crud_delete(
+async def _delete_impl(
     resource: str,
     record_id: str,
     request: Request,
-    session: AsyncSession = Depends(get_async_session),
-    ctx: AdminContext = Depends(require_admin_context),
+    *,
+    session: AsyncSession,
+    ctx: AdminContext,
 ) -> dict[str, Any]:
     admin_class = _get_admin_class(request, resource)
     _require_resource_permission(ctx, admin_class.model_name, "delete")
@@ -212,3 +219,84 @@ async def crud_delete(
         record_id=record_id,
     )
     return result
+
+
+def _register_resource(router: APIRouter, resource: str) -> None:
+    """Register the five CRUD routes for one resource under explicit paths
+    (``/employees`` instead of ``/{resource}``). Each handler closes over
+    ``resource`` so the dispatch impls above are reused verbatim."""
+
+    @router.get(f"/{resource}", name=f"crud_list_{resource}")
+    async def crud_list(
+        request: Request,
+        limit: int = 100,
+        offset: int = 0,
+        search: str | None = None,
+        ordering: str | None = None,
+        dh: str | None = None,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _list_impl(
+            resource,
+            request,
+            limit=limit,
+            offset=offset,
+            search=search,
+            ordering=ordering,
+            dh=dh,
+            session=session,
+            ctx=ctx,
+        )
+
+    @router.post(
+        f"/{resource}", status_code=status.HTTP_201_CREATED, name=f"crud_create_{resource}"
+    )
+    async def crud_create(
+        request: Request,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _create_impl(resource, request, session=session, ctx=ctx)
+
+    @router.get(f"/{resource}/{{record_id}}", name=f"crud_read_{resource}")
+    async def crud_read(
+        record_id: str,
+        request: Request,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _read_impl(resource, record_id, request, session=session, ctx=ctx)
+
+    @router.patch(f"/{resource}/{{record_id}}", name=f"crud_update_{resource}")
+    async def crud_update(
+        record_id: str,
+        request: Request,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _update_impl(resource, record_id, request, session=session, ctx=ctx)
+
+    @router.delete(f"/{resource}/{{record_id}}", name=f"crud_delete_{resource}")
+    async def crud_delete(
+        record_id: str,
+        request: Request,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _delete_impl(resource, record_id, request, session=session, ctx=ctx)
+
+
+def build_crud_router(resources: Iterable[str]) -> APIRouter:
+    """Build a CRUD router with EXPLICIT per-resource paths.
+
+    Instead of one greedy ``/{resource}`` catch-all, this registers
+    ``/employees``, ``/projects``, … for each frozen resource. A path under the
+    admin prefix that is NOT a registered resource then matches no CRUD route,
+    leaving it free for an embedding app to claim via ``app.include_router``
+    after ``create_admin`` (no AdminExtension / route-ordering tricks needed).
+    """
+    router = APIRouter()
+    for resource in resources:
+        _register_resource(router, resource)
+    return router

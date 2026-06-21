@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from asterion.actions.router import router as actions_router
+from asterion.actions.router import build_actions_router
 from asterion.admin.login_contract_router import router as login_contract_router
 from asterion.admin.member_router import router as member_router
 from asterion.admin.navigation_router import router as navigation_router
@@ -23,7 +23,7 @@ from asterion.core.middleware import (
     RequestIDMiddleware,
     SecurityHeadersMiddleware,
 )
-from asterion.crud.router import router as crud_router
+from asterion.crud.router import build_crud_router
 from asterion.root.router import router as root_router
 from asterion.storage.router import router as storage_router
 
@@ -187,16 +187,25 @@ def install_routes(
         tags=["admin-members"],
     )
 
+    # CRUD + action routes are registered EXPLICITLY per registered resource
+    # (``/employees``, ``/employees/_actions/{action}``, …) rather than via a
+    # greedy ``/{resource}`` catch-all. The registry is already frozen at this
+    # point (see core/app_factory.py), so every resource name is known. Effect:
+    # a path under the admin prefix that is NOT a registered resource matches no
+    # CRUD/action route, so an embedding app can claim it with a plain
+    # ``app.include_router`` after ``create_admin`` — no AdminExtension or
+    # route-ordering tricks. ``register_routes`` on extensions still works.
+    resources = app.state.asterion.registry.model_names()
+
     # Actions before CRUD so /{resource}/_actions/{action} is matched first.
     app.include_router(
-        actions_router,
+        build_actions_router(resources),
         prefix=config.admin_api_prefix,
         tags=["admin-actions"],
     )
 
-    # Dynamic CRUD routes last.
     app.include_router(
-        crud_router,
+        build_crud_router(resources),
         prefix=config.admin_api_prefix,
         tags=["admin-crud"],
     )

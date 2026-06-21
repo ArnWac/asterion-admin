@@ -63,9 +63,33 @@ order. Each hook has a no-op default — override only what you need.
 | 10 | _(requests served)_ | | |
 | 11 | `shutdown(app)` | Async resource teardown — called in **reverse** registration order; failures logged but never raised | once per process |
 
-Only `register_routes` receives the `app` directly. Extension routes
-are mounted **before** the framework's dynamic `/{resource}` catch-all,
-so a static-path extension route (`/{resource}/_export`) wins.
+Only `register_routes` receives the `app` directly. Extension routes are
+mounted during the setup phase (before the framework's CRUD routes), so an
+extension can add routes anywhere — including under the admin prefix.
+
+> **You may not need an extension just to mount a router.** As of 0.1.6 the CRUD
+> routes are registered explicitly per registered resource, not as a greedy
+> `/{resource}` catch-all. So an embedding app can mount its own routes under
+> the admin prefix with a plain `app.include_router(...)` **after**
+> `create_admin()`:
+>
+> ```python
+> app = create_admin(config=..., register=...)
+>
+> from fastapi import APIRouter
+> domain = APIRouter()
+>
+> @domain.get("/work-sessions/{session_id}")
+> async def work_session(session_id: str): ...
+>
+> app.include_router(domain, prefix="/api/v1/admin")
+> ```
+>
+> The only constraint: your path must not equal a **registered resource name**
+> (that's a real, explicit conflict — rename the resource or the route). Reach
+> for `register_routes` when you need routes mounted during the setup phase
+> (e.g. before other extensions, or gated on `ctx`); reach for
+> `app.include_router` when you just want to add a router.
 
 ---
 

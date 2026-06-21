@@ -17,6 +17,7 @@ on which shape was used.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -43,7 +44,6 @@ from asterion.security.validation import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
 
 
 class ActionRequest(BaseModel):
@@ -178,14 +178,13 @@ async def _write_action_audit(
         )
 
 
-@router.post("/{resource}/_actions/{action}")
-async def run_action(
+async def _run_action_impl(
     resource: str,
     action: str,
     payload: ActionRequest,
     request: Request,
-    session: AsyncSession = Depends(get_async_session),
-    ctx: AdminContext = Depends(require_admin_context),
+    session: AsyncSession,
+    ctx: AdminContext,
 ) -> dict[str, Any]:
     """Bulk action — operates on the records identified by ``payload.ids``."""
     admin = _resolve_admin(request, resource)
@@ -212,15 +211,14 @@ async def run_action(
     return result
 
 
-@router.post("/{resource}/{record_id}/_actions/{action}")
-async def run_row_action(
+async def _run_row_action_impl(
     resource: str,
     record_id: str,
     action: str,
     payload: RowActionRequest,
     request: Request,
-    session: AsyncSession = Depends(get_async_session),
-    ctx: AdminContext = Depends(require_admin_context),
+    session: AsyncSession,
+    ctx: AdminContext,
 ) -> dict[str, Any]:
     """Row action — operates on the single record identified by the URL.
 
@@ -255,3 +253,43 @@ async def run_row_action(
         ctx=ctx,
     )
     return result
+
+
+def _register_resource_actions(router: APIRouter, resource: str) -> None:
+    """Register the bulk + row action routes for one resource under explicit
+    paths (``/employees/_actions/{action}``), each closing over ``resource``."""
+
+    @router.post(f"/{resource}/_actions/{{action}}", name=f"run_action_{resource}")
+    async def run_action(
+        action: str,
+        payload: ActionRequest,
+        request: Request,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _run_action_impl(resource, action, payload, request, session, ctx)
+
+    @router.post(
+        f"/{resource}/{{record_id}}/_actions/{{action}}", name=f"run_row_action_{resource}"
+    )
+    async def run_row_action(
+        record_id: str,
+        action: str,
+        payload: RowActionRequest,
+        request: Request,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _run_row_action_impl(
+            resource, record_id, action, payload, request, session, ctx
+        )
+
+
+def build_actions_router(resources: Iterable[str]) -> APIRouter:
+    """Build an actions router with EXPLICIT per-resource paths instead of a
+    greedy ``/{resource}/_actions/{action}`` catch-all — see
+    :func:`asterion.crud.router.build_crud_router`."""
+    router = APIRouter()
+    for resource in resources:
+        _register_resource_actions(router, resource)
+    return router

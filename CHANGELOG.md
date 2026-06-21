@@ -16,6 +16,35 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-06-21
+
+### Changed
+- **The admin CRUD/action routes are no longer a greedy catch-all.** They were
+  mounted as a dynamic `/{resource}` (+ `/{resource}/{id}`,
+  `/{resource}/_actions/{action}`) that captured *every* single-segment path
+  under the admin prefix and 404'd unknown ones. They are now registered
+  **explicitly per registered resource** (`/api/v1/admin/employees`,
+  `/api/v1/admin/projects`, …) — the registry is frozen before routes mount, so
+  all resource names are known. **Apps can now mount their own routes under the
+  admin prefix with a plain `app.include_router(...)` after `create_admin()`**
+  (e.g. `/api/v1/admin/work-sessions`) without writing an `AdminExtension` /
+  `register_routes` and without route-ordering tricks. `register_routes` keeps
+  working unchanged — no breaking change for existing extensions.
+  - For every **registered** resource, all endpoints are byte-for-byte
+    unchanged: same URLs, permission gates, error envelopes, and contract
+    (`CONTRACT_VERSION` unchanged).
+  - A path under the admin prefix that is **neither** a registered resource
+    **nor** an app route now returns the framework's standard 404 envelope with
+    a generic message (previously a resource-specific "not registered"
+    message). This is deliberate — those paths are now free for apps.
+  - A genuine name clash (an app route whose path equals a registered resource
+    name) is an explicit, accepted conflict: register your resource under a
+    different name or mount your route elsewhere. The framework does not try to
+    resolve it magically.
+  - Internal: `crud.router` / `actions.router` now expose `build_crud_router`
+    / `build_actions_router` (the per-resource handler logic is unchanged and
+    simply bound per route).
+
 ## [0.1.5] - 2026-06-21
 
 Grows the email extension from "SMTP only" into a small but complete delivery
