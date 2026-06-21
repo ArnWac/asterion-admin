@@ -214,6 +214,11 @@ the same way as reset/invite. Renderers can be passed up front via
 Reset and invite keep their dedicated `send_reset` / `send_invite` (they're
 framework SPI methods) but share the identical build + transport path.
 
+See [`docs/email.md`](email.md) for the full picture: SMTP / Resend / SES
+transports, overridable Jinja templates, custom events, and the transactional
+**outbox** (`OutboxEmailNotifier` + `process_outbox`) for robust, retried
+delivery.
+
 ## SQLite caveat
 
 SQLite has no schemas. On SQLite:

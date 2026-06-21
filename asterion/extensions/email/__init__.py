@@ -1,10 +1,11 @@
-"""SMTP email notifier extension.
+"""Email notifier extension.
 
-Delivers the framework's password-reset and member-invite tokens over SMTP.
-The extension does NOT auto-mount routes or touch the admin context — it just
-exposes :class:`SmtpEmailNotifier`, which satisfies both
+Delivers the framework's password-reset and member-invite tokens — and any
+app-defined email event — over SMTP or a transactional-email provider. The
+extension does NOT auto-mount routes or touch the admin context; it exposes
+notifiers that satisfy both
 :class:`~asterion.auth.password_reset.PasswordResetNotifier` and
-:class:`~asterion.auth.invite.InviteNotifier`. Wire one instance into both
+:class:`~asterion.auth.invite.InviteNotifier`, so one instance wires into both
 ``create_admin`` keywords::
 
     from asterion import create_admin
@@ -17,27 +18,61 @@ exposes :class:`SmtpEmailNotifier`, which satisfies both
         invite_notifier=mailer,
     )
 
-Subclass and override :meth:`SmtpEmailNotifier.render_reset` /
-:meth:`SmtpEmailNotifier.render_invite` to brand the emails.
+Transports
+----------
 
-Dependencies
-------------
+* :class:`SmtpEmailNotifier` — SMTP via ``aiosmtplib`` (``[email]`` extra).
+* :class:`ResendEmailNotifier` — Resend HTTP API via ``httpx``
+  (``[email-resend]`` extra).
+* :class:`SesEmailNotifier` — Amazon SES via ``boto3`` (``[email-ses]`` extra).
 
-Requires ``aiosmtplib``::
+Templates (``[email]`` extra pulls ``jinja2``)
+----------------------------------------------
 
-    pip install asterion-admin[email]
+Bodies render from ``<name>.subject.txt`` / ``<name>.txt`` / ``<name>.html``,
+resolved from an app ``template_dir`` first then the packaged defaults. Without
+``jinja2`` the notifiers fall back to built-in plaintext. Subclass and override
+``render_*`` (or ``register_template``) for full control.
 
-Importing this module without it is safe (the dependency loads lazily inside
-the send path); only an actual SMTP send without it — and without a custom
-``transport=`` — raises a clear :class:`ImportError`.
+Robust delivery
+---------------
+
+Wrap any notifier in :class:`OutboxEmailNotifier` to enqueue emails into an
+``email_outbox`` table (in the triggering request's transaction) and send them
+later via :func:`process_outbox` from your own worker. The framework ships no
+migration for that table — autogenerate it against your env.py (see
+:mod:`asterion.extensions.email.outbox`).
+
+All dependencies load lazily, so importing this package without the extras is
+safe; only an actual send (without an injected client/transport) raises a clear
+:class:`ImportError`.
 """
 
 from __future__ import annotations
 
 from asterion.extensions.email.notifier import (
+    BaseEmailNotifier,
     EmailContent,
     EmailRenderer,
     SmtpEmailNotifier,
 )
+from asterion.extensions.email.outbox import (
+    EmailOutbox,
+    OutboxEmailNotifier,
+    enqueue_email,
+    process_outbox,
+)
+from asterion.extensions.email.providers import ResendEmailNotifier, SesEmailNotifier
 
-__all__ = ["EmailContent", "EmailRenderer", "SmtpEmailNotifier"]
+__all__ = [
+    "BaseEmailNotifier",
+    "EmailContent",
+    "EmailOutbox",
+    "EmailRenderer",
+    "OutboxEmailNotifier",
+    "ResendEmailNotifier",
+    "SesEmailNotifier",
+    "SmtpEmailNotifier",
+    "enqueue_email",
+    "process_outbox",
+]

@@ -25,6 +25,12 @@ class _Capture:
         self.messages.append(message)
 
 
+def _text(msg: EmailMessage) -> str:
+    """Plaintext part of a (possibly multipart text+html) message."""
+    body = msg.get_body(preferencelist=("plain",))
+    return body.get_content() if body is not None else msg.get_content()
+
+
 def _mailer(**overrides) -> tuple[SmtpEmailNotifier, _Capture]:
     cap = _Capture()
     kwargs = dict(
@@ -61,7 +67,7 @@ async def test_send_reset_builds_message_with_link():
     assert msg["To"] == "bob@example.com"
     assert msg["From"] == "admin@example.com"
     assert "Acme Admin" in msg["Subject"]
-    body = msg.get_content()
+    body = _text(msg)
     assert "https://app.example.com/reset?token=tok-123" in body
 
 
@@ -69,7 +75,7 @@ async def test_send_reset_builds_message_with_link():
 async def test_send_reset_without_url_uses_raw_token():
     mailer, cap = _mailer(reset_url=None)
     await mailer.send_reset(email="bob@example.com", token="raw-tok")
-    assert "raw-tok" in cap.messages[0].get_content()
+    assert "raw-tok" in _text(cap.messages[0])
 
 
 # --- send_invite ---
@@ -82,7 +88,7 @@ async def test_send_invite_includes_tenant_and_link():
 
     msg = cap.messages[0]
     assert msg["To"] == "dave@example.com"
-    body = msg.get_content()
+    body = _text(msg)
     assert "acme" in body
     assert "https://app.example.com/accept?token=inv-9" in body
 
@@ -165,6 +171,42 @@ async def test_subclass_can_override_render_event():
     mailer = Dispatcher(host="h", from_addr="a@b.c", transport=cap)
     await mailer.send("anything", "e@x.com", context={"k": "v"})
     assert cap.messages[0]["Subject"] == "evt:anything"
+
+
+# --- Jinja templates (#3) ---
+
+
+@pytest.mark.asyncio
+async def test_default_templates_render_html_alternative():
+    """With jinja2 available, the packaged reset template adds an HTML part."""
+    mailer, cap = _mailer()
+    await mailer.send_reset(email="bob@example.com", token="tok-7")
+    msg = cap.messages[0]
+    assert msg.is_multipart()
+    html = next(p for p in msg.iter_parts() if p.get_content_type() == "text/html")
+    assert "tok-7" in html.get_content()
+
+
+@pytest.mark.asyncio
+async def test_template_dir_override_wins(tmp_path):
+    (tmp_path / "reset.subject.txt").write_text("Override subject", encoding="utf-8")
+    (tmp_path / "reset.txt").write_text("custom body {{ link }}", encoding="utf-8")
+    mailer, cap = _mailer(template_dir=str(tmp_path))
+    await mailer.send_reset(email="bob@example.com", token="zz")
+    msg = cap.messages[0]
+    assert msg["Subject"] == "Override subject"
+    assert "custom body https://app.example.com/reset?token=zz" in _text(msg)
+
+
+@pytest.mark.asyncio
+async def test_custom_event_via_template_file(tmp_path):
+    (tmp_path / "welcome.subject.txt").write_text("Hi {{ to }}", encoding="utf-8")
+    (tmp_path / "welcome.txt").write_text("Welcome {{ name }}!", encoding="utf-8")
+    mailer, cap = _mailer(template_dir=str(tmp_path))
+    await mailer.send("welcome", "sam@example.com", context={"name": "Sam"})
+    msg = cap.messages[0]
+    assert msg["Subject"] == "Hi sam@example.com"
+    assert "Welcome Sam!" in _text(msg)
 
 
 # --- from_env ---

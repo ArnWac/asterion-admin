@@ -1,0 +1,9 @@
+You've been invited{% if tenant_slug %} to {{ tenant_slug }}{% endif %}.
+
+{% if has_url %}Open this link to set your password and get started:
+
+{{ link }}{% else %}Use this invite token to set your password:
+
+{{ link }}{% endif %}
+
+— {{ app_name }}

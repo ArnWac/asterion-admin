@@ -1,0 +1,1 @@
+{{ app_name }}: you've been invited{% if tenant_slug %} to {{ tenant_slug }}{% endif %}

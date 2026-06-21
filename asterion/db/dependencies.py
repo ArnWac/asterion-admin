@@ -32,4 +32,9 @@ async def get_async_session(
             tenant = getattr(request.state, "tenant", None)
             if tenant is not None and "postgresql" in runtime.config.database_url:
                 await set_search_path(session, tenant.schema_name)
+            # Expose the request-scoped session so notifiers / extensions can
+            # join this transaction (e.g. the email outbox writes its row in the
+            # same transaction as the invite/user that triggered it). Neutral
+            # hook — nothing in core depends on it being read.
+            request.state.db_session = session
             yield session

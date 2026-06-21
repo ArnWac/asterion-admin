@@ -16,6 +16,42 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-21
+
+Grows the email extension from "SMTP only" into a small but complete delivery
+layer: provider transports, overridable HTML templates, and a transactional
+outbox for robust async delivery. All three stay inside
+`asterion.extensions.email`; the only core change is one neutral line.
+
+### Added
+- **Transactional-email provider adapters** (alternatives to SMTP) — same
+  rendering, different transport:
+  - `ResendEmailNotifier` (Resend JSON API, extra `[email-resend]` → httpx),
+  - `SesEmailNotifier` (Amazon SES via boto3, extra `[email-ses]`).
+  Both expose `from_env()` and an injectable `send=` for tests / custom
+  pipelines; the SDK is imported lazily.
+- **Overridable Jinja templates** (#3) — reset/invite bodies now render from
+  `<name>.subject.txt` / `<name>.txt` / `<name>.html`, resolved from an app
+  `template_dir` (`ASTERION_EMAIL_TEMPLATE_DIR`) first, then asterion's packaged
+  defaults. The `[email]` extra now also pulls `jinja2`; without it the
+  notifiers fall back to the built-in plaintext. Subclassing `render_*` still
+  works for full control. Default reset/invite emails now include an HTML
+  alternative.
+- **Transactional outbox** (#2, self-contained in the extension) —
+  `OutboxEmailNotifier` wraps any notifier and enqueues into an `email_outbox`
+  table within the triggering request's transaction (atomic with the
+  invite/user); `process_outbox(session, notifier, ...)` drains the queue from
+  your own worker with bounded retries + backoff. Following the `auth_oauth`
+  convention, the framework ships **no** migration for `email_outbox` — the app
+  autogenerates it. `enqueue_email` is exposed for direct use.
+- Internal: `BaseEmailNotifier` now holds all transport-agnostic
+  rendering/SPI; `SmtpEmailNotifier` and the provider adapters subclass it.
+
+### Changed
+- **Core (neutral):** `get_async_session` now stores the request-scoped session
+  on `request.state.db_session`, so notifiers/extensions can join the request
+  transaction (used by the outbox). Nothing in core depends on reading it.
+
 ## [0.1.4] - 2026-06-21
 
 Adds an optional bundled **SMTP email extension** so the password-reset and
