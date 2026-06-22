@@ -225,6 +225,7 @@ def test_static_admin_layout():
         "diff.js",
         "dom.js",
         "format.js",
+        "impersonation.js",
         "logic.js",
     ], files
     views_dir = static_dir / "views"

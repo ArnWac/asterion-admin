@@ -16,6 +16,32 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-06-22
+
+### Added
+- **`CoreAdminConfig.enable_impersonation`** (default `True`) +
+  `ASTERION_ENABLE_IMPERSONATION`. Gates the superadmin impersonation route
+  (`POST {root}/impersonate`) and the UI button. Set `False` to drop the route
+  entirely — e.g. a single-tenant app with no support-impersonation workflow.
+  The `{root}/users` and `{root}/tenants` routes are always mounted regardless
+  (the tenant list powers the UI tenant switcher).
+- **Impersonation button in the admin UI.** On a user's detail page, a
+  superadmin sees an "Impersonate" button (when `enable_impersonation` is on).
+  It mints an impersonation token via `POST {root}/impersonate`, swaps it in
+  for the superadmin's access token, and shows a fixed banner across the shell
+  ("Impersonating <email> — Stop"); "Stop" restores the original token. The
+  button is hidden for non-superadmins, for yourself, and while already
+  impersonating (the route rejects impersonation tokens, so nesting is
+  impossible). Backend unchanged beyond the gate — this wires the existing
+  endpoint into the UI.
+
+### Changed
+- The impersonation route is now mounted via `build_root_router(
+  enable_impersonation=…)` instead of unconditionally. With the default
+  (`True`) there is no behavioural change; the module-level
+  `asterion.root.router.router` still includes impersonation for direct
+  importers.
+
 ## [0.1.11] - 2026-06-22
 
 ### Added

@@ -24,7 +24,7 @@ from asterion.core.middleware import (
     SecurityHeadersMiddleware,
 )
 from asterion.crud.router import build_crud_router
-from asterion.root.router import router as root_router
+from asterion.root.router import build_root_router
 from asterion.storage.router import router as storage_router
 
 
@@ -125,8 +125,10 @@ def install_routes(
 
     # Superadmin-only root routes — never use tenant middleware /
     # TenantAuthContext; require_superadmin rejects impersonation tokens.
+    # The impersonation sub-route is gated by config.enable_impersonation;
+    # users + tenants are always mounted.
     app.include_router(
-        root_router,
+        build_root_router(enable_impersonation=config.enable_impersonation),
         prefix=config.root_api_prefix,
         tags=["root"],
     )
