@@ -59,6 +59,7 @@
       adminPrefix: {{ admin_api_prefix | tojson }},
       rootPrefix: {{ config.root_api_prefix | tojson }},
       multiTenant: {{ config.enable_multi_tenant | tojson }},
+      enableImpersonation: {{ config.enable_impersonation | tojson }},
       tenantResolution: {{ config.tenant_resolution | tojson }},
       tenantHeaderName: {{ config.tenant_header_name | tojson }},
       view: {{ view | tojson }},

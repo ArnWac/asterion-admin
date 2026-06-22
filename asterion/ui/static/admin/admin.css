@@ -139,6 +139,39 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
   cursor: pointer;
 }
 
+/* Impersonation banner — a fixed bar at the bottom of the viewport while a
+ * superadmin is acting as another user. Fixed (not in flow) so it never
+ * shifts the sidebar/main layout. */
+.impersonation-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: #b45309;
+  color: #fff;
+  font-size: 0.9rem;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.18);
+}
+.btn-impersonation-stop {
+  padding: 0.3rem 0.85rem;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.btn-impersonation-stop:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;

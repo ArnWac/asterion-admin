@@ -154,6 +154,15 @@ class CoreAdminConfig:
     enable_builtin_admins: bool = True
     enable_multi_tenant: bool = True
 
+    #: Enable the superadmin impersonation feature: the ``POST {root}/impersonate``
+    #: route and the admin-UI "Impersonate" button on a user's detail page.
+    #: Impersonation is always superadmin-only (the route rejects impersonation
+    #: tokens) and writes an ``ImpersonationLog`` + audit entry. Defaults to True,
+    #: preserving the pre-0.1.12 behaviour where the route was always mounted.
+    #: Set False to drop the route entirely — e.g. a single-tenant app with no
+    #: support-impersonation workflow that doesn't want the surface at all.
+    enable_impersonation: bool = True
+
     tenant_resolution: TenantResolution = "header"
     tenant_header_name: str = "X-Tenant-Slug"
     #: How long (seconds) a resolved tenant is cached per process (Review R9).
@@ -295,6 +304,10 @@ class CoreAdminConfig:
             ),
             enable_multi_tenant=_env_bool(
                 "ASTERION_ENABLE_MULTI_TENANT",
+                True,
+            ),
+            enable_impersonation=_env_bool(
+                "ASTERION_ENABLE_IMPERSONATION",
                 True,
             ),
             tenant_resolution=_env_literal(
@@ -507,6 +520,7 @@ class CoreAdminConfig:
             "enable_builtin_ui": self.enable_builtin_ui,
             "enable_builtin_admins": self.enable_builtin_admins,
             "enable_multi_tenant": self.enable_multi_tenant,
+            "enable_impersonation": self.enable_impersonation,
             "tenant_resolution": self.tenant_resolution,
             "tenant_header_name": self.tenant_header_name,
             "default_language": self.default_language,

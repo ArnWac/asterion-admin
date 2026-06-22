@@ -12,6 +12,7 @@
 import { admin, APIError, auth, root, tenantStore, tokenStore } from "./api.js";
 import { getFullContract } from "./contract.js";
 import { el, mount, showToast } from "./dom.js";
+import { renderImpersonationBanner } from "./impersonation.js";
 
 const cfg = window.ASTERION || {};
 
@@ -60,6 +61,7 @@ async function main() {
 
   wireSignout();
   // Sidebar nav + user line are non-essential; failure shouldn't break the view.
+  renderImpersonationBanner().catch(() => {});
   populateTenantSwitcher().catch(() => {});
   populateSidebarNav().catch(() => {});
   populateSidebarExtensions().catch(() => {});

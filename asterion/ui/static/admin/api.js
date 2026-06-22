@@ -169,6 +169,11 @@ export const admin = {
 // it returns 403 for non-superadmins, which the switcher treats as "hide".
 export const root = {
   tenants: () => request("GET", `${cfg.rootPrefix}/tenants?limit=100`),
+  impersonate: (targetUserId, tenantId = null) =>
+    request("POST", `${cfg.rootPrefix}/impersonate`, {
+      target_user_id: targetUserId,
+      tenant_id: tenantId,
+    }),
 };
 
 

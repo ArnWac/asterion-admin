@@ -5,6 +5,7 @@ import { getResourceContract } from "../contract.js";
 import { looksLikeAuditDiff, renderDiffTable } from "../diff.js";
 import { el, mount, setBreadcrumb } from "../dom.js";
 import { formatValue } from "../format.js";
+import { renderImpersonateButton } from "../impersonation.js";
 
 const cfg = window.ASTERION || {};
 
@@ -43,31 +44,39 @@ export async function mountDetail(root, resource, recordId) {
     grid.appendChild(dd);
   }
 
+  const actions = el("div", { class: "page-actions" }, [
+    el(
+      "a",
+      {
+        class: "btn",
+        href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/edit`,
+      },
+      "Edit"
+    ),
+    el(
+      "a",
+      {
+        class: "btn btn-danger",
+        href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/delete`,
+      },
+      "Delete"
+    ),
+  ]);
+
   mount(
     root,
-    el("div", { class: "page-header" }, [
-      el("h1", {}, `${contract.label} detail`),
-      el("div", { class: "page-actions" }, [
-        el(
-          "a",
-          {
-            class: "btn",
-            href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/edit`,
-          },
-          "Edit"
-        ),
-        el(
-          "a",
-          {
-            class: "btn btn-danger",
-            href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/delete`,
-          },
-          "Delete"
-        ),
-      ]),
-    ]),
+    el("div", { class: "page-header" }, [el("h1", {}, `${contract.label} detail`), actions]),
     el("div", { class: "card" }, grid)
   );
+
+  // Superadmin-only "Impersonate" button (users detail, gated by config).
+  // Appended async after the page renders so the /auth/me check doesn't
+  // block the detail view.
+  renderImpersonateButton(resource, recordId)
+    .then((btn) => {
+      if (btn) actions.appendChild(btn);
+    })
+    .catch(() => {});
 }
 
 function errorScreen(message) {
