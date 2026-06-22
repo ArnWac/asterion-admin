@@ -108,3 +108,40 @@ def test_create_invalid_permission_key_errors(env):
     )
     assert result.exit_code != 0
     assert "Cannot create service account" in result.output
+
+
+def test_create_then_delete(env):
+    runner = CliRunner()
+    created = runner.invoke(
+        cli_app,
+        [
+            "service-account",
+            "create",
+            "--tenant",
+            "acme",
+            "--label",
+            "term",
+            "--email",
+            "term@svc.example",
+            "--permission",
+            "admin.foo.read",
+        ],
+    )
+    assert created.exit_code == 0, created.output
+
+    deleted = runner.invoke(
+        cli_app,
+        ["service-account", "delete", "--tenant", "acme", "--email", "term@svc.example"],
+    )
+    assert deleted.exit_code == 0, deleted.output
+    assert "deleted" in deleted.output
+    assert _users(env) == []
+
+
+def test_delete_unknown_email_errors(env):
+    result = CliRunner().invoke(
+        cli_app,
+        ["service-account", "delete", "--tenant", "acme", "--email", "ghost@svc.example"],
+    )
+    assert result.exit_code != 0
+    assert "No user" in result.output

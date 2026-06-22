@@ -55,6 +55,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.auth.provisioning import create_passwordless_user, ensure_membership
+from asterion.models.tenant_membership import TenantMembership
 from asterion.models.tenant_rbac import (
     TenantMembershipRole,
     TenantRole,
@@ -117,7 +118,9 @@ async def create_service_account(
     ).scalar_one_or_none():
         raise ValueError(f"A tenant role named {role_name!r} already exists — pick a unique label.")
 
-    user = await create_passwordless_user(session, email=email, full_name=label, is_active=True)
+    user = await create_passwordless_user(
+        session, email=email, full_name=label, is_active=True, is_service_account=True
+    )
     membership = await ensure_membership(session, user_id=user.id, tenant_id=tenant_id)
 
     role = TenantRole(name=role_name, description=f"Service account: {label}", is_system=False)
@@ -128,3 +131,84 @@ async def create_service_account(
     session.add(TenantMembershipRole(membership_id=membership.id, role_id=role.id))
     await session.flush()
     return user
+
+
+async def delete_service_account(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+) -> None:
+    """Tear down a service account — the inverse of :func:`create_service_account`.
+
+    Removes the user's membership in the tenant, the dedicated ``service:``
+    role(s) assigned to that membership (with their permission grants and the
+    membership-role link), and the global ``User`` row. ``session`` must be
+    tenant-scoped (see module docstring).
+
+    Raises :class:`ValueError` if ``user_id`` is not a service account — this
+    helper refuses to delete a normal user.
+    """
+    user = await session.get(User, user_id)
+    if user is None or not user.is_service_account:
+        raise ValueError(f"No service account with id {user_id}.")
+
+    membership = (
+        await session.execute(
+            select(TenantMembership).where(
+                TenantMembership.user_id == user_id,
+                TenantMembership.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if membership is not None:
+        links = (
+            (
+                await session.execute(
+                    select(TenantMembershipRole).where(
+                        TenantMembershipRole.membership_id == membership.id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        role_ids = [link.role_id for link in links]
+        for link in links:
+            await session.delete(link)
+
+        if role_ids:
+            roles = (
+                (
+                    await session.execute(
+                        select(TenantRole).where(
+                            TenantRole.id.in_(role_ids),
+                            TenantRole.name.startswith("service:"),
+                            TenantRole.is_system.is_(False),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for role in roles:
+                grants = (
+                    (
+                        await session.execute(
+                            select(TenantRolePermission).where(
+                                TenantRolePermission.role_id == role.id
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                for grant in grants:
+                    await session.delete(grant)
+                await session.delete(role)
+
+        await session.delete(membership)
+
+    await session.delete(user)
+    await session.flush()

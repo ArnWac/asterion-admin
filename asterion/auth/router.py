@@ -418,7 +418,10 @@ async def password_reset_request(
     ).scalar_one_or_none()
 
     issued = False
-    if user is not None and user.is_active:
+    # Service / machine accounts are token-only and passwordless — never issue
+    # them a reset token (it would let a reset turn them into a login-capable
+    # account). The response is identical on every branch (no enumeration).
+    if user is not None and user.is_active and not user.is_service_account:
         raw_token = await create_password_reset(
             session,
             user=user,
