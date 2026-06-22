@@ -9,7 +9,7 @@
 // sidebar resource navigation, the bottom user line, and an
 // unauthenticated -> /login redirect for app pages.
 
-import { admin, APIError, auth, tokenStore } from "./api.js";
+import { admin, APIError, auth, root, tenantStore, tokenStore } from "./api.js";
 import { getFullContract } from "./contract.js";
 import { el, mount, showToast } from "./dom.js";
 
@@ -60,6 +60,7 @@ async function main() {
 
   wireSignout();
   // Sidebar nav + user line are non-essential; failure shouldn't break the view.
+  populateTenantSwitcher().catch(() => {});
   populateSidebarNav().catch(() => {});
   populateSidebarExtensions().catch(() => {});
   populateUserLine().catch(() => {});
@@ -102,6 +103,55 @@ function wireSignout() {
       window.location.href = `${cfg.uiPath}/login`;
     }
   });
+}
+
+async function populateTenantSwitcher() {
+  // Superadmin tenant switch. Lets a superadmin "enter" a tenant from the
+  // UI: the selected slug rides on every admin request as the tenant header,
+  // so the scope-filtered sidebar (Phase A) swaps to that tenant's models and
+  // CRUD runs against its schema. Only meaningful in header-resolution
+  // multi-tenant mode — in subdomain mode the host already decides the tenant.
+  const host = document.getElementById("tenant-switcher");
+  if (!host) return;
+  if (!cfg.multiTenant || cfg.tenantResolution !== "header") return;
+
+  let tenants = [];
+  try {
+    const resp = await root.tenants();
+    tenants = (resp.items || []).filter((t) => t.is_active);
+  } catch (err) {
+    // 403/401 → not a superadmin (or not allowed to list tenants). Leave the
+    // switcher hidden; regular tenant users are bound to their own tenant.
+    if (err instanceof APIError) return;
+    return;
+  }
+  if (tenants.length === 0) return;
+
+  const current = tenantStore.get();
+  const select = el(
+    "select",
+    { id: "tenant-select", class: "tenant-select", "aria-label": "Active tenant" },
+    [
+      el("option", { value: "", selected: current === "" }, "Global (public)"),
+      ...tenants.map((t) =>
+        el("option", { value: t.slug, selected: current === t.slug }, t.name || t.slug)
+      ),
+    ]
+  );
+  select.addEventListener("change", () => {
+    const slug = select.value;
+    if (slug) tenantStore.set(slug);
+    else tenantStore.clear();
+    // Full reload to the dashboard: the contract + sidebar re-fetch in the new
+    // context, and the current resource may not exist in the target scope.
+    window.location.assign(`${cfg.uiPath}/dashboard`);
+  });
+
+  host.replaceChildren(
+    el("span", { class: "tenant-switcher-label" }, "Tenant"),
+    select
+  );
+  host.hidden = false;
 }
 
 async function populateSidebarNav() {

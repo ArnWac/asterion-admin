@@ -16,6 +16,23 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-06-22
+
+### Added
+- **Superadmin tenant switcher in the admin UI.** In header-resolution
+  multi-tenant mode, superadmins get a tenant dropdown at the top of the
+  sidebar (populated from `GET /root/tenants`). Selecting a tenant stores the
+  slug and reloads; every subsequent admin-API request carries the configured
+  tenant header, so the scope-filtered sidebar (0.1.10) swaps to that tenant's
+  models and CRUD runs against its schema. "Global (public)" clears the
+  selection. The switcher only appears for superadmins (non-superadmins get a
+  403 from `/root/tenants`, which hides it) and only in header mode — in
+  subdomain mode the host already determines the tenant. No backend change: a
+  superadmin already resolves to `admin.*` inside any tenant; this wires the
+  existing header path into the UI. The tenant header is attached **only** to
+  admin-prefix requests, never to `auth/` or `root/`, so a stale selection
+  can't break login or the switcher's own tenant lookup.
+
 ## [0.1.10] - 2026-06-22
 
 ### Added

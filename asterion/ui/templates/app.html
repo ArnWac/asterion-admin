@@ -21,6 +21,8 @@
         <span class="app-admin-label">Admin</span>
       </a>
 
+      <div id="tenant-switcher" class="tenant-switcher" aria-label="Active tenant" hidden></div>
+
       <ul id="sidebar-nav" class="sidebar-nav" aria-label="Models">
         <li><span class="placeholder">Loading…</span></li>
       </ul>
@@ -55,6 +57,10 @@
       uiPath: {{ admin_ui_path | tojson }},
       authPrefix: {{ auth_api_prefix | tojson }},
       adminPrefix: {{ admin_api_prefix | tojson }},
+      rootPrefix: {{ config.root_api_prefix | tojson }},
+      multiTenant: {{ config.enable_multi_tenant | tojson }},
+      tenantResolution: {{ config.tenant_resolution | tojson }},
+      tenantHeaderName: {{ config.tenant_header_name | tojson }},
       view: {{ view | tojson }},
       resource: {{ resource | tojson }},
       recordId: {{ record_id | tojson }},

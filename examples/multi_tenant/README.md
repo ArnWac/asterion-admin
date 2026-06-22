@@ -77,6 +77,13 @@ host has no subdomain, so it falls through to public. `*.localhost`
 already resolves to the loopback address in modern browsers, so no
 `/etc/hosts` edits are needed.
 
+In **header mode**, a logged-in superadmin also gets a **tenant switcher** at
+the top of the admin sidebar (`http://127.0.0.1:8000/admin`): pick `acme` or
+`globex` to browse that tenant's schema, or "Global (public)" to return to the
+global tables (users, tenants, audit log). The sidebar swaps its model list to
+match the selected scope. The switcher is header-mode only — in subdomain mode
+the host already picks the tenant.
+
 > **Note:** in subdomain mode, access the app by hostname, not by raw IP.
 > `http://127.0.0.1:8000` parses `127` as the first label and tries to
 > resolve a tenant named `127` (→ 404). The header-mode smoke checks below

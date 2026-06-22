@@ -110,6 +110,35 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
   flex-shrink: 0;
 }
 
+/* Superadmin tenant switcher — sits between the logo and the model list.
+ * Hidden by default (revealed by JS only for superadmins in header mode). */
+.tenant-switcher {
+  flex-shrink: 0;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--sidebar-divider);
+}
+.tenant-switcher-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sidebar-fg-muted);
+  margin-bottom: 0.3rem;
+}
+.tenant-switcher .tenant-select {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  background: var(--sidebar-hover);
+  color: var(--sidebar-fg);
+  border: 1px solid var(--sidebar-divider);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;

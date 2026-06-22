@@ -9,6 +9,29 @@
 const cfg = window.ASTERION || {};
 const TOKEN_KEY = "asterion_access";
 const REFRESH_KEY = "asterion_refresh";
+const TENANT_KEY = "asterion_tenant";
+
+// Superadmin tenant switch (header resolution only). The selected slug is
+// attached as the configured tenant header to ADMIN-prefix requests so a
+// superadmin can browse a tenant's schema from the UI. Persisted in
+// localStorage so the choice survives the full-page reload the switcher
+// triggers.
+export const tenantStore = {
+  get: () => localStorage.getItem(TENANT_KEY) || "",
+  set: (slug) => localStorage.setItem(TENANT_KEY, slug),
+  clear: () => localStorage.removeItem(TENANT_KEY),
+};
+
+function attachTenantHeader(headers, path) {
+  // Header-mode multi-tenancy only — in subdomain mode the host decides the
+  // tenant, so a header would be ignored. Scope strictly to admin-API paths:
+  // auth/ and root/ routes never carry it, so a stale selection can't break
+  // login or the switcher's own /root/tenants lookup.
+  if (!cfg.multiTenant || cfg.tenantResolution !== "header") return;
+  if (!cfg.adminPrefix || !path.startsWith(cfg.adminPrefix)) return;
+  const slug = tenantStore.get();
+  if (slug) headers[cfg.tenantHeaderName || "X-Tenant-Slug"] = slug;
+}
 
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -56,6 +79,7 @@ async function request(method, path, body, opts = {}) {
   const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
   const token = tokenStore.get();
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  attachTenantHeader(headers, path);
 
   const init = { method, headers };
   if (body !== undefined) init.body = JSON.stringify(body);
@@ -141,6 +165,12 @@ export const admin = {
     request("PUT", `${cfg.adminPrefix}/_permission_matrix`, { assignments }),
 };
 
+// Superadmin-only root endpoints. ``tenants`` powers the tenant switcher;
+// it returns 403 for non-superadmins, which the switcher treats as "hide".
+export const root = {
+  tenants: () => request("GET", `${cfg.rootPrefix}/tenants?limit=100`),
+};
+
 
 // --- file helpers (used by the import_export extension UI) ---
 
@@ -148,6 +178,7 @@ async function downloadFile(url) {
   const headers = {};
   const token = tokenStore.get();
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  attachTenantHeader(headers, url);
 
   const resp = await fetch(url, { headers });
   if (resp.status === 401) {
@@ -176,6 +207,7 @@ async function uploadFile(url, file) {
   const headers = {};
   const token = tokenStore.get();
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  attachTenantHeader(headers, url);
 
   const form = new FormData();
   form.append("file", file, file.name);
