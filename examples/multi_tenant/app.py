@@ -27,6 +27,15 @@ DATABASE_URL = os.environ.get(
     "postgresql+asyncpg://postgres:postgres@localhost:5432/asterion",
 )
 
+# How the active tenant is resolved per request. Switch with the env var:
+#   TENANT_RESOLUTION=header     -> read the X-Tenant-Slug header (default)
+#   TENANT_RESOLUTION=subdomain  -> read the first Host label, e.g.
+#                                   acme.localhost:8000 -> tenant "acme"
+# With "subdomain", reach a tenant at http://<slug>.localhost:8000 and the
+# global superadmin at http://localhost:8000 (a single-label host has no
+# subdomain, so it resolves to the public schema).
+TENANT_RESOLUTION = os.environ.get("TENANT_RESOLUTION", "header")
+
 config = CoreAdminConfig(
     database_url=DATABASE_URL,
     secret_key=os.environ.get("SECRET_KEY", "dev-secret-change-me-in-production"),
@@ -35,7 +44,7 @@ config = CoreAdminConfig(
     # All admins (including the tenant RBAC ones) are registered
     # explicitly in admin_config.py — nothing is auto-installed.
     enable_builtin_admins=False,
-    tenant_resolution="header",
+    tenant_resolution=TENANT_RESOLUTION,
     tenant_header_name="X-Tenant-Slug",
 )
 

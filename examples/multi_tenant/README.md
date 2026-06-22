@@ -62,6 +62,27 @@ Open <http://127.0.0.1:8000/admin> and sign in with the credentials
 printed to the console. The first boot seeds two tenants + sample
 projects + tickets; subsequent boots are no-ops.
 
+### Tenant resolution: header (default) or subdomain
+
+By default the active tenant is read from the `X-Tenant-Slug` header. To
+resolve it from the host subdomain instead, set `TENANT_RESOLUTION`:
+
+```bash
+TENANT_RESOLUTION=subdomain uvicorn examples.multi_tenant.app:app --reload
+```
+
+Then reach a tenant at `http://<slug>.localhost:8000` and the global
+superadmin (public schema) at `http://localhost:8000` — a single-label
+host has no subdomain, so it falls through to public. `*.localhost`
+already resolves to the loopback address in modern browsers, so no
+`/etc/hosts` edits are needed.
+
+> **Note:** in subdomain mode, access the app by hostname, not by raw IP.
+> `http://127.0.0.1:8000` parses `127` as the first label and tries to
+> resolve a tenant named `127` (→ 404). The header-mode smoke checks below
+> all use `127.0.0.1` + `X-Tenant-Slug`, so run them with the default
+> resolution.
+
 ## Smoke checklist
 
 After a fresh boot, the following should all hold. Each line is a single
@@ -127,6 +148,17 @@ curl -H "Authorization: Bearer $TOKEN" \
 #    permissions there and gets a 403.
 curl -H "Authorization: Bearer $TOKEN" \
      http://127.0.0.1:8000/api/v1/admin/projects
+```
+
+With `TENANT_RESOLUTION=subdomain` the tenant comes from the host instead
+of the header — the same calls become:
+
+```bash
+# tenant acme, scoped purely by hostname (no X-Tenant-Slug needed)
+curl -H "Authorization: Bearer $TOKEN" http://acme.localhost:8000/api/v1/admin/projects
+
+# the same owner against globex.localhost → cross-tenant → 403
+curl -H "Authorization: Bearer $TOKEN" http://globex.localhost:8000/api/v1/admin/projects
 ```
 
 ## Seeding without booting the server

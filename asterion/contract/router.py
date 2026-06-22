@@ -18,6 +18,7 @@ from asterion.contract.service import (
     ModelContractMeta,
     build_model_contract,
     compute_field_permissions,
+    resolve_model_scope,
 )
 from asterion.security.validation import (
     InvalidResourceNameError,
@@ -33,8 +34,20 @@ async def get_full_contract(
     ctx: AdminContext = Depends(require_admin_context),
 ) -> dict:
     runtime = request.app.state.asterion
+    # Context-aware sidebar filter (Phase A). In multi-tenant mode the full
+    # contract — which feeds the sidebar and dashboard — lists only the
+    # resources reachable in the current request scope: tenant-scoped models
+    # require an active tenant, public models only resolve outside one. This
+    # mirrors what the CRUD endpoints accept, so the UI can't offer a link
+    # that would 500 with "relation does not exist". Single-tenant apps
+    # (no TenantMiddleware, ctx.tenant always None) skip the filter entirely
+    # and see every registered resource, exactly as before.
+    multi_tenant = runtime.config.enable_multi_tenant
+    in_tenant = ctx.tenant is not None
     models: list[dict] = []
     for admin in runtime.registry.all():
+        if multi_tenant and (resolve_model_scope(admin) == "tenant") != in_tenant:
+            continue
         # Field permissions are policy.field_permission() output for
         # the calling principal — pre-computed here (async) so the
         # sync builder below can stamp the result into FieldMeta.

@@ -39,6 +39,27 @@ ALLOWED_BADGE_STYLES: frozenset[str] = frozenset(
     {"neutral", "success", "warning", "danger", "info"}
 )
 
+#: Wire-format values for :attr:`ModelContractMeta.scope`.
+ModelScope = Literal["tenant", "global"]
+
+
+def resolve_model_scope(model_admin: ModelAdmin) -> ModelScope:
+    """Whether the admin's model lives in a tenant schema or the public schema.
+
+    Derived from the SQLAlchemy declarative base: subclasses of
+    :class:`~asterion.models.base.TenantBase` (i.e. ``TenantModel``) are
+    tenant-scoped — their tables only exist inside a tenant schema;
+    everything else (``GlobalModel`` / ``GlobalBase``, or any other base) is
+    treated as global/public. Drives context-aware sidebar filtering in
+    multi-tenant mode: tenant-scoped resources are only reachable while a
+    tenant is active, public resources only outside one. ``"global"`` is the
+    safe default — a model that isn't tenant-scoped stays visible in the
+    public (superadmin) view rather than disappearing.
+    """
+    from asterion.models.base import TenantBase
+
+    return "tenant" if issubclass(model_admin.model, TenantBase) else "global"
+
 
 def resolve_date_hierarchy(model_admin: ModelAdmin) -> str | None:
     """Validate ``ModelAdmin.date_hierarchy`` for the contract (Roadmap 5.5).
@@ -276,6 +297,13 @@ class ModelContractMeta(BaseModel):
     label: str
     label_plural: str
     description: str | None = None
+    #: Schema scope of the backing model (Phase A): ``"tenant"`` for models
+    #: that live inside a tenant schema (``TenantModel``), ``"global"`` for
+    #: public-schema models. The full-contract endpoint filters the sidebar by
+    #: this in multi-tenant mode so a resource only appears where it's actually
+    #: reachable. Defaults to ``"global"`` so pre-Phase-A clients (and
+    #: single-tenant apps that ignore the field) behave exactly as before.
+    scope: ModelScope = "global"
     fields: list[FieldMeta]
     crud_actions: list[str]
     admin_actions: list[AdminActionMeta]
@@ -946,6 +974,7 @@ def build_model_contract(
         label=model_admin.display_label,
         label_plural=model_admin.display_label_plural,
         description=model_admin.description,
+        scope=resolve_model_scope(model_admin),
         fields=field_metas,
         crud_actions=list(CRUD_ACTIONS),
         admin_actions=[_admin_action_meta(a) for a in model_admin.actions],
