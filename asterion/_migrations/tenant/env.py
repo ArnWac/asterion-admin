@@ -55,7 +55,18 @@ def run_migrations_offline() -> None:
 def do_run_migrations(connection):
     if _schema:
         connection.execute(text(f'SET search_path TO "{_schema}", public'))
-    context.configure(connection=connection, target_metadata=target_metadata)
+        # ``execute`` autobegins a transaction (SQLAlchemy 2.0). Commit it so
+        # Alembic's own ``begin_transaction()`` below owns — and commits — the
+        # migration DDL. ``SET search_path`` is session-scoped (not SET LOCAL),
+        # so it survives this commit. WITHOUT this commit the DDL runs inside
+        # the autobegun transaction that the outer ``connect()`` context rolls
+        # back on exit, so the tables silently never persist.
+        connection.commit()
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        version_table_schema=_schema,
+    )
     with context.begin_transaction():
         context.run_migrations()
 
