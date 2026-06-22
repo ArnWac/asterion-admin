@@ -52,7 +52,6 @@ tenant's members.
 
 from __future__ import annotations
 
-import secrets
 import uuid
 from typing import Any
 
@@ -63,7 +62,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.admin.context import AdminContext, require_admin_context
 from asterion.auth.invite import create_invite
-from asterion.auth.password import hash_password
+from asterion.auth.provisioning import create_passwordless_user, ensure_membership
 from asterion.authz.permissions import assert_permission
 from asterion.db.dependencies import get_async_session
 from asterion.models.tenant_membership import TenantMembership
@@ -296,35 +295,16 @@ async def add_member(
     invited = False
     if user is None:
         # No global account yet → create an inactive, passwordless user and
-        # issue an invite token. The random hash is never a usable password;
-        # the invitee sets a real one via /auth/password-reset/confirm, which
-        # also activates the account.
-        user = User(
-            email=email,
-            hashed_password=hash_password(secrets.token_urlsafe(32)),
-            full_name=body.full_name,
-            is_active=False,
-            is_superadmin=False,
+        # issue an invite token. The account has no usable password; the
+        # invitee sets one via /auth/password-reset/confirm, which also
+        # activates it.
+        user = await create_passwordless_user(
+            session, email=email, full_name=body.full_name, is_active=False
         )
-        session.add(user)
-        await session.flush()
         invited = True
 
     # Create or reactivate the membership (idempotent on (user, tenant)).
-    membership = (
-        await session.execute(
-            select(TenantMembership).where(
-                TenantMembership.user_id == user.id,
-                TenantMembership.tenant_id == tenant_id,
-            )
-        )
-    ).scalar_one_or_none()
-    if membership is None:
-        membership = TenantMembership(user_id=user.id, tenant_id=tenant_id, is_active=True)
-        session.add(membership)
-        await session.flush()
-    elif not membership.is_active:
-        membership.is_active = True
+    membership = await ensure_membership(session, user_id=user.id, tenant_id=tenant_id)
 
     if desired_roles:
         await _set_membership_roles(

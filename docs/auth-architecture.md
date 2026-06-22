@@ -178,6 +178,53 @@ The `GET /_navigation` endpoint already does this — see
 
 ---
 
+## Service / machine accounts
+
+A device or service-to-service caller (e.g. a stationary time-clock terminal)
+needs an account that authenticates **only** via a minted access token, never a
+password. `asterion.auth.service_accounts.create_service_account` provisions one
+in a single call instead of hand-assembling `User` + `TenantMembership` +
+tenant RBAC:
+
+```python
+from asterion.auth.service_accounts import create_service_account
+from asterion.auth.tokens import create_access_token
+
+# `session` MUST be tenant-scoped (SET LOCAL search_path), like get_async_session.
+user = await create_service_account(
+    session,
+    tenant_id=tenant.id,
+    label="lobby-terminal",
+    permission_keys=["admin.time_entries.create"],
+)
+token = create_access_token(
+    user.id,
+    secret_key=config.secret_key,
+    algorithm=config.jwt_algorithm,
+    expires_minutes=config.access_token_expire_minutes,
+    token_version=user.token_version,
+)
+```
+
+It creates an **active, passwordless** user (`is_active=True`,
+`is_superadmin=False`; an unusable password hash so `POST /auth/login` rejects
+it), a `TenantMembership`, and a dedicated `service:<label>` role granting the
+permission keys. It does **not** mint tokens — that's the caller's job. A token
+for this account resolves through the normal tenant-RBAC path to a principal
+carrying exactly those keys.
+
+**Revocation** is the standard per-user invariant: bump `user.token_version` or
+set `user.is_active = False` to invalidate the account's existing tokens.
+
+The CLI wraps the helper and prints one freshly minted token:
+
+```bash
+asterion service-account create --tenant acme --label lobby-terminal \
+    --permission admin.time_entries.create --permission admin.time_entries.read
+```
+
+---
+
 ## Writing a custom provider
 
 The common case: your app already has an identity system and you want

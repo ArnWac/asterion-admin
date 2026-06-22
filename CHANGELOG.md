@@ -16,6 +16,35 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-06-22
+
+### Added
+- **`create_service_account`** (`asterion.auth.service_accounts`) — provisions
+  active, passwordless **service / machine accounts** (token-only auth via
+  `create_access_token`), bound to a tenant with a dedicated `service:<label>`
+  role carrying the given permission keys. Makes device / service-to-service
+  accounts (e.g. a stationary time-clock terminal) possible without downstream
+  apps stitching together `User` + `TenantMembership` + tenant RBAC themselves.
+  - The account is `is_active=True`, `is_superadmin=False`, and **passwordless**
+    (an unusable password hash), so `POST /auth/login` rejects it — it can only
+    authenticate via a minted access token. Revocation is the standard
+    invariant: bump `token_version` or set `is_active=False`.
+  - The helper does **not** mint tokens (separation of concerns); the caller
+    does, with `create_access_token(user.id, ...)`.
+  - `session` must be tenant-scoped (`SET LOCAL search_path`), like
+    `get_async_session` / the CRUD path — the RBAC tables are tenant-local while
+    `User` + `TenantMembership` are global.
+- **CLI** `asterion service-account create --tenant <slug> --label <x>
+  --permission <key> …` — provisions the account and prints one freshly minted
+  access token (shown once).
+
+### Changed
+- Internal: the "passwordless user + membership" creation in the member-invite
+  POST path (`asterion/admin/member_router.py`) was factored into shared
+  primitives (`asterion.auth.provisioning`) now reused by both member
+  onboarding and `create_service_account`. No behavioural change to member
+  onboarding.
+
 ## [0.1.6] - 2026-06-21
 
 ### Changed

@@ -6,6 +6,7 @@ Subcommands are organized into:
   * migrate:   generate, apply, status
   * tenant:    create, list, bootstrap, upgrade
   * permissions: sync, list, check
+  * service-account: create
 """
 
 from __future__ import annotations
@@ -49,6 +50,7 @@ tenant_app = typer.Typer(help="Tenant management commands.")
 permissions_app = typer.Typer(help="Permission catalog management.")
 user_app = typer.Typer(help="User management commands.")
 audit_app = typer.Typer(help="Audit log management.")
+service_account_app = typer.Typer(help="Service / machine account management.")
 
 app.add_typer(db_app, name="db")
 app.add_typer(migrate_app, name="migrate")
@@ -56,6 +58,7 @@ app.add_typer(tenant_app, name="tenant")
 app.add_typer(permissions_app, name="permissions")
 app.add_typer(user_app, name="user")
 app.add_typer(audit_app, name="audit")
+app.add_typer(service_account_app, name="service-account")
 
 
 # ---------------------------------------------------------------------------
@@ -1097,6 +1100,106 @@ async def _audit_prune(days: int) -> None:
         typer.echo(f"Pruned {deleted} audit row(s) older than {days} days.")
     finally:
         await db.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Service-account commands
+# ---------------------------------------------------------------------------
+
+
+@service_account_app.command("create")
+def service_account_create(
+    tenant: str = typer.Option(..., "--tenant", help="Tenant slug to bind the account to."),
+    label: str = typer.Option(..., "--label", help="Human label; names the role service:<label>."),
+    permission: list[str] = typer.Option(
+        [],
+        "--permission",
+        help="Permission key to grant (repeatable), e.g. admin.time_entries.create.",
+    ),
+    email: str | None = typer.Option(None, "--email", help="Override the synthetic email."),
+    expires_minutes: int | None = typer.Option(
+        None,
+        "--expires-minutes",
+        help="Access-token lifetime (defaults to access_token_expire_minutes).",
+    ),
+):
+    """Provision a token-only service account and print a freshly minted token once.
+
+    Creates an active, passwordless user bound to ``--tenant`` with the given
+    permission keys (see :func:`asterion.auth.service_accounts.create_service_account`)
+    and mints one access token. The token is shown ONCE — store it securely.
+    """
+    asyncio.run(_service_account_create(tenant, label, list(permission), email, expires_minutes))
+
+
+async def _service_account_create(
+    slug: str,
+    label: str,
+    permissions: list[str],
+    email: str | None,
+    expires_minutes: int | None,
+) -> None:
+    from asterion.auth.service_accounts import create_service_account
+    from asterion.auth.tokens import create_access_token
+    from asterion.tenancy.schema_names import make_tenant_schema_name
+    from asterion.tenancy.schema_strategy import set_search_path
+
+    try:
+        validated = validate_tenant_slug(slug)
+    except ValidationError as exc:
+        typer.echo(f"Invalid slug: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    config = _load_config()
+    db = _make_db(config)
+    token: str | None = None
+    out_email: str | None = None
+    out_id: str | None = None
+    try:
+        async with db.session() as session:
+            async with session.begin():
+                tenant_row = (
+                    await session.execute(select(Tenant).where(Tenant.slug == validated))
+                ).scalar_one_or_none()
+                if tenant_row is None:
+                    typer.echo(f"Tenant '{validated}' not found.", err=True)
+                    raise typer.Exit(code=1)
+
+                # RBAC tables are tenant-local — scope the session like the
+                # request CRUD path does (PostgreSQL only).
+                if "postgresql" in config.database_url:
+                    await set_search_path(session, make_tenant_schema_name(validated))
+
+                try:
+                    user = await create_service_account(
+                        session,
+                        tenant_id=tenant_row.id,
+                        label=label,
+                        permission_keys=permissions,
+                        email=email,
+                    )
+                except ValueError as exc:
+                    typer.echo(f"Cannot create service account: {exc}", err=True)
+                    raise typer.Exit(code=1) from exc
+
+                # Mint inside the transaction so user.id / token_version are
+                # loaded before commit expires the instance.
+                out_id = str(user.id)
+                out_email = user.email
+                token = create_access_token(
+                    user.id,
+                    secret_key=config.secret_key,
+                    algorithm=config.jwt_algorithm,
+                    expires_minutes=expires_minutes or config.access_token_expire_minutes,
+                    token_version=user.token_version,
+                )
+    finally:
+        await db.dispose()
+
+    typer.echo(f"Service account created: {out_email}")
+    typer.echo(f"User ID: {out_id}")
+    typer.echo("Access token (shown once — store it securely):")
+    typer.echo(token)
 
 
 if __name__ == "__main__":
