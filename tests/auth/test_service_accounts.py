@@ -19,9 +19,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from asterion import CoreAdminConfig, create_admin
-from asterion.auth.service_accounts import create_service_account
+from asterion.auth.service_accounts import create_service_account, delete_service_account
 from asterion.auth.tokens import create_access_token
 from asterion.models.base import GLOBAL_METADATA, TenantBase
+from asterion.models.password_reset_token import PasswordResetToken
 from asterion.models.tenant_membership import TenantMembership
 from asterion.models.tenant_rbac import (
     TenantMembershipRole,
@@ -62,9 +63,11 @@ async def test_provisions_passwordless_active_user_with_role(factory):
                 permission_keys=["admin.time_entries.create", "admin.time_entries.read"],
             )
             uid = user.id
-            # Active, non-superadmin, passwordless (hash set but unusable).
+            # Active, non-superadmin, passwordless (hash set but unusable),
+            # flagged as a service account.
             assert user.is_active is True
             assert user.is_superadmin is False
+            assert user.is_service_account is True
             assert user.hashed_password
             assert user.email.endswith("@service.invalid")
 
@@ -142,6 +145,57 @@ async def test_duplicate_label_raises(factory):
                 await create_service_account(s, tenant_id=tid, label="dup", permission_keys=[])
 
 
+# --- delete ---
+
+
+@pytest.mark.asyncio
+async def test_delete_service_account_removes_everything(factory):
+    tid = uuid.uuid4()
+    async with factory() as s:
+        async with s.begin():
+            user = await create_service_account(
+                s, tenant_id=tid, label="gone", permission_keys=["admin.foo.read"]
+            )
+            uid = user.id
+
+    async with factory() as s:
+        async with s.begin():
+            await delete_service_account(s, user_id=uid, tenant_id=tid)
+
+    async with factory() as s:
+        assert (await s.execute(select(User).where(User.id == uid))).scalar_one_or_none() is None
+        assert (
+            await s.execute(select(TenantMembership).where(TenantMembership.user_id == uid))
+        ).scalar_one_or_none() is None
+        assert (
+            await s.execute(select(TenantRole).where(TenantRole.name == "service:gone"))
+        ).scalar_one_or_none() is None
+        # No orphan grants or membership-role links left behind.
+        assert (await s.execute(select(TenantRolePermission))).first() is None
+        assert (await s.execute(select(TenantMembershipRole))).first() is None
+
+
+@pytest.mark.asyncio
+async def test_delete_refuses_non_service_user(factory):
+    tid = uuid.uuid4()
+    async with factory() as s:
+        async with s.begin():
+            user = User(
+                email="real@example.com",
+                hashed_password="x",
+                is_active=True,
+                is_superadmin=False,
+                is_service_account=False,
+            )
+            s.add(user)
+            await s.flush()
+            uid = user.id
+    async with factory() as s:
+        async with s.begin():
+            with pytest.raises(ValueError, match="service account"):
+                await delete_service_account(s, user_id=uid, tenant_id=tid)
+
+
 # --- HTTP auth invariants ---
 
 
@@ -189,6 +243,25 @@ def test_login_rejects_passwordless_service_account(app):
         json={"email": state["email"], "password": "whatever-strong-1"},
     )
     assert resp.status_code == 401, resp.text
+
+
+def test_password_reset_request_excludes_service_account(app):
+    """A reset would let someone turn the token-only account into a
+    login-capable one — so no reset token is ever issued. The response is the
+    standard 202 (no account enumeration)."""
+    application, runtime, state = app
+    resp = TestClient(application).post(
+        "/api/v1/auth/password-reset/request",
+        json={"email": state["email"]},
+    )
+    assert resp.status_code == 202, resp.text
+
+    async def _count_tokens() -> int:
+        async with runtime.db.session() as session:
+            rows = (await session.execute(select(PasswordResetToken))).scalars().all()
+            return len(rows)
+
+    assert asyncio.run(_count_tokens()) == 0
 
 
 def test_minted_token_authenticates_then_bump_invalidates(app):

@@ -41,6 +41,7 @@ async def create_passwordless_user(
     email: str,
     full_name: str | None = None,
     is_active: bool,
+    is_service_account: bool = False,
 ) -> User:
     """Create a passwordless, non-superadmin :class:`User` and flush it."""
     user = User(
@@ -49,6 +50,7 @@ async def create_passwordless_user(
         full_name=full_name,
         is_active=is_active,
         is_superadmin=False,
+        is_service_account=is_service_account,
     )
     session.add(user)
     await session.flush()

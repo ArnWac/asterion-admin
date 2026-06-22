@@ -6,7 +6,7 @@ Subcommands are organized into:
   * migrate:   generate, apply, status
   * tenant:    create, list, bootstrap, upgrade
   * permissions: sync, list, check
-  * service-account: create
+  * service-account: create, delete
 """
 
 from __future__ import annotations
@@ -1200,6 +1200,60 @@ async def _service_account_create(
     typer.echo(f"User ID: {out_id}")
     typer.echo("Access token (shown once — store it securely):")
     typer.echo(token)
+
+
+@service_account_app.command("delete")
+def service_account_delete(
+    tenant: str = typer.Option(..., "--tenant", help="Tenant slug the account belongs to."),
+    email: str = typer.Option(..., "--email", help="Email of the service account to delete."),
+):
+    """Delete a service account (user + membership + its dedicated service role).
+
+    Refuses to delete a normal (non-service) user.
+    """
+    asyncio.run(_service_account_delete(tenant, email))
+
+
+async def _service_account_delete(slug: str, email: str) -> None:
+    from asterion.auth.service_accounts import delete_service_account
+    from asterion.tenancy.schema_names import make_tenant_schema_name
+    from asterion.tenancy.schema_strategy import set_search_path
+
+    try:
+        validated = validate_tenant_slug(slug)
+    except ValidationError as exc:
+        typer.echo(f"Invalid slug: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    config = _load_config()
+    db = _make_db(config)
+    try:
+        async with db.session() as session:
+            async with session.begin():
+                tenant_row = (
+                    await session.execute(select(Tenant).where(Tenant.slug == validated))
+                ).scalar_one_or_none()
+                if tenant_row is None:
+                    typer.echo(f"Tenant '{validated}' not found.", err=True)
+                    raise typer.Exit(code=1)
+
+                user = await _find_user_by_email(session, email.lower().strip())
+                if user is None:
+                    typer.echo(f"No user with email '{email}'.", err=True)
+                    raise typer.Exit(code=1)
+
+                if "postgresql" in config.database_url:
+                    await set_search_path(session, make_tenant_schema_name(validated))
+
+                try:
+                    await delete_service_account(session, user_id=user.id, tenant_id=tenant_row.id)
+                except ValueError as exc:
+                    typer.echo(f"Cannot delete: {exc}", err=True)
+                    raise typer.Exit(code=1) from exc
+    finally:
+        await db.dispose()
+
+    typer.echo(f"Service account deleted: {email}")
 
 
 if __name__ == "__main__":

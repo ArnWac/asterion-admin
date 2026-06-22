@@ -16,6 +16,31 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-06-22
+
+Hardens the service-account feature from 0.1.7 into a first-class, manageable
+account type.
+
+### Added
+- **`User.is_service_account`** (shared migration `0005`) — marks token-only
+  service / machine accounts as a first-class type so they can be identified in
+  queries / UI and reasoned about by the framework.
+  `create_service_account` now sets it. (Run `asterion db upgrade-public` to
+  apply.)
+- **`delete_service_account`** (`asterion.auth.service_accounts`) — the inverse
+  of `create_service_account`: removes the user, its tenant membership, and the
+  dedicated `service:<label>` role (with grants + membership link), so tearing
+  one down leaves no orphan role. Refuses to delete a non-service user.
+- **CLI** `asterion service-account delete --tenant <slug> --email <email>`.
+
+### Fixed
+- **Service accounts are excluded from the password-reset flow.**
+  `POST /auth/password-reset/request` no longer issues a reset token for a
+  service account — previously, if one had been created with a real
+  (deliverable) email, a reset could have set a password and turned the
+  token-only account into a login-capable one. The response is unchanged (202,
+  no enumeration).
+
 ## [0.1.7] - 2026-06-22
 
 ### Added

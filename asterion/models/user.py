@@ -49,6 +49,17 @@ class User(GlobalModel):
         nullable=False,
     )
 
+    #: Marks a token-only service / machine account (provisioned via
+    #: :func:`asterion.auth.service_accounts.create_service_account`). Such an
+    #: account is active + passwordless and authenticates only with a minted
+    #: token; the framework refuses to issue it a password-reset token so it
+    #: can't be turned into a login-capable account.
+    is_service_account: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
     #: Base32 TOTP shared secret (Roadmap 3.4). Set during 2FA setup;
     #: ``totp_enabled`` flips to True only after the first code is
     #: verified at the enable step. ``None`` means no 2FA configured.

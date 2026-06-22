@@ -207,20 +207,28 @@ token = create_access_token(
 ```
 
 It creates an **active, passwordless** user (`is_active=True`,
-`is_superadmin=False`; an unusable password hash so `POST /auth/login` rejects
-it), a `TenantMembership`, and a dedicated `service:<label>` role granting the
-permission keys. It does **not** mint tokens — that's the caller's job. A token
-for this account resolves through the normal tenant-RBAC path to a principal
-carrying exactly those keys.
+`is_superadmin=False`, `is_service_account=True`; an unusable password hash so
+`POST /auth/login` rejects it), a `TenantMembership`, and a dedicated
+`service:<label>` role granting the permission keys. It does **not** mint
+tokens — that's the caller's job. A token for this account resolves through the
+normal tenant-RBAC path to a principal carrying exactly those keys.
+
+The `is_service_account` flag makes the account a first-class type: it's
+excluded from the password-reset flow (`POST /auth/password-reset/request`
+never issues it a token), so a reset can't turn the token-only account into a
+login-capable one, and you can identify service accounts in queries / UI.
 
 **Revocation** is the standard per-user invariant: bump `user.token_version` or
-set `user.is_active = False` to invalidate the account's existing tokens.
+set `user.is_active = False` to invalidate the account's existing tokens. To
+tear an account down entirely (user + membership + dedicated role), use
+`delete_service_account(session, user_id=..., tenant_id=...)`.
 
-The CLI wraps the helper and prints one freshly minted token:
+The CLI wraps both helpers (and prints one freshly minted token on create):
 
 ```bash
 asterion service-account create --tenant acme --label lobby-terminal \
     --permission admin.time_entries.create --permission admin.time_entries.read
+asterion service-account delete --tenant acme --email <account-email>
 ```
 
 ---
