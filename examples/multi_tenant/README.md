@@ -87,7 +87,7 @@ curl -sf -H "Authorization: Bearer $SU" $BASE/api/v1/root/tenants \
 # 4. Owner can log in and see projects in their tenant only.
 OWNER=$(curl -sf -X POST $BASE/api/v1/auth/login \
     -H 'Content-Type: application/json' \
-    -d '{"email":"owner@acme.test","password":"owner123"}' \
+    -d '{"email":"owner@acme.example.com","password":"owner123"}' \
     | jq -r .access_token)
 curl -sf -H "Authorization: Bearer $OWNER" -H "X-Tenant-Slug: acme" \
     $BASE/api/v1/admin/projects | jq -e '.items | length == 2' >/dev/null \
@@ -116,7 +116,7 @@ useful for superadmins managing tenants and users.
 # 1. log in as a tenant owner
 TOKEN=$(curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login \
     -H 'Content-Type: application/json' \
-    -d '{"email":"owner@acme.test","password":"owner123"}' | jq -r .access_token)
+    -d '{"email":"owner@acme.example.com","password":"owner123"}' | jq -r .access_token)
 
 # 2. list projects in the acme schema
 curl -H "Authorization: Bearer $TOKEN" \

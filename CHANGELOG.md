@@ -16,6 +16,30 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-06-22
+
+### Fixed
+- **Tenant migrations silently did not persist on PostgreSQL.** The bundled
+  tenant `env.py` issued `SET search_path TO "<schema>", public` *before*
+  Alembic's `begin_transaction()`. Under SQLAlchemy 2.0 that `execute`
+  autobegins a transaction, so Alembic no longer owned the DDL — and the outer
+  `connect()` context rolled it back on exit. Result: `bootstrap_tenant` /
+  `asterion db upgrade-tenant(s)` logged "Running upgrade …" but created **no
+  tenant tables** (`tenant_roles`, …), so tenant provisioning then failed with
+  `relation "tenant_roles" does not exist`. The env now commits the
+  `search_path` set (session-scoped, so it survives) before running migrations,
+  and pins `version_table_schema` to the tenant schema. Added a PostgreSQL
+  regression test that runs the real migration and asserts the tables persist
+  (the prior tests built tenant tables via `create_all` or mocked
+  `command.upgrade`, so this path was uncovered).
+
+### Changed
+- `examples/multi_tenant`: owner accounts are seeded under `…@acme.example.com`
+  / `…@globex.example.com` instead of the `.test` TLD. Modern `email-validator`
+  (behind `EmailStr` on the login endpoint) rejects reserved special-use TLDs
+  like `.test`, so the demo owners could not log in. (`example.com` is the
+  RFC-2606 documentation domain and validates cleanly.)
+
 ## [0.1.8] - 2026-06-22
 
 Hardens the service-account feature from 0.1.7 into a first-class, manageable

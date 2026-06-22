@@ -55,7 +55,7 @@ TENANT_SEEDS: tuple[dict, ...] = (
     {
         "slug": "acme",
         "name": "Acme Corp",
-        "owner_email": "owner@acme.test",
+        "owner_email": "owner@acme.example.com",
         "owner_password": "owner123",
         "owner_name": "Alice Acme",
         "projects": [
@@ -81,7 +81,7 @@ TENANT_SEEDS: tuple[dict, ...] = (
     {
         "slug": "globex",
         "name": "Globex Industries",
-        "owner_email": "owner@globex.test",
+        "owner_email": "owner@globex.example.com",
         "owner_password": "owner123",
         "owner_name": "Greta Globex",
         "projects": [
