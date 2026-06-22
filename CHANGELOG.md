@@ -16,6 +16,24 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-06-22
+
+### Added
+- **Context-aware sidebar (multi-tenant).** The full-contract endpoint
+  (`/_contract`), which feeds the admin sidebar and dashboard, now lists only
+  the resources reachable in the current request scope: outside a tenant
+  (public schema) only **global** models appear; inside a tenant only
+  **tenant-scoped** models appear. Previously every registered model was shown
+  regardless of scope, so a superadmin in the public schema saw tenant-only
+  resources (`Projects`, `Tickets`, `Tenant Roles`, …) whose tables don't exist
+  in `public` — clicking one 500'd with `relation "…" does not exist`. The
+  sidebar now mirrors what the CRUD endpoints actually accept. Single-tenant
+  apps (`enable_multi_tenant=False`) are unaffected and still see every model.
+- `ModelContractMeta.scope` (`"tenant"` | `"global"`), derived from the model's
+  SQLAlchemy base (`TenantModel` → `"tenant"`, everything else → `"global"`).
+  Additive field with a safe default (`"global"`), so `CONTRACT_VERSION` stays
+  `"2"`; clients that ignore unknown fields are unaffected.
+
 ## [0.1.9] - 2026-06-22
 
 ### Fixed
