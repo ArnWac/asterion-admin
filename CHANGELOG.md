@@ -16,6 +16,16 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+### Fixed
+- **Security (examples/multi_tenant): impersonation/audit logs were deletable.**
+  The example's `ImpersonationLogAdmin` and `AuditLogAdmin` expressed read-only
+  intent only via `readonly_fields` (form-level) — the DELETE endpoint still
+  existed, and a tenant `owner`'s `admin.*` wildcard matched
+  `admin.impersonation_logs.delete`, allowing cross-tenant deletion of
+  impersonation records. Both now attach `ReadOnlyPolicy`, which returns 403 on
+  create/update/delete regardless of permission keys. Example-only (these
+  admins are not shipped in the wheel); no package API change.
+
 ## [0.1.12] - 2026-06-22
 
 ### Added

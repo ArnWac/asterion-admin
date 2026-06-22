@@ -14,12 +14,16 @@ description, no external imports.
 Read-only intent
 ----------------
 
-There is no framework-level ``read_only = True`` flag on ``ModelAdmin``
-in v1. ``AuditLogAdmin`` and ``ImpersonationLogAdmin`` express read-only
-intent by listing every field in ``readonly_fields``, which makes the
-generated form render only disabled inputs. CRUD endpoints still exist
-server-side; if a future framework adds ``read_only``, replacing the
-field lists with the flag is a one-line change.
+``AuditLogAdmin`` and ``ImpersonationLogAdmin`` are append-only records
+written by the framework, never edited through the admin. They attach
+:class:`~asterion.admin.policy.ReadOnlyPolicy`, which makes the CRUD
+router answer 403 to create/update/delete and the contract-driven UI
+hide the write buttons — so the rows cannot be mutated or deleted even
+by a caller (e.g. a tenant ``owner`` whose ``admin.*`` wildcard would
+otherwise match ``admin.impersonation_logs.delete``). Listing every
+field in ``readonly_fields`` additionally locks the detail form; that
+alone is form-level only (the DELETE endpoint still exists), which is
+why the policy — not just the field list — is the actual guard.
 
 Permission catalog side effects
 -------------------------------
@@ -36,6 +40,7 @@ the default ``admin`` tenant role.
 
 from __future__ import annotations
 
+from asterion.admin.policy import ReadOnlyPolicy
 from asterion.models import (
     AuditLog,
     ImpersonationLog,
@@ -116,6 +121,11 @@ class AuditLogAdmin(ModelAdmin):
     label_plural = "Audit Logs"
     description = "Immutable log of administrative actions. Read-only in the UI."
 
+    # Append-only: ReadOnlyPolicy makes create/update/delete 403 regardless
+    # of the caller's permission keys (the readonly_fields below only disable
+    # the form). See module docstring.
+    policy = ReadOnlyPolicy()
+
     list_display = ["created_at", "actor_label", "method", "path", "status_code", "resource"]
     search_fields = ["path", "resource", "record_id", "action", "actor_label"]
     ordering = ["-created_at"]
@@ -140,6 +150,11 @@ class ImpersonationLogAdmin(ModelAdmin):
     label = "Impersonation Log"
     label_plural = "Impersonation Logs"
     description = "Record of superadmin → user impersonation sessions. Read-only in the UI."
+
+    # Append-only: blocks create/update/delete at the route, so a tenant
+    # owner's admin.* wildcard cannot delete cross-tenant impersonation
+    # records. See module docstring.
+    policy = ReadOnlyPolicy()
 
     list_display = ["created_at", "superadmin_id", "target_user_id", "tenant_id", "revoked_at"]
     search_fields = ["jti"]
