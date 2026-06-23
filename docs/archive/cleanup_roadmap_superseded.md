@@ -3,7 +3,7 @@
 > **SUPERSEDED / ARCHIVIERT (2026-06-15).**
 > Dieses Dokument schlug vor, das Extension-System abzubauen. Die
 > verbindliche Entscheidung ist das Gegenteil: Das Extension-System
-> bleibt Kern. Maßgeblich ist `docs/review-hardening-roadmap.md`. Dieses Dokument wird
+> bleibt Kern. Maßgeblich ist `docs/roadmap.md`. Dieses Dokument wird
 > nur historisch aufbewahrt und ist **keine** Arbeitsgrundlage.
 > (Zusätzlich ist es durch ein fehlerhaftes Such-/Ersetzen an mehreren
 > Stellen technisch beschädigt.)

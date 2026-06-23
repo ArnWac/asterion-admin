@@ -102,7 +102,7 @@ class AdminRuntime:
     #: This is deliberate and documented (see
     #: ``asterion/security/protected_fields.py`` and the "documented
     #: singletons are allowed" carve-out in
-    #: ``docs/review-hardening-roadmap.md``): a leaked
+    #: ``docs/roadmap.md``): a leaked
     #: secret from any admin's response is the same security failure no
     #: matter which app instance holds the registry, so protected fields
     #: are a global, fail-safe concern — two apps sharing the registry can

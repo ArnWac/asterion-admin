@@ -158,7 +158,7 @@ bootstrap, or the CLI — those still import the concrete builtin `User`
 model. So an external IdP runs the admin surface, but root/audit/CLI
 remain builtin-coupled by design for now. This is a deliberate, documented
 limitation, not an oversight; full decoupling is tracked in
-[review-hardening-roadmap.md](review-hardening-roadmap.md).
+[roadmap.md](roadmap.md).
 
 ---
 

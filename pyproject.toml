@@ -97,7 +97,7 @@ dev = [
     "build>=1.2.0",
     # Static analysis aids for local cleanup passes (not CI gates):
     # vulture finds dead code, radon reports cyclomatic complexity /
-    # maintainability. See docs/review-hardening-roadmap.md.
+    # maintainability. See docs/roadmap.md.
     "vulture>=2.16",
     "radon>=6.0",
 ]

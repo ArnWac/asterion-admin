@@ -179,7 +179,7 @@ for how to raise custom envelopes via `AdminError`.
   and `cli/main.py` still import the concrete builtin `User` model. An
   external IdP works for the admin surface; superadmin/root tooling and
   audit-actor resolution remain builtin-only by design for now. Full
-  decoupling is tracked in [review-hardening-roadmap.md](review-hardening-roadmap.md).
+  decoupling is tracked in [roadmap.md](roadmap.md).
 - No CSP by default (the bundled UI's inline config scripts would break a
   strict `script-src 'self'`). Set `CoreAdminConfig.content_security_policy`
   (or `ASTERION_CONTENT_SECURITY_POLICY`) to emit one — recommended for

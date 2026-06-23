@@ -36,7 +36,7 @@ remain anonymous).
 
 Some limitations are known and documented rather than treated as
 vulnerabilities — see [`docs/security.md`](docs/security.md) and
-[`docs/review-hardening-roadmap.md`](docs/review-hardening-roadmap.md). Notably:
+[`docs/roadmap.md`](docs/roadmap.md). Notably:
 
 - The default login rate limiter is in-memory and single-process; multi-worker
   deployments must supply a shared backend.
