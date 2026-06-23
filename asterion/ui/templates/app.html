@@ -36,6 +36,9 @@
 
       <div class="sidebar-footer">
         <span id="user-ctx" class="user-line" aria-label="Signed in user"></span>
+        {% if config.enable_multi_tenant %}
+        <a id="permissions-link" href="{{ admin_ui_path }}/permissions">Permissions</a>
+        {% endif %}
         <a id="settings-link" href="{{ admin_ui_path }}/settings">Settings</a>
         <button id="signout" type="button" class="btn-signout">Sign out</button>
       </div>

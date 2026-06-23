@@ -16,6 +16,20 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-06-23
+
+### Added
+- **Permissions matrix link in the sidebar.** When multi-tenancy is enabled,
+  the admin sidebar footer now shows a **Permissions** link to the existing
+  roles × permissions matrix (`/admin/permissions`, backed by
+  `GET/PUT /_permission_matrix`). Previously the matrix view shipped but was
+  undiscoverable; the raw `TenantRolePermission` list was the only obvious way
+  to inspect role grants. The matrix is the Django-style grid for assigning
+  permissions to tenant roles; the matrix API enforces
+  `admin.tenant_roles.list` (read) / `admin.tenant_role_permissions.update`
+  (write). No new queries on list pages — the matrix loads roles + assignments
+  in one bounded fetch.
+
 ## [0.1.13] - 2026-06-23
 
 ### Added

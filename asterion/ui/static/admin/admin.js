@@ -225,8 +225,11 @@ async function populateUserLine() {
 }
 
 function highlightSettingsLink() {
-  if (cfg.view !== "settings") return;
-  const link = document.getElementById("settings-link");
+  // Footer links that map 1:1 to a view; highlight the active one.
+  const byView = { settings: "settings-link", permissions: "permissions-link" };
+  const id = byView[cfg.view];
+  if (!id) return;
+  const link = document.getElementById(id);
   if (!link) return;
   link.setAttribute("aria-current", "page");
   link.classList.add("active");
