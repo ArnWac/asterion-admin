@@ -9,9 +9,10 @@ export async function mountDashboard(root) {
   setBreadcrumb([{ label: "Home" }]);
 
   const contract = await getFullContract();
-  const models = (contract.models || []).slice().sort((a, b) =>
-    a.label_plural.localeCompare(b.label_plural)
-  );
+  const models = (contract.models || [])
+    .filter((m) => m.show_in_nav !== false)
+    .slice()
+    .sort((a, b) => a.label_plural.localeCompare(b.label_plural));
 
   if (models.length === 0) {
     mount(
