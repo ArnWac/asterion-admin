@@ -16,6 +16,16 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.29] - 2026-06-24
+
+### Removed
+- **Dead `SchemaBuilder` class** (+ its private `_col_info` helper) removed from
+  `asterion/schemas/builder.py`. It was an A3-era Pydantic-schema factory
+  superseded by the contract system; nothing in the package or tests used it
+  (only the standalone `build_model_schema` is live). Not part of the public
+  API (`asterion.__all__`), so no public surface changes. `schemas/builder.py`
+  coverage went 40% → 100% as a result (the file is no longer half dead code).
+
 ## [0.1.28] - 2026-06-24
 
 ### Changed
