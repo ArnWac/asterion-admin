@@ -16,6 +16,24 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-06-23
+
+### Added
+- **Per-tenant audit logs.** Tenant-context admin events (CRUD / actions /
+  import-export on tenant-scoped resources) are now written to a
+  `tenant_audit_logs` table **inside the tenant's own schema** instead of the
+  public `audit_logs` table. Isolation is physical (`search_path`), not a
+  `tenant_id` filter, so there's no cross-tenant leak risk and a tenant's audit
+  trail surfaces through the normal tenant-scoped admin. Global / cross-tenant
+  events (login, impersonation, user/tenant management) stay in the public
+  `audit_logs` table — which now tracks *only* global events. New
+  `TenantAuditLog` model + read-only `TenantAuditLogAdmin` builtin (shown in
+  tenant context via the scope filter); routing is driven by the
+  `tenant_scoped` switch on the audit writer, set from `ctx.tenant`.
+- Tenant Alembic migration `0002_tenant_audit_logs` creates the table. New
+  tenants get it during `bootstrap_tenant`; **existing tenants need
+  `asterion db upgrade-tenants`** to add it.
+
 ### Fixed
 - **Security (examples/multi_tenant): impersonation/audit logs were deletable.**
   The example's `ImpersonationLogAdmin` and `AuditLogAdmin` expressed read-only
