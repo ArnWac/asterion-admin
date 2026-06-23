@@ -162,6 +162,7 @@ async def _write_action_audit(
             actor=ctx.principal,
             resource=admin.model_name,
             tenant_id=ctx.tenant.id if ctx.tenant is not None else None,
+            tenant_scoped=ctx.tenant is not None,
             changes={
                 "action": action_instance.name,
                 "ids": [str(i) for i in ids],

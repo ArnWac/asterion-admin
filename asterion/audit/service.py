@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from asterion.core.net import request_client_ip
 from asterion.db.session import DatabaseManager
 from asterion.models.audit_log import AuditLog
+from asterion.models.tenant_audit_log import TenantAuditLog
 from asterion.providers.base import AdminPrincipal
 from asterion.security.sanitize import sanitize_payload
 
@@ -103,8 +104,20 @@ def audit_payload(
     record_id: str | int | uuid.UUID | None = None,
     changes: Mapping[str, Any] | None = None,
     ip_address: str | None = None,
-) -> AuditLog:
-    """Build an AuditLog row, sanitizing ``changes`` along the way.
+    tenant_scoped: bool = False,
+) -> AuditLog | TenantAuditLog:
+    """Build an audit row, sanitizing ``changes`` along the way.
+
+    ``tenant_scoped`` selects the destination model:
+
+    * ``False`` (default) → :class:`AuditLog` (public schema) — the home
+      for global / cross-tenant events (login, impersonation, user/tenant
+      management). ``tenant_id`` is recorded as a discriminator column.
+    * ``True`` → :class:`TenantAuditLog`, which lives inside the active
+      tenant schema. The caller MUST pass a tenant-scoped session whose
+      ``search_path`` points at that schema; the row carries no
+      ``tenant_id`` (the schema *is* the tenant), so ``tenant_id`` is
+      ignored here.
 
     Performs no I/O — callers persist the row.
     """
@@ -112,19 +125,21 @@ def audit_payload(
     if changes is not None:
         sanitized = sanitize_payload(dict(changes))
 
-    return AuditLog(
-        method=method,
-        path=path,
-        status_code=status_code,
-        actor_user_id=_coerce_actor_id(actor),
-        tenant_id=tenant_id,
-        resource=resource,
-        record_id=None if record_id is None else str(record_id),
-        action=action,
-        actor_label=getattr(actor, "email", None),
-        changes=sanitized,
-        ip_address=ip_address,
-    )
+    common = {
+        "method": method,
+        "path": path,
+        "status_code": status_code,
+        "actor_user_id": _coerce_actor_id(actor),
+        "resource": resource,
+        "record_id": None if record_id is None else str(record_id),
+        "action": action,
+        "actor_label": getattr(actor, "email", None),
+        "changes": sanitized,
+        "ip_address": ip_address,
+    }
+    if tenant_scoped:
+        return TenantAuditLog(**common)
+    return AuditLog(tenant_id=tenant_id, **common)
 
 
 async def record_audit_in_session(session: AsyncSession, **kw: Any) -> None:

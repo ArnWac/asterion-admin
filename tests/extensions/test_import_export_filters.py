@@ -20,7 +20,7 @@ from sqlalchemy.orm import DeclarativeBase
 from asterion import CoreAdminConfig, ModelAdmin, create_admin
 from asterion.auth.password import hash_password
 from asterion.extensions.import_export import ImportExportExtension
-from asterion.models.base import GlobalModel
+from asterion.models.base import GlobalModel, TenantBase
 from asterion.models.user import User
 from tests._helpers import make_admin_principal, make_admin_tenant, override_admin_context
 
@@ -73,6 +73,7 @@ def app(tmp_path):
     async def _setup():
         async with runtime.db.engine.begin() as conn:
             await conn.run_sync(GlobalModel.metadata.create_all)
+            await conn.run_sync(TenantBase.metadata.create_all)
             await conn.run_sync(_FilterableWidget.metadata.create_all)
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
@@ -221,7 +222,7 @@ def test_export_with_ids_ignores_filter_params(app):
 def test_export_audit_records_filters(app):
     from sqlalchemy import select
 
-    from asterion.models.audit_log import AuditLog
+    from asterion.models.tenant_audit_log import TenantAuditLog
 
     _grant(app)
     _seed(app, [{"name": "a", "color": "red"}])
@@ -234,7 +235,7 @@ def test_export_audit_records_filters(app):
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
             result = await session.execute(
-                select(AuditLog).order_by(AuditLog.created_at.desc()).limit(1)
+                select(TenantAuditLog).order_by(TenantAuditLog.created_at.desc()).limit(1)
             )
             return result.scalar_one()
 

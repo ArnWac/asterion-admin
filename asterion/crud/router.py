@@ -80,7 +80,12 @@ async def _audit_crud(
     try:
         kwargs = request_audit_kwargs(request, status_code=status_code)
         if ctx.tenant is not None:
+            # Inside a tenant the session is tenant-scoped, so the audit row
+            # goes to that tenant's own audit_logs table (physical isolation),
+            # not the public one. Global/cross-tenant events stay on the
+            # public table with tenant_id as a discriminator.
             kwargs["tenant_id"] = ctx.tenant.id
+            kwargs["tenant_scoped"] = True
         await record_audit_in_session(
             session,
             action=action,

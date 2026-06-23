@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from asterion.admin.policy import ReadOnlyPolicy
 from asterion.models.audit_log import AuditLog
+from asterion.models.tenant_audit_log import TenantAuditLog
 from asterion.models.tenant_rbac import (
     TenantMembershipRole,
     TenantRole,
@@ -119,10 +120,75 @@ class AuditLogAdmin(ModelAdmin):
     ]
 
 
+class TenantAuditLogAdmin(ModelAdmin):
+    """Read-only admin on the per-tenant :class:`TenantAuditLog` table.
+
+    Lives inside each tenant schema, so it surfaces only the calling
+    tenant's own audit trail — physical isolation via ``search_path``,
+    no cross-tenant filtering. Tenant-context admin events (CRUD /
+    actions / import-export) are routed here; global events stay in the
+    public :class:`AuditLogAdmin`. Append-only via
+    :class:`~asterion.admin.policy.ReadOnlyPolicy`.
+
+    It carries no ``tenant_id`` column (the schema is the tenant), so the
+    list/detail are slightly leaner than the global audit admin.
+    """
+
+    model = TenantAuditLog
+
+    label = "Audit Log"
+    label_plural = "Audit Logs"
+    description = "Immutable record of this tenant's admin write operations."
+
+    policy = ReadOnlyPolicy()
+
+    list_display = [
+        "created_at",
+        "actor_label",
+        "method",
+        "path",
+        "status_code",
+        "resource",
+        "record_id",
+        "action",
+    ]
+    search_fields = [
+        "actor_label",
+        "resource",
+        "record_id",
+        "action",
+        "path",
+        "ip_address",
+    ]
+    filter_fields = [
+        "method",
+        "status_code",
+        "resource",
+        "action",
+    ]
+    ordering = ["-created_at"]
+    readonly_fields = [
+        "id",
+        "created_at",
+        "updated_at",
+        "method",
+        "path",
+        "status_code",
+        "actor_user_id",
+        "resource",
+        "record_id",
+        "action",
+        "actor_label",
+        "changes",
+        "ip_address",
+    ]
+
+
 BUILTIN_TENANT_ADMINS = (
     TenantRoleAdmin,
     TenantRolePermissionAdmin,
     TenantMembershipRoleAdmin,
+    TenantAuditLogAdmin,
 )
 
 #: Read-only admins on framework-owned tables (Roadmap 5.1). Installed
@@ -135,6 +201,7 @@ __all__ = [
     "BUILTIN_AUDIT_ADMINS",
     "BUILTIN_TENANT_ADMINS",
     "AuditLogAdmin",
+    "TenantAuditLogAdmin",
     "TenantMembershipRoleAdmin",
     "TenantRoleAdmin",
     "TenantRolePermissionAdmin",

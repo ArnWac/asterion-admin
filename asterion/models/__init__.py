@@ -5,6 +5,7 @@ from asterion.models.permission_catalog import PermissionCatalog
 from asterion.models.revoked_token import RevokedToken
 from asterion.models.saved_filter import SavedFilter
 from asterion.models.tenant import Tenant
+from asterion.models.tenant_audit_log import TenantAuditLog
 from asterion.models.tenant_membership import TenantMembership
 from asterion.models.tenant_rbac import (
     TenantMembershipRole,
@@ -22,6 +23,7 @@ __all__ = [
     "RevokedToken",
     "SavedFilter",
     "Tenant",
+    "TenantAuditLog",
     "TenantMembership",
     "TenantMembershipRole",
     "TenantRole",

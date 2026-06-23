@@ -271,6 +271,7 @@ async def export_records(
             actor=ctx.principal,
             resource=admin.model_name,
             tenant_id=ctx.tenant.id if ctx.tenant is not None else None,
+            tenant_scoped=ctx.tenant is not None,
             changes={
                 "rows": len(rows),
                 "format": format,
@@ -490,6 +491,7 @@ async def import_records(
             actor=ctx.principal,
             resource=admin.model_name,
             tenant_id=ctx.tenant.id if ctx.tenant is not None else None,
+            tenant_scoped=ctx.tenant is not None,
             changes={
                 "created": created,
                 "failed": failed,

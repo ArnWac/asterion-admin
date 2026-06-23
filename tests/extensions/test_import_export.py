@@ -33,8 +33,8 @@ from asterion.extensions.import_export import (
     MAX_IMPORT_ROWS,
     ImportExportExtension,
 )
-from asterion.models.audit_log import AuditLog
-from asterion.models.base import GlobalModel
+from asterion.models.base import GlobalModel, TenantBase
+from asterion.models.tenant_audit_log import TenantAuditLog
 from asterion.models.user import User
 from tests._helpers import make_admin_principal, make_admin_tenant, override_admin_context
 
@@ -87,6 +87,7 @@ def app(tmp_path):
     async def _setup():
         async with runtime.db.engine.begin() as conn:
             await conn.run_sync(GlobalModel.metadata.create_all)
+            await conn.run_sync(TenantBase.metadata.create_all)
             await conn.run_sync(Widget.metadata.create_all)
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
@@ -210,6 +211,7 @@ def test_full_contract_omits_import_export_when_not_mounted(tmp_path):
     async def _setup():
         async with runtime.db.engine.begin() as conn:
             await conn.run_sync(GlobalModel.metadata.create_all)
+            await conn.run_sync(TenantBase.metadata.create_all)
             await conn.run_sync(Widget.metadata.create_all)
 
     asyncio.run(_setup())
@@ -304,7 +306,7 @@ def test_export_writes_audit_row(app):
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
             result = await session.execute(
-                select(AuditLog).where(AuditLog.action == EXPORT_AUDIT_ACTION)
+                select(TenantAuditLog).where(TenantAuditLog.action == EXPORT_AUDIT_ACTION)
             )
             return list(result.scalars().all())
 
@@ -387,7 +389,7 @@ def test_export_audit_records_selection_count(app):
             return list(
                 (
                     await session.execute(
-                        select(AuditLog).where(AuditLog.action == EXPORT_AUDIT_ACTION)
+                        select(TenantAuditLog).where(TenantAuditLog.action == EXPORT_AUDIT_ACTION)
                     )
                 )
                 .scalars()
@@ -437,7 +439,7 @@ def test_export_xlsx_audit_records_format(app):
             return list(
                 (
                     await session.execute(
-                        select(AuditLog).where(AuditLog.action == EXPORT_AUDIT_ACTION)
+                        select(TenantAuditLog).where(TenantAuditLog.action == EXPORT_AUDIT_ACTION)
                     )
                 )
                 .scalars()
@@ -580,7 +582,7 @@ def test_csv_import_writes_audit_row(app):
             return list(
                 (
                     await session.execute(
-                        select(AuditLog).where(AuditLog.action == IMPORT_AUDIT_ACTION)
+                        select(TenantAuditLog).where(TenantAuditLog.action == IMPORT_AUDIT_ACTION)
                     )
                 )
                 .scalars()
@@ -716,7 +718,7 @@ def test_dry_run_writes_no_audit_log(app):
             return list(
                 (
                     await session.execute(
-                        select(AuditLog).where(AuditLog.action == IMPORT_AUDIT_ACTION)
+                        select(TenantAuditLog).where(TenantAuditLog.action == IMPORT_AUDIT_ACTION)
                     )
                 )
                 .scalars()

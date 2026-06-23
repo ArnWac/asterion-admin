@@ -25,6 +25,7 @@ from asterion.admin.fieldset import Fieldset
 from asterion.admin.inline import InlineAdmin
 from asterion.admin.policy import AdminPolicy
 from asterion.builtins.admin import (
+    TenantAuditLogAdmin,
     TenantMembershipRoleAdmin,
     TenantRoleAdmin,
     TenantRolePermissionAdmin,
@@ -149,5 +150,6 @@ def register(registry: AdminRegistry) -> None:
     registry.register(TenantRoleAdmin)
     registry.register(TenantRolePermissionAdmin)
     registry.register(TenantMembershipRoleAdmin)
+    registry.register(TenantAuditLogAdmin)
     registry.register(ProjectAdmin)
     registry.register(TicketAdmin)

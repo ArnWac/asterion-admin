@@ -25,7 +25,8 @@ from asterion.audit import (
 )
 from asterion.auth.password import hash_password
 from asterion.models.audit_log import AuditLog
-from asterion.models.base import GlobalModel
+from asterion.models.base import GlobalModel, TenantBase
+from asterion.models.tenant_audit_log import TenantAuditLog
 from asterion.models.user import User
 from tests._helpers import make_admin_principal, make_admin_tenant, override_admin_context
 
@@ -74,6 +75,10 @@ def app(tmp_path):
     async def _setup():
         async with runtime.db.engine.begin() as conn:
             await conn.run_sync(GlobalModel.metadata.create_all)
+            # The context override sets a tenant, so CRUD/action/export events
+            # route to the per-tenant audit table (v0.1.13). In this sqlite
+            # single-DB test that table lives alongside the global one.
+            await conn.run_sync(TenantBase.metadata.create_all)
             await conn.run_sync(Widget.metadata.create_all)
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
@@ -105,14 +110,24 @@ def _client(app):
 
 
 def _audits(app, action: str | None = None) -> list[AuditLog]:
+    return _audits_for(app, AuditLog, action)
+
+
+def _tenant_audits(app, action: str | None = None) -> list[TenantAuditLog]:
+    """Tenant-scoped audit rows. CRUD/action/export under an active tenant
+    route here instead of the global table (v0.1.13)."""
+    return _audits_for(app, TenantAuditLog, action)
+
+
+def _audits_for(app, model, action: str | None):
     runtime = app.state.asterion
 
     async def _go():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
-            stmt = select(AuditLog)
+            stmt = select(model)
             if action is not None:
-                stmt = stmt.where(AuditLog.action == action)
+                stmt = stmt.where(model.action == action)
             result = await session.execute(stmt)
             return list(result.scalars().all())
 
@@ -182,7 +197,7 @@ def _seed_widget(app, name: str = "w1") -> int:
 def test_crud_create_writes_audit(app):
     resp = _client(app).post("/api/v1/admin/widgets", json={"name": "alpha"})
     assert resp.status_code == 201
-    rows = _audits(app, CRUD_CREATE)
+    rows = _tenant_audits(app, CRUD_CREATE)
     assert len(rows) == 1
     assert rows[0].resource == "widgets"
     assert rows[0].record_id is not None
@@ -193,7 +208,7 @@ def test_crud_update_writes_audit(app):
     wid = _seed_widget(app)
     resp = _client(app).patch(f"/api/v1/admin/widgets/{wid}", json={"name": "renamed"})
     assert resp.status_code == 200
-    rows = _audits(app, CRUD_UPDATE)
+    rows = _tenant_audits(app, CRUD_UPDATE)
     assert len(rows) == 1
     assert rows[0].record_id == str(wid)
 
@@ -202,7 +217,7 @@ def test_crud_delete_writes_audit(app):
     wid = _seed_widget(app)
     resp = _client(app).delete(f"/api/v1/admin/widgets/{wid}")
     assert resp.status_code == 200
-    rows = _audits(app, CRUD_DELETE)
+    rows = _tenant_audits(app, CRUD_DELETE)
     assert len(rows) == 1
     assert rows[0].record_id == str(wid)
 
@@ -211,7 +226,7 @@ def test_crud_failure_does_not_write_audit(app):
     """A 422 from clean_write_payload (unknown field) must NOT emit an audit row."""
     resp = _client(app).post("/api/v1/admin/widgets", json={"name": "x", "unknown": 1})
     assert resp.status_code == 422
-    assert _audits(app, CRUD_CREATE) == []
+    assert _tenant_audits(app, CRUD_CREATE) == []
 
 
 # --- admin actions ---
@@ -221,7 +236,7 @@ def test_admin_action_writes_audit(app):
     wid = _seed_widget(app)
     resp = _client(app).post("/api/v1/admin/widgets/_actions/ping", json={"ids": [wid]})
     assert resp.status_code == 200
-    rows = _audits(app, ADMIN_ACTION)
+    rows = _tenant_audits(app, ADMIN_ACTION)
     assert len(rows) == 1
     assert rows[0].resource == "widgets"
     assert rows[0].changes["action"] == "ping"
