@@ -1,6 +1,6 @@
 # asterion — Roadmap & Hardening (konsolidiert)
 
-Stand: 2026-06-19 · bezieht sich auf `asterion` 0.1.0
+Stand: 2026-06-23 · bezieht sich auf `asterion` 0.1.0
 
 Dieses Dokument konsolidiert die frühere `roadmap.md` (Feature-Phasen,
 Non-Goals) und `stabilization.md` (Pre-1.0-Härtung) und führt sie mit den
@@ -663,6 +663,91 @@ ein generischer Baustein mit klarem Wert für jede Terminal-/Geräte-App.
 
 **Status:** geplant — Design festgelegt (oben), Umsetzung nach Bedarf; der erste
 Konsument (Zeiterfassungs-Punch) läuft bis dahin auf Domain-Backstop (A).
+
+---
+
+### Globale RBAC — nicht-superadmin globale Admins („Support"-Rollen)
+
+**Angefordert (2026-06-23).** Heute sind die globalen (public-schema)
+Ressourcen — `users`, `tenants`, `audit_logs`, `impersonation_logs`,
+`tenant_memberships` — **ausschließlich superadmin-zugänglich**. Der Zugriff
+hängt allein an `User.is_superadmin`: ein Superadmin bekommt im Public-Kontext
+`admin.*`, jeder Nicht-Superadmin bekommt dort **keine** Keys und wird
+geblockt. Ein **per-Rollen-Permissionsystem existiert nur per-Tenant**
+(`tenant_roles` + `tenant_role_permissions` im Tenant-Schema, editiert über
+die Permission-Matrix / den per-Rollen-Picker). Für die globale Ebene gibt es
+bewusst kein Äquivalent.
+
+**Ziel:** eine globale Rolle wie **„Support"** — ein Nicht-Superadmin, der
+tenant-übergreifend bestimmte globale Ressourcen sehen (typischer Fall:
+read-only) und ggf. eng umrissen bearbeiten darf, **ohne** den Vollzugriff
+eines Superadmins. Beispiel: Support sieht alle `users` + `tenants` +
+`audit_logs` read-only, darf aber nicht impersonieren, keine Tenants anlegen
+und keine Logs löschen.
+
+**Warum das ein eigenes Feature ist (kein Reuse der Tenant-Matrix):** Die
+Tenant-RBAC-Tabellen leben im **Tenant-Schema** und werden über den
+tenant-gescopten `search_path` aufgelöst; im Public-Kontext (`ctx.tenant is
+None`) existieren sie nicht (genau die 0.1.19-Lücke, die `/_permission_matrix`
+außerhalb eines Tenants leer zurückgeben lässt). Globale Rollen brauchen daher
+**eigene public-schema-Tabellen** und einen eigenen Auflösungspfad im
+`BuiltinPermissionProvider`.
+
+**Designskizze (noch nicht umgesetzt):**
+
+- **Datenmodell (public schema, `GlobalModel`):**
+  - `global_roles` — Rollendefinition (z. B. „Support", „Billing").
+  - `global_role_permissions` — Rolle × Permission-Key (dieselben Keys wie
+    sonst, z. B. `users.read`, `tenants.read`, `audit_logs.read`).
+  - `user_global_roles` — Zuordnung `User` ↔ `global_role` (n:m).
+- **Permission-Auflösung:** `BuiltinPermissionProvider.get_permissions`
+  ([providers/permissions.py](../asterion/providers/permissions.py)) im
+  **Public-Kontext** (kein aktiver Tenant) um die globalen Rollen-Keys des
+  Users ergänzen — additiv zu `is_superadmin` (Superadmin bleibt der Wildcard
+  `admin.*`, Support ist eine Teilmenge scoped Keys). Im Tenant-Kontext bleibt
+  alles wie heute (tenant-RBAC).
+- **Sidebar / Contract:** Der Context-Filter
+  ([contract/router.py](../asterion/contract/router.py)) zeigt globale
+  Ressourcen schon heute nur im Public-Scope; mit globalen Keys greifen die
+  bestehenden `capabilities` (create/update/delete je Key) ohne Sonderfall.
+- **Read-only-Default:** Der häufigste Support-Fall ist read-only. Dafür gibt
+  es zwei Hebel, die sich ergänzen: (a) die Rolle vergibt schlicht nur
+  `*.read`-Keys; (b) `ReadOnlyPolicy` / `AdminPolicy.read_only` auf den
+  globalen Admins erzwingt es hart unabhängig von den Keys (vgl. 0.1.20). Für
+  einen sauberen „Support sieht alles, ändert nichts"-Modus genügt (a).
+- **UI:** Eine **globale Permission-Matrix** analog zur per-Tenant-Matrix,
+  aber public-gescopt (Roles × globale Permission-Keys), plus Rollen-Zuweisung
+  auf der `User`-Detailseite. Wiederverwendung des Two-List-Pickers
+  ([views/role_permissions.js](../asterion/ui/static/admin/views/role_permissions.js)).
+
+**Sicherheits-/Vertrauens-Hinweise (müssen ins Scoping):**
+
+- Globale Ressourcen tragen **sensible, tenant-übergreifende** Daten
+  (User-PII, Impersonation-Logs, alle Memberships). Eine Support-Rolle ist
+  per Definition ein **cross-tenant**-Einblick — das ist eine bewusste
+  Vertrauensentscheidung, kein Nebeneffekt. Default daher **read-only** und
+  Impersonation/Tenant-Anlage **nie** über eine Rolle, sondern weiter
+  `is_superadmin`-only.
+- Die `protected_fields` / Field-Policy-Schicht bleibt die Grenze für
+  einzelne Spalten (z. B. `password_hash`, `token_version`) — globale Rollen
+  dürfen sie nicht aushebeln.
+- Kein „Rolle vergibt `admin.*`" — der Wildcard bleibt allein an
+  `is_superadmin` gebunden, sonst ist die Grenze Superadmin/Support sinnlos.
+
+**Test (Abnahmekriterium, wenn umgesetzt):** (1) User mit Support-Rolle +
+`users.read` sieht `users` read-only, bekommt 403 auf POST/PATCH/DELETE.
+(2) Derselbe User ohne `impersonate`-Recht bekommt 403 auf
+`/root/impersonate`. (3) Kein globaler Key ⇒ Public-Kontext weiterhin
+komplett geblockt (heutiges Verhalten unverändert). (4) Im Tenant-Kontext
+greift weiterhin ausschließlich die Tenant-RBAC (globale Rollen lecken nicht
+in den Tenant-Scope).
+
+**Risiko/Einordnung:** Mittel — berührt den CI-bestätigten
+Permission-Auflösungspfad und sensible Daten. **Kein 1.0-Blocker**, aber ein
+in sich geschlossenes Feature mit klarem Bedarf.
+
+**Status:** geplant — Design festgelegt (oben), Umsetzung als eigenes,
+versioniertes Increment nach Bedarf.
 
 ---
 
