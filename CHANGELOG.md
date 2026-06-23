@@ -16,6 +16,15 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-06-23
+
+### Fixed
+- **"Open tenant" button no longer shown in subdomain mode.** It sets the
+  `X-Tenant-Slug` header, which subdomain resolution ignores (the host decides
+  the tenant), so it was a no-op there. It's now header-mode only, matching the
+  tenant switcher. In subdomain mode you enter a tenant by navigating to its
+  subdomain and return to the global scope via the bare host.
+
 ## [0.1.20] - 2026-06-23
 
 ### Fixed

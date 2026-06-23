@@ -399,7 +399,8 @@ export async function mountList(root, resource) {
             "View"
           ),
           // Superadmin "enter tenant" shortcut straight from the row.
-          resource === "tenants"
+          // Header-mode only (subdomain switches by host, not header).
+          resource === "tenants" && cfg.tenantResolution === "header"
             ? el(
                 "button",
                 { type: "button", class: "btn btn-sm", onClick: () => openTenant(id) },
