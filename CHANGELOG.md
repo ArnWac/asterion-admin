@@ -16,6 +16,16 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.27] - 2026-06-23
+
+### Changed
+- **Internal: `CoreAdminConfig.validate` decomposed** by concern into private
+  `_validate_secrets` / `_validate_token_policy` / `_validate_paths` /
+  `_validate_tenancy_and_i18n` / `_validate_operational` /
+  `_validate_production_footguns` helpers, dropping its cyclomatic complexity
+  from 30 to below the lint threshold. Validation order and every error message
+  are unchanged — behaviour-preserving refactor only.
+
 ## [0.1.26] - 2026-06-23
 
 ### Changed

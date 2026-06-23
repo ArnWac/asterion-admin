@@ -392,63 +392,67 @@ class CoreAdminConfig:
         return config
 
     def validate(self) -> None:
+        """Validate the whole config, grouped by concern.
+
+        Each ``_validate_*`` helper raises ``ValueError`` on the first
+        violation in its group; the order here is preserved from when this
+        was a single flat method, so error precedence is unchanged.
+        """
+        self._validate_secrets()
+        self._validate_token_policy()
+        self._validate_paths()
+        self._validate_tenancy_and_i18n()
+        self._validate_operational()
+        self._validate_production_footguns()
+
+    def _validate_secrets(self) -> None:
         if not self.database_url.strip():
             raise ValueError("database_url must not be empty")
-
         if not self.secret_key.strip():
             raise ValueError("secret_key must not be empty")
-
         if self.secret_key == "change-me-in-production":
             raise ValueError("secret_key must not use the insecure default value")
 
+    def _validate_token_policy(self) -> None:
         if self.access_token_expire_minutes <= 0:
             raise ValueError("access_token_expire_minutes must be greater than 0")
-
         if self.refresh_token_expire_minutes <= 0:
             raise ValueError("refresh_token_expire_minutes must be greater than 0")
-
         if self.password_reset_token_expire_minutes <= 0:
             raise ValueError("password_reset_token_expire_minutes must be greater than 0")
-
         if self.invite_token_expire_minutes <= 0:
             raise ValueError("invite_token_expire_minutes must be greater than 0")
-
         if self.password_min_length < 8:
             raise ValueError("password_min_length must be at least 8")
 
+    def _validate_paths(self) -> None:
         if not self.auth_api_prefix.startswith("/"):
             raise ValueError("auth_api_prefix must start with '/'")
-
         if not self.admin_api_prefix.startswith("/"):
             raise ValueError("admin_api_prefix must start with '/'")
-
         if not self.root_api_prefix.startswith("/"):
             raise ValueError("root_api_prefix must start with '/'")
-
         if not self.admin_ui_path.startswith("/"):
             raise ValueError("admin_ui_path must start with '/'")
 
+    def _validate_tenancy_and_i18n(self) -> None:
         if self.tenant_resolution not in get_args(TenantResolution):
             raise ValueError(f"tenant_resolution must be one of {get_args(TenantResolution)}")
-
         if not self.tenant_header_name.strip():
             raise ValueError("tenant_header_name must not be empty")
-
         if not self.default_language.strip():
             raise ValueError("default_language must not be empty")
-
         if self.default_date_format not in get_args(DateFormat):
             raise ValueError(f"default_date_format must be one of {get_args(DateFormat)}")
-
         if self.default_date_format == "custom" and not self.default_date_pattern.strip():
             raise ValueError(
                 "default_date_pattern must not be empty when default_date_format='custom'"
             )
 
-        # --- PR-4: operational baseline ---
+    def _validate_operational(self) -> None:
+        """PR-4: operational baseline (pools, logging, CORS, enums)."""
         if self.db_pool_size <= 0:
             raise ValueError("db_pool_size must be > 0")
-
         if self.db_max_overflow < 0:
             raise ValueError("db_max_overflow must be >= 0")
 
@@ -472,36 +476,35 @@ class CoreAdminConfig:
             raise ValueError(
                 f"environment must be one of {get_args(Environment)}, got {self.environment!r}"
             )
-
         if self.user_mode not in get_args(UserMode):
             raise ValueError(
                 f"user_mode must be one of {get_args(UserMode)}, got {self.user_mode!r}"
             )
-
         if self.storage_max_upload_bytes <= 0:
             raise ValueError("storage_max_upload_bytes must be > 0")
 
-        # --- PR-10: production foot-guns ---
-        # validate() is called from from_env() AND from create_admin().
-        # In production mode we refuse to boot with insecure config rather
-        # than warn — a misconfigured production deployment is worse than
-        # a hard crash at startup.
-        if self.environment == "production":
-            if self.debug:
-                raise ValueError(
-                    "debug=True is not allowed in production; set ASTERION_DEBUG=false."
-                )
-            if self.database_url.startswith(("sqlite://", "sqlite+aiosqlite://")):
-                raise ValueError(
-                    "SQLite is not allowed in production; use a PostgreSQL "
-                    "database_url. SQLite is for local dev + tests only."
-                )
-            if len(self.secret_key) < MIN_PRODUCTION_SECRET_LENGTH:
-                raise ValueError(
-                    f"secret_key must be at least {MIN_PRODUCTION_SECRET_LENGTH} "
-                    "characters in production; generate one with "
-                    "`openssl rand -hex 32`."
-                )
+    def _validate_production_footguns(self) -> None:
+        """PR-10: refuse to boot with insecure config in production.
+
+        validate() is called from from_env() AND from create_admin(). In
+        production mode we hard-fail rather than warn — a misconfigured
+        production deployment is worse than a crash at startup.
+        """
+        if self.environment != "production":
+            return
+        if self.debug:
+            raise ValueError("debug=True is not allowed in production; set ASTERION_DEBUG=false.")
+        if self.database_url.startswith(("sqlite://", "sqlite+aiosqlite://")):
+            raise ValueError(
+                "SQLite is not allowed in production; use a PostgreSQL "
+                "database_url. SQLite is for local dev + tests only."
+            )
+        if len(self.secret_key) < MIN_PRODUCTION_SECRET_LENGTH:
+            raise ValueError(
+                f"secret_key must be at least {MIN_PRODUCTION_SECRET_LENGTH} "
+                "characters in production; generate one with "
+                "`openssl rand -hex 32`."
+            )
 
     def to_safe_dict(self) -> dict[str, object]:
         return {
