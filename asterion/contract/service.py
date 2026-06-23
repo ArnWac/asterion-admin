@@ -304,6 +304,9 @@ class ModelContractMeta(BaseModel):
     #: reachable. Defaults to ``"global"`` so pre-Phase-A clients (and
     #: single-tenant apps that ignore the field) behave exactly as before.
     scope: ModelScope = "global"
+    #: Whether the resource appears in the sidebar nav. ``False`` hides it
+    #: while keeping it routable (e.g. a table managed via a dedicated UI).
+    show_in_nav: bool = True
     fields: list[FieldMeta]
     crud_actions: list[str]
     admin_actions: list[AdminActionMeta]
@@ -975,6 +978,7 @@ def build_model_contract(
         label_plural=model_admin.display_label_plural,
         description=model_admin.description,
         scope=resolve_model_scope(model_admin),
+        show_in_nav=bool(getattr(model_admin, "show_in_nav", True)),
         fields=field_metas,
         crud_actions=list(CRUD_ACTIONS),
         admin_actions=[_admin_action_meta(a) for a in model_admin.actions],

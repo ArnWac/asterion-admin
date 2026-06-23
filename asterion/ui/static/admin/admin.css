@@ -150,6 +150,39 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
   font-size: 0.85em;
 }
 
+/* Per-role permission picker (two-list assign/unassign). */
+.dual-list-wrap {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  padding: 1rem 1.5rem;
+}
+.dual-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+}
+.dual-col label {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.dual-col .dual-list {
+  width: 100%;
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.8rem;
+}
+.dual-actions {
+  flex: 0 0 auto;
+  justify-content: center;
+  align-items: center;
+}
+.dual-actions .btn {
+  width: 100%;
+}
+
 /* Impersonation banner — a fixed bar at the bottom of the viewport while a
  * superadmin is acting as another user. Fixed (not in flow) so it never
  * shifts the sidebar/main layout. */

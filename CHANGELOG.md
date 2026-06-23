@@ -16,6 +16,21 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-06-23
+
+### Added
+- **Per-role permission picker (Django-style two lists).** A tenant role's
+  detail page gets an **Edit permissions** button opening a dedicated view with
+  Available ↔ Assigned permission lists (add/remove, save). Backed by the
+  existing `/_permission_matrix` API scoped to the one role; system roles are
+  read-only. This is the per-role assignment UI (distinct from the global
+  roles × permissions matrix, which stays available).
+- **`ModelAdmin.show_in_nav`** (default `True`). When `False` the resource stays
+  fully routable (CRUD, contract, permission keys) but is hidden from the
+  sidebar. Surfaced in the contract; the sidebar filters on it. The builtin
+  `TenantRolePermissionAdmin` now sets `show_in_nav = False` so the sidebar
+  shows only **Tenant Roles** — role permissions are managed through the picker.
+
 ## [0.1.16] - 2026-06-23
 
 ### Added

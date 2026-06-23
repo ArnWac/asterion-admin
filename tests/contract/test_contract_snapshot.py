@@ -67,6 +67,7 @@ EXPECTED: dict = {
     "label_plural": "Articles",
     "description": None,
     "scope": "global",
+    "show_in_nav": True,
     "fields": [
         {
             "name": "id",

@@ -54,6 +54,9 @@ class TenantRolePermissionAdmin(ModelAdmin):
     search_fields = ["permission_key"]
     ordering = ["permission_key"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    # Managed through the per-role permission picker (the Tenant Role detail's
+    # "Edit permissions"), so it stays routable but off the sidebar.
+    show_in_nav = False
 
     async def resolve_list_labels(self, objs, *, session, ctx=None):
         return {"role_id": await _role_name_labels(session, {o.role_id for o in objs})}

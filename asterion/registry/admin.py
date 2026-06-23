@@ -165,6 +165,14 @@ class ModelAdmin:
 
     calculated_fields: dict[str, Callable[[Any], Any]] = {}
 
+    #: Whether this resource appears in the admin sidebar nav. ``False`` keeps
+    #: the resource fully routable (CRUD, contract, permission keys) but hides
+    #: it from the sidebar — for tables managed through a dedicated UI rather
+    #: than the generic list (e.g. ``TenantRolePermission``, edited via the
+    #: per-role permission picker). Surfaced in the contract; the sidebar
+    #: filters on it.
+    show_in_nav: bool = True
+
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
         for attr in (

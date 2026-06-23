@@ -73,6 +73,17 @@ export async function mountDetail(root, resource, recordId) {
       },
       "Delete"
     ),
+    // Tenant roles get a dedicated two-list permission picker.
+    resource === "tenant_roles"
+      ? el(
+          "a",
+          {
+            class: "btn",
+            href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/permissions`,
+          },
+          "Edit permissions"
+        )
+      : null,
   ]);
 
   mount(

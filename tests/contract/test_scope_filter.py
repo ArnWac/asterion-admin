@@ -67,6 +67,15 @@ def test_scope_in_built_contract():
     assert build_model_contract(TenantThingAdmin()).scope == "tenant"
 
 
+def test_show_in_nav_default_true_and_builtin_flag():
+    from asterion.builtins.admin import TenantRolePermissionAdmin
+
+    # Default is True; the flat tenant-role-permission admin opts out so the
+    # sidebar shows only Tenant Roles (permissions edited via the picker).
+    assert build_model_contract(GlobalThingAdmin()).show_in_nav is True
+    assert build_model_contract(TenantRolePermissionAdmin()).show_in_nav is False
+
+
 def test_scope_defaults_to_global_for_unknown_base():
     """A model on neither GlobalBase nor TenantBase stays visible in the
     public view (safe default) rather than vanishing."""

@@ -33,6 +33,10 @@ const viewLoaders = {
   settings: (root) => import("./views/settings.js").then((m) => m.mountSettings(root)),
   permissions: (root) =>
     import("./views/permission_matrix.js").then((m) => m.mountPermissionMatrix(root)),
+  role_permissions: (root) =>
+    import("./views/role_permissions.js").then((m) =>
+      m.mountRolePermissions(root, cfg.resource, cfg.recordId)
+    ),
   page: (root) =>
     import("./views/page.js").then((m) => m.mountPage(root, cfg.pageModule, cfg.pageId)),
 };
@@ -160,9 +164,10 @@ async function populateSidebarNav() {
   const nav = document.getElementById("sidebar-nav");
   if (!nav) return;
   const contract = await getFullContract();
-  const models = (contract.models || []).slice().sort((a, b) =>
-    a.label_plural.localeCompare(b.label_plural)
-  );
+  const models = (contract.models || [])
+    .filter((m) => m.show_in_nav !== false)
+    .slice()
+    .sort((a, b) => a.label_plural.localeCompare(b.label_plural));
 
   const items = models.map((m) => {
     const link = el("a", { href: `${cfg.uiPath}/${m.resource}` }, m.label_plural);

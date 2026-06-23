@@ -189,6 +189,21 @@ async def ui_delete(request: Request, resource: str, record_id: str):
 
 
 @router.get(
+    "/{resource}/{record_id}/permissions",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+async def ui_role_permissions(request: Request, resource: str, record_id: str):
+    """Per-role permission picker (two-list assign/unassign).
+
+    Generic route; the view is meaningful for ``tenant_roles`` and is
+    reached from that resource's detail page. Backed by the existing
+    ``/_permission_matrix`` API scoped to one role.
+    """
+    return _app(request, view="role_permissions", resource=resource, record_id=record_id)
+
+
+@router.get(
     "/{resource}/{record_id}",
     response_class=HTMLResponse,
     include_in_schema=False,
