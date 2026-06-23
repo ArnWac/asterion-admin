@@ -16,6 +16,17 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-06-23
+
+### Added
+- **"Open tenant" button now works in subdomain mode too.** Re-enabled the
+  button hidden in 0.1.21: in subdomain mode it navigates to the tenant's
+  subdomain (`<slug>.<host>`) instead of setting the (ignored) `X-Tenant-Slug`
+  header. Header mode is unchanged (sets the header + reloads the dashboard).
+  Either way the superadmin `tenant_access` audit event is still recorded via
+  `POST /root/tenants/{id}/access`. Return to the global scope is still the bare
+  host.
+
 ## [0.1.21] - 2026-06-23
 
 ### Fixed

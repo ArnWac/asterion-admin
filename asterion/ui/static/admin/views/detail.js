@@ -94,10 +94,9 @@ export async function mountDetail(root, resource, recordId) {
         )
       : null,
     // A tenant can be "entered" as superadmin (scoped context switch).
-    // Header-mode only: in subdomain mode the host decides the tenant, so a
-    // header-setting Open button is a no-op — you navigate to the subdomain
-    // instead (and back to global via the bare host).
-    resource === "tenants" && cfg.tenantResolution === "header"
+    // Works in both resolution modes: header mode sets the tenant header,
+    // subdomain mode navigates to the tenant's subdomain (openTenant decides).
+    resource === "tenants"
       ? el("button", { type: "button", class: "btn", onClick: () => openTenant(recordId) }, "Open")
       : null,
   ]);
