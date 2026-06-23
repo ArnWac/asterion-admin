@@ -40,6 +40,8 @@ the default ``admin`` tenant role.
 
 from __future__ import annotations
 
+from sqlalchemy import select
+
 from asterion.admin.policy import ReadOnlyPolicy
 from asterion.models import (
     AuditLog,
@@ -49,6 +51,24 @@ from asterion.models import (
     User,
 )
 from asterion.registry import AdminRegistry, ModelAdmin
+
+
+async def _email_labels(session, user_ids) -> dict[str, str]:
+    """Batched ``user_id`` → email map (one query)."""
+    ids = {u for u in user_ids if u is not None}
+    if not ids:
+        return {}
+    rows = (await session.execute(select(User.id, User.email).where(User.id.in_(ids)))).all()
+    return {str(uid): email for uid, email in rows}
+
+
+async def _tenant_slug_labels(session, tenant_ids) -> dict[str, str]:
+    """Batched ``tenant_id`` → slug map (one query)."""
+    ids = {t for t in tenant_ids if t is not None}
+    if not ids:
+        return {}
+    rows = (await session.execute(select(Tenant.id, Tenant.slug).where(Tenant.id.in_(ids)))).all()
+    return {str(tid): slug for tid, slug in rows}
 
 
 class UserAdmin(ModelAdmin):
@@ -92,6 +112,12 @@ class TenantMembershipAdmin(ModelAdmin):
     list_display = ["user_id", "tenant_id", "is_active", "created_at"]
     ordering = ["tenant_id"]
     readonly_fields = ["id", "created_at", "updated_at"]
+
+    async def resolve_list_labels(self, objs, *, session, ctx=None):
+        return {
+            "user_id": await _email_labels(session, {o.user_id for o in objs}),
+            "tenant_id": await _tenant_slug_labels(session, {o.tenant_id for o in objs}),
+        }
 
 
 # Every persistent column listed so the generated form renders disabled
@@ -160,6 +186,19 @@ class ImpersonationLogAdmin(ModelAdmin):
     search_fields = ["jti"]
     ordering = ["-created_at"]
     readonly_fields = _IMPERSONATION_LOG_READONLY
+
+    async def resolve_list_labels(self, objs, *, session, ctx=None):
+        # superadmin_id + target_user_id both resolve from the same batched
+        # user→email map; tenant_id → slug.
+        emails = await _email_labels(
+            session,
+            {o.superadmin_id for o in objs} | {o.target_user_id for o in objs},
+        )
+        return {
+            "superadmin_id": emails,
+            "target_user_id": emails,
+            "tenant_id": await _tenant_slug_labels(session, {o.tenant_id for o in objs}),
+        }
 
 
 GLOBAL_ADMINS: tuple[type[ModelAdmin], ...] = (

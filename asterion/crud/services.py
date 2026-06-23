@@ -144,6 +144,30 @@ def _deny(resource: str, action: str) -> HTTPException:
     )
 
 
+async def _attach_reference_labels(
+    items: list[dict],
+    records: list,
+    admin_class: ModelAdmin,
+    *,
+    session: AsyncSession,
+    ctx: AdminContext | None,
+) -> None:
+    """Attach ``<col>__label`` keys from the admin's batched label resolver.
+
+    Shared by the list and detail read paths so both render resolved names
+    (role, member email, …) next to raw id columns. No-op when the admin
+    doesn't override ``resolve_list_labels``.
+    """
+    labels = await admin_class.resolve_list_labels(records, session=session, ctx=ctx)
+    if not labels:
+        return
+    for item in items:
+        for col, mapping in labels.items():
+            raw = item.get(col)
+            if raw is not None and str(raw) in mapping:
+                item[f"{col}__label"] = mapping[str(raw)]
+
+
 async def list_records(
     session: AsyncSession,
     admin_class: ModelAdmin,
@@ -189,13 +213,7 @@ async def list_records(
     # Reference labels (batched, one query per related table for the page).
     # Each resolved column gets a parallel ``<col>__label`` on the row so the
     # UI can show a name instead of a raw id; the raw value stays in place.
-    labels = await admin_class.resolve_list_labels(list(records), session=session, ctx=ctx)
-    if labels:
-        for item in items:
-            for col, mapping in labels.items():
-                raw = item.get(col)
-                if raw is not None and str(raw) in mapping:
-                    item[f"{col}__label"] = mapping[str(raw)]
+    await _attach_reference_labels(items, list(records), admin_class, session=session, ctx=ctx)
 
     return PageResult(
         items=items,
@@ -221,6 +239,10 @@ async def read_record(
         payload = await serialize_record_with_policy(record, admin_class, ctx)
     else:
         payload = serialize_record(record, admin_class)
+
+    # Same reference-label resolution as the list view, for this single row,
+    # so the detail page can show names next to raw id columns.
+    await _attach_reference_labels([payload], [record], admin_class, session=session, ctx=ctx)
 
     return await _augment_with_inlines(payload, session, record, admin_class)
 

@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from asterion.builtins.admin import TenantMembershipRoleAdmin, TenantRolePermissionAdmin
-from asterion.crud.services import list_records
+from asterion.crud.services import list_records, read_record
 from asterion.models.base import GlobalModel, TenantBase
 from asterion.models.tenant import Tenant
 from asterion.models.tenant_membership import TenantMembership
@@ -87,3 +87,16 @@ async def test_role_permission_list_resolves_role_name(seeded):
     row = page["items"][0]
     assert row["role_id__label"] == ids["role_name"]
     assert "membership_id__label" not in row
+
+
+@pytest.mark.asyncio
+async def test_detail_read_resolves_labels(seeded):
+    """The detail (read) path attaches the same labels as the list view."""
+    from sqlalchemy import select
+
+    factory, ids = seeded
+    async with factory() as session:
+        row_id = (await session.execute(select(TenantMembershipRole.id))).scalars().first()
+        payload = await read_record(session, TenantMembershipRoleAdmin(), str(row_id))
+    assert payload["role_id__label"] == ids["role_name"]
+    assert payload["membership_id__label"] == ids["email"]

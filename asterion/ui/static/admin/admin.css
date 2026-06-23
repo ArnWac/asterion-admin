@@ -130,13 +130,24 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
 .tenant-switcher .tenant-select {
   width: 100%;
   padding: 0.35rem 0.5rem;
-  background: var(--sidebar-hover);
+  background: var(--sidebar-bg);
   color: var(--sidebar-fg);
   border: 1px solid var(--sidebar-divider);
   border-radius: 4px;
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
+}
+/* Native dropdown options render on a white popup; without this the inherited
+ * light sidebar text was white-on-white. Force a readable dark-on-light. */
+.tenant-switcher .tenant-select option {
+  color: #1f2937;
+  background-color: #fff;
+}
+
+/* Raw id shown next to a resolved reference label in the detail view. */
+.ref-raw {
+  font-size: 0.85em;
 }
 
 /* Impersonation banner — a fixed bar at the bottom of the viewport while a

@@ -38,6 +38,18 @@ export async function mountDetail(root, resource, recordId) {
       grid.appendChild(el("dd", {}, renderDiffTable(value)));
       continue;
     }
+    // Reference label: show the resolved name with the raw id kept
+    // alongside (muted) so the detail view stays traceable.
+    const refLabel = record[`${field.name}__label`];
+    if (refLabel != null) {
+      grid.appendChild(
+        el("dd", {}, [
+          String(refLabel),
+          value != null ? el("span", { class: "muted ref-raw" }, ` (${value})`) : null,
+        ])
+      );
+      continue;
+    }
     const formatted = formatValue(value, field);
     const dd = el("dd", { class: formatted.muted ? "muted" : "" }, formatted.text);
     if (formatted.mono) dd.style.fontFamily = "ui-monospace, SFMono-Regular, monospace";

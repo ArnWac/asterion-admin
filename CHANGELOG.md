@@ -16,6 +16,24 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-06-23
+
+### Added
+- **Reference labels in the detail view too.** The read path now attaches the
+  same `<col>__label` keys as the list view (shared `_attach_reference_labels`),
+  and the detail page shows the resolved name with the raw id kept alongside
+  (muted). Works for any admin that overrides `resolve_list_labels`.
+- **Example global admins resolve ids to labels.** `TenantMembershipAdmin`
+  (user → email, tenant → slug) and `ImpersonationLogAdmin` (superadmin /
+  target user → email, tenant → slug) now show readable values instead of raw
+  UUIDs, batched per related table.
+
+### Fixed
+- **Tenant switcher dropdown was white-on-white.** Native `<select>` options
+  render on a white popup and inherited the light sidebar text colour; they're
+  now explicitly dark-on-white. The closed control uses the solid sidebar
+  background for consistent contrast.
+
 ## [0.1.15] - 2026-06-23
 
 ### Added
