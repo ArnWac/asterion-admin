@@ -72,6 +72,30 @@ class TenantMembershipRoleAdmin(ModelAdmin):
     list_display = ["membership_id", "role_id", "created_at"]
     ordering = ["membership_id"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    # membership_id has no DB-level foreign key (cross-schema → public
+    # tenant_memberships), so force the FK-picker widget; resolve_fk_options
+    # below supplies its member-email options. role_id has a real FK and is
+    # picked up generically.
+    widgets = {"membership_id": "foreign_key"}
+
+    async def resolve_fk_options(self, field, *, session, ctx=None, q=None, limit=100):
+        """Member-email options for the cross-schema ``membership_id`` picker.
+
+        Resolves membership ids to ``member email`` via a join into public
+        (``TenantMembership`` → ``User``) through the request session, the same
+        cross-schema path :meth:`resolve_list_labels` uses. ``role_id`` returns
+        ``None`` so the generic resolver lists ``tenant_roles`` by name.
+        """
+        if field != "membership_id":
+            return None
+        stmt = select(TenantMembership.id, User.email).join(
+            User, User.id == TenantMembership.user_id
+        )
+        if q and q.strip():
+            stmt = stmt.where(User.email.ilike(f"%{q.strip()}%"))
+        stmt = stmt.order_by(User.email.asc()).limit(limit)
+        rows = (await session.execute(stmt)).all()
+        return [{"value": str(mid), "label": email} for mid, email in rows]
 
     async def resolve_list_labels(self, objs, *, session, ctx=None):
         labels: dict[str, dict[str, str]] = {

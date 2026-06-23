@@ -16,6 +16,21 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-06-23
+
+### Added
+- **FK dropdowns for cross-schema / join-label references.** New overridable
+  `ModelAdmin.resolve_fk_options(field, *, session, ctx, q, limit)` hook lets an
+  admin supply `{value, label}` options the generic resolver can't produce — a
+  reference id with no DB-level foreign key (cross-schema, e.g.
+  `tenant_membership_roles.membership_id` → public `tenant_memberships`), or a
+  label that needs a join (member email, not the membership row). Paired with
+  `widgets = {"<field>": "foreign_key"}` so the column renders as a dropdown
+  even without a DB FK. The `_options/{field}` endpoint calls the hook before
+  the FK-constraint check; returning `None` falls back to the generic
+  target-table resolver. The built-in `TenantMembershipRoleAdmin` uses it so
+  `membership_id` is now a member-email dropdown.
+
 ## [0.1.23] - 2026-06-23
 
 ### Added

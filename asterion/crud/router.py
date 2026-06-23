@@ -243,6 +243,22 @@ async def _fk_options_impl(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Field '{field}' is not a column of '{resource}'.",
         ) from None
+
+    # Custom resolver first — owns the cross-schema / join-label cases (e.g.
+    # membership_id → member email) that the generic target-table query can't
+    # express. It also covers columns with no DB-level foreign key, so it runs
+    # before the FK-constraint check below.
+    custom = await admin_class.resolve_fk_options(
+        field, session=session, ctx=ctx, q=q, limit=limit
+    )
+    if custom is not None:
+        custom = list(custom)
+        return {
+            "options": custom[:limit],
+            "truncated": len(custom) > limit,
+            "registered": True,
+        }
+
     fks = list(column.foreign_keys)
     if not fks:
         raise HTTPException(

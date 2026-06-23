@@ -38,6 +38,9 @@ class Item(_AppBase):
     id = Column(Integer, primary_key=True, autoincrement=True)
     title = Column(String(200), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    # A reference id with NO DB-level foreign key — resolved via the custom
+    # resolve_fk_options hook + a widgets override (mirrors membership_id).
+    owner_ref = Column(Integer, nullable=True)
 
 
 class CategoryAdmin(ModelAdmin):
@@ -48,6 +51,18 @@ class CategoryAdmin(ModelAdmin):
 class ItemAdmin(ModelAdmin):
     model = Item
     list_display = ["id", "title", "category_id"]
+    widgets = {"owner_ref": "foreign_key"}
+
+    async def resolve_fk_options(self, field, *, session, ctx=None, q=None, limit=100):
+        if field != "owner_ref":
+            return None
+        opts = [
+            {"value": "1", "label": "owner-one"},
+            {"value": "2", "label": "owner-two"},
+        ]
+        if q:
+            opts = [o for o in opts if q in o["label"]]
+        return opts
 
 
 @pytest.fixture
@@ -165,3 +180,32 @@ def test_options_unknown_field_returns_404(app):
     _grant(app, {"admin.items.read", "admin.categories.list"})
     resp = _client(app).get("/api/v1/admin/items/_options/nope")
     assert resp.status_code == 404
+
+
+# --- custom resolver (cross-schema / no DB FK) ---
+
+
+def test_custom_resolver_supplies_options_without_db_fk(app):
+    # owner_ref has no ForeignKey, but resolve_fk_options handles it.
+    _grant(app, {"admin.items.read"})
+    resp = _client(app).get("/api/v1/admin/items/_options/owner_ref")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["registered"] is True
+    assert body["options"] == [
+        {"value": "1", "label": "owner-one"},
+        {"value": "2", "label": "owner-two"},
+    ]
+
+
+def test_custom_resolver_honours_search(app):
+    _grant(app, {"admin.items.read"})
+    resp = _client(app).get("/api/v1/admin/items/_options/owner_ref?q=two")
+    assert resp.status_code == 200
+    assert resp.json()["options"] == [{"value": "2", "label": "owner-two"}]
+
+
+def test_default_resolve_fk_options_returns_none():
+    import asyncio
+
+    assert asyncio.run(CategoryAdmin().resolve_fk_options("name", session=None)) is None

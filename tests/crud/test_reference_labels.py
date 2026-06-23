@@ -90,6 +90,29 @@ async def test_role_permission_list_resolves_role_name(seeded):
 
 
 @pytest.mark.asyncio
+async def test_membership_role_fk_options_resolve_member_email(seeded):
+    """The FK-picker options for the cross-schema membership_id resolve to
+    member emails via the membership → user join (no DB FK)."""
+    factory, ids = seeded
+    async with factory() as session:
+        opts = await TenantMembershipRoleAdmin().resolve_fk_options(
+            "membership_id", session=session
+        )
+    assert opts == [{"value": ids["membership_id"], "label": ids["email"]}]
+
+
+@pytest.mark.asyncio
+async def test_membership_role_fk_options_role_id_falls_back(seeded):
+    """role_id has a real FK → custom resolver returns None (generic path)."""
+    factory, _ = seeded
+    async with factory() as session:
+        assert (
+            await TenantMembershipRoleAdmin().resolve_fk_options("role_id", session=session)
+            is None
+        )
+
+
+@pytest.mark.asyncio
 async def test_detail_read_resolves_labels(seeded):
     """The detail (read) path attaches the same labels as the list view."""
     from sqlalchemy import select

@@ -255,6 +255,35 @@ class ModelAdmin:
         """
         return {}
 
+    async def resolve_fk_options(
+        self,
+        field: str,
+        *,
+        session: Any,
+        ctx: AdminContext | None = None,
+        q: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, str]] | None:
+        """Custom ``{value, label}`` options for a foreign-key dropdown.
+
+        Override to supply options the generic resolver (which lists the FK's
+        target table by its :meth:`label_field`) can't produce:
+
+        * a cross-schema target id with **no DB-level foreign key** — e.g.
+          ``tenant_membership_roles.membership_id`` pointing at public
+          ``tenant_memberships``; or
+        * a label that needs a **join** rather than a column on the target —
+          e.g. the member's email instead of the membership row itself.
+
+        Pair the override with ``widgets = {"<field>": "foreign_key"}`` so the
+        column renders as a dropdown even without a DB FK. Resolve in **one
+        batched query** through the request ``session`` (its ``search_path``
+        reaches public for cross-schema reads), honour ``q`` (label substring)
+        and ``limit``. Return ``None`` for any field you don't handle so the
+        generic resolver takes over.
+        """
+        return None
+
     # ------------------------------------------------------------------
     # Lifecycle hooks (B1)
     # ------------------------------------------------------------------
