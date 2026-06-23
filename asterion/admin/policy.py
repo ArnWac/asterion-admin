@@ -212,7 +212,7 @@ def static_field_permission(model_admin: Any, field: str) -> FieldPermission:
     the contract / schema builders (also sync) can call it directly;
     the async policy hop stays separate.
     """
-    protected = getattr(model_admin, "all_protected", frozenset())
+    protected: frozenset[str] = getattr(model_admin, "all_protected", frozenset())
     if field in protected:
         return FieldPermission.HIDDEN
 

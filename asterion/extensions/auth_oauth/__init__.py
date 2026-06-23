@@ -208,7 +208,10 @@ class OAuthExtension(AdminExtension):
             return
         api_base = _api_base_from_auth_prefix(ctx.config.auth_api_prefix)
         app.include_router(
-            build_oauth_router(self._providers),
+            # OAuthProvider is intentionally a minimal Protocol (config +
+            # claim_mapper); the router needs the flow methods that, by design,
+            # live on the concrete GoogleOIDCProvider subclasses (see base.py).
+            build_oauth_router(self._providers),  # type: ignore[arg-type]
             prefix=api_base,
         )
 

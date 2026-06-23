@@ -19,6 +19,7 @@ serializer keeps the pre-B4 behaviour exactly.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -130,7 +131,7 @@ class Serializer:
 
     def serialize_many(
         self,
-        objs: list,
+        objs: Sequence[Any],
         model_admin: ModelAdmin,
         *,
         hidden_extra: set[str] | None = None,
@@ -155,7 +156,7 @@ def serialize_record(
 
 
 def serialize_records(
-    objs: list,
+    objs: Sequence[Any],
     model_admin: ModelAdmin,
     *,
     hidden_extra: set[str] | None = None,

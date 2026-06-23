@@ -17,9 +17,10 @@ import subprocess
 import sys
 from datetime import UTC
 from pathlib import Path
+from typing import Any, cast
 
 import typer
-from sqlalchemy import select, text
+from sqlalchemy import CursorResult, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.auth.password import hash_password
@@ -1095,8 +1096,13 @@ async def _audit_prune(days: int) -> None:
     try:
         async with db.session() as session:
             async with session.begin():
-                result = await session.execute(delete(AuditLog).where(AuditLog.created_at < cutoff))
-        deleted = result.rowcount if result.rowcount is not None else 0
+                result = await session.execute(
+                    delete(AuditLog).where(AuditLog.created_at < cutoff)
+                )
+        # DML execute() returns a CursorResult at runtime; the static type is the
+        # base Result, which doesn't expose rowcount.
+        rowcount = cast(CursorResult[Any], result).rowcount
+        deleted = rowcount if rowcount is not None else 0
         typer.echo(f"Pruned {deleted} audit row(s) older than {days} days.")
     finally:
         await db.dispose()

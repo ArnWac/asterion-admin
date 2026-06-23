@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.orm import Mapper
 
 from asterion.models.base import GUID
 from asterion.schemas.fields import AdminModelSchema
@@ -88,7 +89,8 @@ def validate_uuid_fields(cleaned: Mapping[str, Any], model: type) -> None:
     ``GUID.process_bind_param``. This catches the common case — UUID PKs/FKs —
     early and reports it as a field error.
     """
-    columns = sa_inspect(model).columns
+    mapper: Mapper[Any] = sa_inspect(model)
+    columns = mapper.columns
     bad: list[str] = []
     for name, value in cleaned.items():
         if value is None or name not in columns:

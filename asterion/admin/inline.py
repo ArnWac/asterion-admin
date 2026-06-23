@@ -98,7 +98,9 @@ class InlineAdmin:
 
     @property
     def model_name(self) -> str:
-        return self.model.__tablename__
+        # __tablename__ is set by SQLAlchemy's declarative metaclass, so it is
+        # invisible to the static ``type`` annotation on ``model``.
+        return self.model.__tablename__  # type: ignore[attr-defined]
 
     @property
     def display_label(self) -> str:
@@ -135,6 +137,7 @@ def _writable_columns_for_inline(inline: InlineAdmin) -> set[str]:
     ``readonly_fields``. When ``fields`` is empty, fall back to all
     columns on the child model except the fk column itself."""
     from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy.orm import Mapper
 
     declared = list(getattr(inline, "fields", []) or [])
     readonly = set(getattr(inline, "readonly_fields", []) or [])
@@ -142,7 +145,7 @@ def _writable_columns_for_inline(inline: InlineAdmin) -> set[str]:
     if declared:
         return {name for name in declared if name not in readonly}
 
-    mapper = sa_inspect(inline.model)
+    mapper: Mapper[Any] = sa_inspect(inline.model)
     fk_name = getattr(inline, "fk_name", None)
     return {col.name for col in mapper.columns if col.name != fk_name and col.name not in readonly}
 
@@ -160,13 +163,13 @@ async def _fetch_inline_record(
     inline: InlineAdmin,
     raw_id: Any,
 ):
-    from sqlalchemy import select
+    from sqlalchemy import Result, select
 
     from asterion.crud.query import primary_key_column
 
     pk_col = primary_key_column(inline.model)
     pk_value = _coerce_pk(inline.model, raw_id)
-    result = await session.execute(select(inline.model).where(pk_col == pk_value))
+    result: Result[Any] = await session.execute(select(inline.model).where(pk_col == pk_value))
     row = result.scalar_one_or_none()
     if row is None:
         raise HTTPException(
@@ -242,7 +245,7 @@ async def fetch_inline_children(
     wire — they identify which parent the row belongs to and the UI
     needs them to round-trip an update.
     """
-    from sqlalchemy import select
+    from sqlalchemy import Select, select
 
     from asterion.schemas.serialization.serializer import serialize_records
 
@@ -264,7 +267,7 @@ async def fetch_inline_children(
             out[tablename] = []
             continue
 
-        stmt = select(inline.model).where(fk_col == parent_id)
+        stmt: Select[Any] = select(inline.model).where(fk_col == parent_id)
 
         # Apply per-inline ordering (descending with ``-`` prefix).
         for raw in list(getattr(inline, "ordering", []) or []):

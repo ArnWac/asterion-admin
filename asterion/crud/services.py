@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import Result, Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.crud.payload import clean_write_payload, validate_uuid_fields
@@ -92,7 +92,7 @@ async def get_record_or_404(
     pk_column = primary_key_column(model)
     pk_value = coerce_primary_key_value(model, record_id)
 
-    result = await session.execute(select(model).where(pk_column == pk_value))
+    result: Result[Any] = await session.execute(select(model).where(pk_column == pk_value))
     record = result.scalar_one_or_none()
 
     if record is None:
@@ -192,7 +192,7 @@ async def list_records(
         offset=offset,
     )
 
-    base_stmt = select(model)
+    base_stmt: Select[Any] = select(model)
     base_stmt = apply_filters(base_stmt, admin_class, filters or {})
     base_stmt = apply_date_hierarchy(base_stmt, admin_class, date_hierarchy)
     base_stmt = apply_search(base_stmt, admin_class, search)

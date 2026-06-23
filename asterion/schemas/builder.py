@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, create_model
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.orm import Mapper
 
 from asterion.fields import FieldRegistry, build_default_registry
 from asterion.registry.admin import AUTO_FIELDS, ModelAdmin
@@ -22,7 +23,7 @@ def _col_info(
     columns or columns with any default count as optional in the
     write-side schema.
     """
-    mapper = sa_inspect(model_admin.model)
+    mapper: Mapper[Any] = sa_inspect(model_admin.model)
     cols: list[tuple[str, type, bool]] = []
     for col in mapper.columns:
         adapter = registry.find_adapter(col)
@@ -137,7 +138,7 @@ class SchemaBuilder:
 
 
 def build_model_schema(model_admin: ModelAdmin) -> AdminModelSchema:
-    mapper = sa_inspect(model_admin.model)
+    mapper: Mapper[Any] = sa_inspect(model_admin.model)
     protected = model_admin.all_protected
     readonly_set = frozenset(model_admin.readonly_fields)
 

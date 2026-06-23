@@ -14,7 +14,10 @@ provider implementation.
 
 from __future__ import annotations
 
-from sqlalchemy import JSON, Column, Index, String
+from typing import Any
+
+from sqlalchemy import JSON, Index, String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from asterion.models.base import GlobalModel
 
@@ -22,10 +25,10 @@ from asterion.models.base import GlobalModel
 class SavedFilter(GlobalModel):
     __tablename__ = "admin_saved_filters"
 
-    user_id: str = Column(String(128), nullable=False)
-    tenant_id: str | None = Column(String(128), nullable=True)
-    resource: str = Column(String(128), nullable=False)
-    name: str = Column(String(200), nullable=False)
-    payload = Column(JSON, nullable=False, default=dict)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    tenant_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    resource: Mapped[str] = mapped_column(String(128), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
 
     __table_args__ = (Index("ix_saved_filters_owner", "user_id", "resource"),)

@@ -418,8 +418,9 @@ class ModelAdmin:
         showing the raw id when nothing more readable exists.
         """
         from sqlalchemy import inspect as sa_inspect
+        from sqlalchemy.orm import Mapper
 
-        mapper = sa_inspect(self.model)
+        mapper: Mapper[Any] = sa_inspect(self.model)
         column_names = {col.name for col in mapper.columns}
         pk = mapper.primary_key
         pk_name = pk[0].name if len(pk) == 1 else None
@@ -436,7 +437,9 @@ class ModelAdmin:
 
     @property
     def model_name(self) -> str:
-        return self.model.__tablename__
+        # __tablename__ is set by SQLAlchemy's declarative metaclass, so it is
+        # invisible to the static ``type`` annotation on ``model``.
+        return self.model.__tablename__  # type: ignore[attr-defined]
 
     @property
     def display_label(self) -> str:

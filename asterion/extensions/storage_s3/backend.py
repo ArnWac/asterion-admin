@@ -55,8 +55,8 @@ def _import_boto3() -> tuple[Any, Any]:
     extras entry to install). Returns ``(boto3_module, ClientError)``.
     """
     try:
-        import boto3  # type: ignore[import-not-found]
-        from botocore.exceptions import ClientError  # type: ignore[import-not-found]
+        import boto3
+        from botocore.exceptions import ClientError
     except ImportError as exc:
         raise ImportError(
             "S3StorageBackend requires the 'boto3' package. "

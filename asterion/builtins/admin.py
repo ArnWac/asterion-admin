@@ -260,7 +260,7 @@ class TenantAuditLogAdmin(ModelAdmin):
     ]
 
 
-BUILTIN_TENANT_ADMINS = (
+BUILTIN_TENANT_ADMINS: tuple[type[ModelAdmin], ...] = (
     TenantRoleAdmin,
     TenantRolePermissionAdmin,
     TenantMembershipRoleAdmin,
@@ -270,7 +270,7 @@ BUILTIN_TENANT_ADMINS = (
 #: Read-only admins on framework-owned tables (Roadmap 5.1). Installed
 #: by default alongside the tenant admins so any app with
 #: ``enable_builtin_admins=True`` gets the Audit-UI for free.
-BUILTIN_AUDIT_ADMINS = (AuditLogAdmin,)
+BUILTIN_AUDIT_ADMINS: tuple[type[ModelAdmin], ...] = (AuditLogAdmin,)
 
 
 __all__ = [

@@ -38,7 +38,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.admin.context import AdminContext, require_admin_context
@@ -103,7 +103,7 @@ def available_formats() -> tuple[str, ...]:
     return ("csv", "xlsx") if xlsx_available() else ("csv",)
 
 
-def _resolve_admin(request: Request, resource: str) -> type[ModelAdmin]:
+def _resolve_admin(request: Request, resource: str) -> ModelAdmin:
     try:
         resource = validate_resource_name(resource)
     except InvalidResourceNameError:
@@ -220,7 +220,7 @@ async def export_records(
 
     capped_limit = max(1, min(int(limit), MAX_EXPORT_ROWS))
 
-    base_stmt = select(admin.model)
+    base_stmt: Select[Any] = select(admin.model)
     if ids:
         # Selection-based export: ignore search and the limit (the limit is
         # still applied as a safety cap, but with the typical UI selection
@@ -279,11 +279,7 @@ async def export_records(
                 "selected_ids": len(ids) if ids else 0,
                 "filters": {
                     k: v
-                    for k, v in (
-                        request.query_params.multi_items()
-                        if hasattr(request.query_params, "multi_items")
-                        else list(request.query_params)
-                    )
+                    for k, v in request.query_params.multi_items()
                     if k.startswith("filter_")
                 },
             },
