@@ -177,3 +177,15 @@ def test_audit_delete_is_forbidden(audit_app):
     row_id = audit_app.get("/api/v1/admin/audit_logs/").json()["items"][0]["id"]
     resp = audit_app.delete(f"/api/v1/admin/audit_logs/{row_id}")
     assert resp.status_code == 403
+
+
+def test_read_only_policy_zeroes_contract_capabilities():
+    """The contract must report no write capabilities for a ReadOnlyPolicy
+    admin even when the caller holds admin.* — so the UI hides New/Edit/Delete
+    instead of offering controls the route would 403."""
+    from asterion.contract.service import build_model_contract
+
+    contract = build_model_contract(AuditLogAdmin(), permissions=frozenset({"admin.*"}))
+    assert contract.capabilities.create is False
+    assert contract.capabilities.update is False
+    assert contract.capabilities.delete is False

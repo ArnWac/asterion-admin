@@ -16,6 +16,19 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-06-23
+
+### Fixed
+- **Read-only admins no longer show New/Edit/Delete controls.** The contract's
+  `capabilities` were computed only from the caller's permission keys, so an
+  owner with `admin.*` saw create/update/delete buttons on append-only tables
+  (audit / impersonation logs) even though the route 403s them via
+  `ReadOnlyPolicy`. `AdminPolicy.read_only` (set by `ReadOnlyPolicy`) now forces
+  `create`/`update`/`delete` capabilities to `False`, and the UI honours
+  `capabilities`: the list **New** button and the detail **Edit/Delete** buttons
+  are hidden when the resource reports no write access. (The server-side 403 was
+  already correct — this aligns the UI with it.)
+
 ## [0.1.19] - 2026-06-23
 
 ### Fixed

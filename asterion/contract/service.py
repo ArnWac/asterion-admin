@@ -707,11 +707,17 @@ def _build_capabilities(
         if _has(permissions, resource, action_name):
             bulk_actions.append(action_name)
 
+    # A resource-level read-only policy (e.g. ReadOnlyPolicy on audit /
+    # impersonation admins) overrides the permission-key answer: the write
+    # gates 403 at the route regardless of the caller's keys, so the contract
+    # must report no create/update/delete and the UI hides those controls.
+    read_only = bool(getattr(getattr(model_admin, "policy", None), "read_only", False))
+
     return CapabilitiesMeta(
-        create=_has(permissions, resource, "create"),
-        update=_has(permissions, resource, "update"),
-        delete=_has(permissions, resource, "delete"),
-        bulk_actions=bulk_actions,
+        create=(not read_only) and _has(permissions, resource, "create"),
+        update=(not read_only) and _has(permissions, resource, "update"),
+        delete=(not read_only) and _has(permissions, resource, "delete"),
+        bulk_actions=[] if read_only else bulk_actions,
     )
 
 

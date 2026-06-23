@@ -89,6 +89,13 @@ class AdminPolicy:
     backward-compatible.
     """
 
+    #: Resource-level read-only marker. When ``True`` the contract reports
+    #: ``create``/``update``/``delete`` capabilities as ``False`` (regardless
+    #: of the caller's permission keys), so the UI hides the New/Edit/Delete
+    #: controls — matching what the object-level ``can_*`` gates enforce at the
+    #: route. Set by :class:`ReadOnlyPolicy`; custom policies can set it too.
+    read_only: bool = False
+
     async def can_view_model(self, ctx: AdminContext) -> bool:
         """Gate the entire admin (list + read + write). Use for
         resource-level visibility ("hide the Orders admin from
@@ -152,6 +159,10 @@ class ReadOnlyPolicy(AdminPolicy):
     to hide specific columns, layer a field-permission policy on top
     or set ``readonly_fields`` on the admin.
     """
+
+    #: Surfaced in the contract so the UI hides New/Edit/Delete (the object
+    #: gates below already 403 the write at the route).
+    read_only = True
 
     async def can_create(self, ctx: AdminContext) -> bool:
         return False

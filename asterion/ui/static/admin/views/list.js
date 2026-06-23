@@ -75,9 +75,12 @@ export async function mountList(root, resource) {
   const tableBody = el("tbody");
   const paginationBar = el("nav", { class: "pagination", "aria-label": "Pagination" });
 
+  // Hidden for read-only resources (capabilities.create=false), so we don't
+  // offer a create form the server would 403.
+  const canCreate = !contract.capabilities || contract.capabilities.create !== false;
   const newBtn = el(
     "a",
-    { class: "btn btn-primary", href: `${cfg.uiPath}/${resource}/new` },
+    { class: "btn btn-primary", href: `${cfg.uiPath}/${resource}/new`, hidden: canCreate ? null : "" },
     "+ New"
   );
 

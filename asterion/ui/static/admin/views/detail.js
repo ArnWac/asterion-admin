@@ -57,23 +57,31 @@ export async function mountDetail(root, resource, recordId) {
     grid.appendChild(dd);
   }
 
+  const caps = contract.capabilities || {};
   const actions = el("div", { class: "page-actions" }, [
-    el(
-      "a",
-      {
-        class: "btn",
-        href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/edit`,
-      },
-      "Edit"
-    ),
-    el(
-      "a",
-      {
-        class: "btn btn-danger",
-        href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/delete`,
-      },
-      "Delete"
-    ),
+    // Edit/Delete only when the contract says this caller may write — a
+    // read-only resource (e.g. audit logs) reports update/delete=false, so
+    // we don't offer controls the server would 403.
+    caps.update === false
+      ? null
+      : el(
+          "a",
+          {
+            class: "btn",
+            href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/edit`,
+          },
+          "Edit"
+        ),
+    caps.delete === false
+      ? null
+      : el(
+          "a",
+          {
+            class: "btn btn-danger",
+            href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/delete`,
+          },
+          "Delete"
+        ),
     // Tenant roles get a dedicated two-list permission picker.
     resource === "tenant_roles"
       ? el(
