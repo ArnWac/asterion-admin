@@ -167,7 +167,7 @@ def test_runtime_protected_fields_defaults_to_the_global_singleton():
     one registry.
 
     This is a *documented* singleton (see runtime.py + protected_fields.py
-    docstrings and docs/review-hardening-roadmap.md). Two apps sharing it can only ever
+    docstrings and docs/roadmap.md). Two apps sharing it can only ever
     over-protect (a field protected by app B is also stripped for app A),
     never leak — protected fields are a global, fail-safe concern. If a
     future change makes this per-runtime, it MUST also re-route every

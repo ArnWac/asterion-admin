@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows the project's stability policy in
-[`docs/review-hardening-roadmap.md`](docs/review-hardening-roadmap.md#release--versionspolitik--10-gate):
+[`docs/roadmap.md`](docs/roadmap.md#release--versionspolitik--10-gate):
 while on `0.x`, a minor release may make breaking changes to the public API
 or the JSON contract — such changes are called out here. From `1.0` onward
 the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -666,7 +666,7 @@ non-editable dependency in a downstream app). Pin it via
   (`validate_tenant_slug`) and the read path (`X-Tenant-Slug` / subdomain),
   so client casing/whitespace resolves the canonical tenant.
 - Docs: `roadmap.md` and `stabilization.md` consolidated into
-  `docs/review-hardening-roadmap.md`; tenancy/architecture docs corrected to
+  `docs/roadmap.md`; tenancy/architecture docs corrected to
   describe where `search_path` is actually applied.
 
 ## [0.1.0]
