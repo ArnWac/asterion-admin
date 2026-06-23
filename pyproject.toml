@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asterion-admin"
-version = "0.1.25"
+version = "0.1.26"
 description = "FastAPI admin framework with built-in UI, JWT auth, RBAC, and multi-tenancy"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -139,16 +139,13 @@ markers = [
 # Type checking
 # ---------------------------------------------------------------------------
 [tool.mypy]
-# Pre-1.0 stabilization: mypy is enforced on the typed contract surface that
-# consumers depend on — the provider Protocols and the config object. The
-# rest of the package still carries ~80 framework-typing nits (SQLAlchemy /
-# FastAPI generics, type[ModelAdmin]-vs-instance) tracked in
-# docs/review-hardening-roadmap.md; broadening this scope is a follow-up, not a 1.0
-# blocker. ``follow_imports = silent`` keeps transitive noise from those
-# modules out of the report while still checking the targeted files.
+# mypy is enforced package-wide. The Alembic ``env.py`` files are generated
+# from templates and call ``context.configure(**kwargs)`` with a dynamic dict
+# that can't be statically reconciled with Alembic's overloaded signature, so
+# the migration tree is excluded (it is excluded from ruff too).
 python_version = "3.11"
-files = ["asterion/providers", "asterion/core/config.py"]
-follow_imports = "silent"
+files = ["asterion"]
+exclude = "asterion/_migrations/"
 ignore_missing_imports = true
 warn_unused_ignores = true
 

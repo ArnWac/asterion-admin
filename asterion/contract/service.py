@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.orm import Mapper
 
 from asterion.fields import FieldRegistry, build_default_registry
 from asterion.registry.admin import AUTO_FIELDS, ModelAdmin
@@ -74,7 +75,8 @@ def resolve_date_hierarchy(model_admin: ModelAdmin) -> str | None:
     if not field:
         return None
     try:
-        column = sa_inspect(model_admin.model).columns[field]
+        mapper: Mapper[Any] = sa_inspect(model_admin.model)
+        column = mapper.columns[field]
     except KeyError:
         return None
     return field if isinstance(column.type, (Date, DateTime)) else None
@@ -534,7 +536,7 @@ def build_field_metadata(
         registry = build_default_registry()
     perms = field_permissions or {}
 
-    mapper = sa_inspect(model_admin.model)
+    mapper: Mapper[Any] = sa_inspect(model_admin.model)
     protected = model_admin.all_protected
     readonly_set = set(model_admin.readonly_fields)
     placeholders = dict(getattr(model_admin, "placeholders", {}) or {})
@@ -654,12 +656,13 @@ async def compute_field_permissions(
         static = static_field_permission(model_admin, field_name)
         if not run_policy:
             return static.value
+        assert policy is not None  # guaranteed by run_policy
         dynamic = await policy.field_permission(field_name, None, ctx)
         if not isinstance(dynamic, FieldPermission):
             dynamic = FieldPermission(str(dynamic))
         return FieldPermission.strictest(static, dynamic).value
 
-    mapper = sa_inspect(model_admin.model)
+    mapper: Mapper[Any] = sa_inspect(model_admin.model)
     out: dict[str, str] = {}
     for col in mapper.columns:
         out[col.name] = await _resolve(col.name)
@@ -669,8 +672,8 @@ async def compute_field_permissions(
 
 
 def _admin_action_meta(action) -> AdminActionMeta:
-    name = getattr(action, "name", None) or getattr(action, "__name__", "unknown")
-    label = getattr(action, "label", None) or name.replace("_", " ").title()
+    name = str(getattr(action, "name", None) or getattr(action, "__name__", "unknown"))
+    label = str(getattr(action, "label", None) or name.replace("_", " ").title())
     return AdminActionMeta(name=name, label=label)
 
 
@@ -746,7 +749,7 @@ def build_fieldset_metadata(model_admin: ModelAdmin) -> list[FieldsetMeta]:
     if not declared:
         return []
 
-    mapper = sa_inspect(model_admin.model)
+    mapper: Mapper[Any] = sa_inspect(model_admin.model)
     column_names = {col.name for col in mapper.columns}
     calculated_names = set(getattr(model_admin, "calculated_fields", {}) or {})
     valid_names = column_names | calculated_names
@@ -801,7 +804,7 @@ def build_filter_metadata(
     if registry is None:
         registry = build_default_registry()
 
-    mapper = sa_inspect(model_admin.model)
+    mapper: Mapper[Any] = sa_inspect(model_admin.model)
     by_name = {col.name: col for col in mapper.columns}
 
     out: list[FilterMeta] = []
@@ -921,7 +924,7 @@ def build_relation_metadata(
     still get the structural relation list, just with
     ``target_registered=False`` everywhere.
     """
-    mapper = sa_inspect(model_admin.model)
+    mapper: Mapper[Any] = sa_inspect(model_admin.model)
     registered_tables: set[str] = set()
     if admin_registry is not None:
         registered_tables = set(admin_registry.model_names())

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator, Callable
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -30,7 +30,10 @@ from asterion.ui.admin_pages import mirror_pages_into_navigation
 logger = logging.getLogger(__name__)
 
 #: Type alias for FastAPI's lifespan context manager factory shape.
-LifespanFactory = Callable[[FastAPI], "AsyncIterator[None]"]
+#: FastAPI accepts a callable returning an async context manager (the shape
+#: produced by ``@asynccontextmanager``); ``_to_async_cm`` additionally tolerates
+#: a raw async-generator factory at runtime for loosely-typed test code.
+LifespanFactory = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 
 
 def run_setup_phase(

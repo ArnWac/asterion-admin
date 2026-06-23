@@ -13,6 +13,7 @@ SQLAlchemy types live in :mod:`asterion.fields.scalar` (and later
 
 from __future__ import annotations
 
+import builtins
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
@@ -35,7 +36,7 @@ class FieldContract:
     hidden: bool = False
     nullable: bool = False
     calculated: bool = False
-    python_type: type | None = None
+    python_type: builtins.type | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

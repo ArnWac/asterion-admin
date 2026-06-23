@@ -22,7 +22,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import Result, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.actions import AdminAction, uses_typed_run
@@ -66,7 +66,7 @@ def _not_found(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
 
 
-def _resolve_admin(request: Request, resource: str) -> type[ModelAdmin]:
+def _resolve_admin(request: Request, resource: str) -> ModelAdmin:
     try:
         resource = validate_resource_name(resource)
     except InvalidResourceNameError:
@@ -106,7 +106,7 @@ async def _resolve_records(
     model = admin.model
     pk_column = primary_key_column(model)
     coerced = [coerce_primary_key_value(model, str(raw)) for raw in raw_ids]
-    result = await session.execute(select(model).where(pk_column.in_(coerced)))
+    result: Result[Any] = await session.execute(select(model).where(pk_column.in_(coerced)))
     return list(result.scalars().all())
 
 

@@ -33,7 +33,7 @@ def provisioning_uri(secret: str, *, account_name: str, issuer: str) -> str:
     return pyotp.TOTP(secret).provisioning_uri(name=account_name, issuer_name=issuer)
 
 
-def verify_totp(secret: str, code: str) -> bool:
+def verify_totp(secret: str | None, code: str) -> bool:
     """Verify a 6-digit TOTP code against the secret (±1 time step)."""
     if not secret or not code:
         return False

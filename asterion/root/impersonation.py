@@ -121,10 +121,12 @@ async def _resolve_target_tenant(
     if len(tenant_ids) != 1:
         return None, None
     only = next(iter(tenant_ids))
-    tenant = (await session.execute(select(Tenant).where(Tenant.id == only))).scalar_one_or_none()
-    if tenant is None or not tenant.is_active:
+    candidate = (
+        await session.execute(select(Tenant).where(Tenant.id == only))
+    ).scalar_one_or_none()
+    if candidate is None or not candidate.is_active:
         return None, None
-    return tenant.id, tenant.slug
+    return candidate.id, candidate.slug
 
 
 @router.post("/impersonate", response_model=ImpersonateResponse)

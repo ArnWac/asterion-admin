@@ -37,10 +37,10 @@ Scope
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy import delete, select
+from sqlalchemy import CursorResult, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.admin.context import AdminContext, require_admin_context
@@ -191,7 +191,9 @@ async def delete_saved_filter(
             SavedFilter.tenant_id == _tenant_id(ctx),
         )
     )
-    if result.rowcount == 0:
+    # DML execute() returns a CursorResult at runtime; the static type is the
+    # base Result, which doesn't expose rowcount.
+    if cast(CursorResult[Any], result).rowcount == 0:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Saved filter not found.",

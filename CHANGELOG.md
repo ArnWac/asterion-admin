@@ -16,6 +16,25 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.26] - 2026-06-23
+
+### Changed
+- **mypy is now enforced package-wide** (previously scoped to the provider
+  Protocols + `core/config.py`). The full `asterion` package type-checks clean
+  (154 files, 0 errors). The `[tool.mypy]` config switched from a targeted file
+  list to `files = ["asterion"]`; the generated Alembic `env.py` tree is
+  excluded (its `context.configure(**kwargs)` can't be reconciled with
+  Alembic's overloaded signature). No runtime behaviour changed — this is a
+  typing-only pass. Notable internal fixes along the way:
+  - `ModelAdmin` is consistently treated as an **instance** at the typed
+    boundaries (`_resolve_admin` and the `apply_*` query helpers no longer
+    disagree about `type[ModelAdmin]` vs `ModelAdmin`).
+  - `SavedFilter` migrated from legacy `Column` declarations to the modern
+    `Mapped[...] = mapped_column(...)` style used by every other model.
+  - `verify_totp` now accepts `str | None` (matches its existing runtime
+    guard); the member-update path raises a clean 404 if the referenced user
+    account is missing instead of dereferencing `None`.
+
 ## [0.1.25] - 2026-06-23
 
 ### Changed

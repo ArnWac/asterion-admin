@@ -366,6 +366,11 @@ async def update_member(
     await session.flush()
 
     user = await session.get(User, membership.user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Member user account not found.",
+        )
     roles_map = await _roles_by_membership(session, [membership.id])
     return {"member": _member_view(membership, user, roles_map.get(membership.id, []))}
 

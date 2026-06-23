@@ -88,7 +88,7 @@ def get_model_column(model: type[Any], field_name: str):
 
 def apply_ordering(
     stmt: Select,
-    admin_class: type[ModelAdmin],
+    admin_class: ModelAdmin,
     ordering: str | None = None,
 ) -> Select:
     model = admin_class.model
@@ -124,7 +124,7 @@ def apply_ordering(
 
         if field_name not in known_columns:
             raise RuntimeError(
-                f"{admin_class.__name__}.ordering contains unknown field: {field_name}"
+                f"{type(admin_class).__name__}.ordering contains unknown field: {field_name}"
             )
 
         column = get_model_column(model, field_name)
@@ -268,7 +268,7 @@ def _parse_date_hierarchy(value: str) -> tuple[datetime, datetime] | None:
 
 def apply_date_hierarchy(
     stmt: Select,
-    admin_class: type[ModelAdmin],
+    admin_class: ModelAdmin,
     value: str | None,
 ) -> Select:
     """Filter to a date period over ``ModelAdmin.date_hierarchy`` (Roadmap 5.5).
@@ -297,7 +297,7 @@ def apply_date_hierarchy(
 
 def apply_search(
     stmt: Select,
-    admin_class: type[ModelAdmin],
+    admin_class: ModelAdmin,
     search: str | None,
 ) -> Select:
     if search is None or not search.strip():
@@ -317,7 +317,7 @@ def apply_search(
     for field_name in search_fields:
         if field_name not in known_columns:
             raise RuntimeError(
-                f"{admin_class.__name__}.search_fields contains unknown field: {field_name}"
+                f"{type(admin_class).__name__}.search_fields contains unknown field: {field_name}"
             )
 
         column = get_model_column(model, field_name)
