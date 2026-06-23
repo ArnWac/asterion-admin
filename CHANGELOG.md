@@ -16,6 +16,29 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-06-23
+
+### Fixed
+- **Invalid UUID input now returns 422, not 500.** The write path validated
+  field names but not column types, so a non-UUID value for a GUID column
+  (e.g. a free-text `project_id` of `"test"`) reached the driver and surfaced
+  as a 500 from `GUID.process_bind_param`. `validate_uuid_fields` now rejects
+  it early as a field error on both create and update.
+- **`/_permission_matrix` no longer 500s outside a tenant.** Tenant roles live
+  in a tenant schema; without an active tenant the endpoint returns an empty
+  matrix instead of erroring on the missing `tenant_roles` table.
+- **Dashboard honours `show_in_nav`.** The Django-style dashboard now hides
+  resources flagged `show_in_nav=False` (e.g. `TenantRolePermission`), matching
+  the sidebar — role permissions are managed via the per-role picker.
+
+### Changed
+- Removed the **Permissions** link from the sidebar footer; the roles ×
+  permissions matrix is no longer the entry point — per-role permissions are
+  edited from a Tenant Role's "Edit permissions" picker.
+- The header-mode **tenant switcher now also records a `tenant_access` audit
+  event** (it routes through the same audited entry path as the Open button),
+  so switching tenants is traceable too.
+
 ## [0.1.18] - 2026-06-23
 
 ### Added

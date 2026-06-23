@@ -13,6 +13,7 @@ import { admin, APIError, auth, root, tenantStore, tokenStore } from "./api.js";
 import { getFullContract } from "./contract.js";
 import { el, mount, showToast } from "./dom.js";
 import { renderImpersonationBanner } from "./impersonation.js";
+import { openTenant } from "./tenant_access.js";
 
 const cfg = window.ASTERION || {};
 
@@ -146,8 +147,18 @@ async function populateTenantSwitcher() {
   );
   select.addEventListener("change", () => {
     const slug = select.value;
-    if (slug) tenantStore.set(slug);
-    else tenantStore.clear();
+    if (slug) {
+      // Route through the same audited "enter tenant" path as the Open
+      // button (records a tenant_access event, sets the slug, reloads).
+      const tenant = tenants.find((t) => t.slug === slug);
+      if (tenant) {
+        openTenant(tenant.id);
+        return;
+      }
+      tenantStore.set(slug);
+    } else {
+      tenantStore.clear();
+    }
     // Full reload to the dashboard: the contract + sidebar re-fetch in the new
     // context, and the current resource may not exist in the target scope.
     window.location.assign(`${cfg.uiPath}/dashboard`);

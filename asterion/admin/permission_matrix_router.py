@@ -90,10 +90,19 @@ class _PermissionMatrixUpdate(BaseModel):
 
 @router.get("/_permission_matrix")
 async def get_matrix(
+    request: Request,
     ctx: AdminContext = Depends(require_admin_context),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict[str, Any]:
     assert_permission(ctx.permissions, "admin.tenant_roles.list")
+
+    # In multi-tenant mode tenant roles live in a tenant schema; without an
+    # active tenant the table isn't on the search_path, so return an empty
+    # matrix instead of letting the query 500 (e.g. hit from the global
+    # context). Single-tenant apps keep the table in their one schema and
+    # query normally.
+    if request.app.state.asterion.config.enable_multi_tenant and ctx.tenant is None:
+        return {"roles": [], "permissions": [], "assignments": {}}
 
     roles = (await session.execute(select(TenantRole).order_by(TenantRole.name))).scalars().all()
 
@@ -166,7 +175,7 @@ async def update_matrix(
 
     if not body.assignments:
         # No-op: return current state without touching the DB.
-        return await get_matrix(ctx=ctx, session=session)
+        return await get_matrix(request, ctx=ctx, session=session)
 
     # Resolve each role id, refusing system roles + unknown ids up
     # front so the response is all-or-nothing — partial application
@@ -257,4 +266,4 @@ async def update_matrix(
                 await session.delete(row)
 
     await session.flush()
-    return await get_matrix(ctx=ctx, session=session)
+    return await get_matrix(request, ctx=ctx, session=session)
