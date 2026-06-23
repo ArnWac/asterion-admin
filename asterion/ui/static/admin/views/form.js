@@ -197,6 +197,51 @@ export async function mountForm(root, resource, mode, recordId) {
     ]),
     el("div", { class: "card" }, form)
   );
+
+  // Foreign-key dropdowns: fetch the target resource's {value, label} options
+  // and fill each FK <select>. Done after mount so the form renders instantly;
+  // a failed/empty fetch leaves the provisional raw-id option in place.
+  for (const field of editableFields) {
+    if (field.widget !== "foreign_key") continue;
+    const select = inputs.get(field.name);
+    if (!select || select.tagName !== "SELECT" || select.disabled) continue;
+    populateForeignKey(select, resource, field, existing ? existing[field.name] : null);
+  }
+}
+
+async function populateForeignKey(select, resource, field, current) {
+  let data;
+  try {
+    data = await admin.fieldOptions(resource, field.name);
+  } catch {
+    return; // keep the provisional/raw select on failure
+  }
+  const opts = (data && data.options) || [];
+  // Nothing to offer (target not registered, or cross-schema FK not yet
+  // supported): leave the provisional select alone so the value still shows.
+  if (!opts.length) return;
+
+  const currentStr = current != null ? String(current) : "";
+  while (select.firstChild) select.removeChild(select.firstChild);
+  if (field.nullable) select.appendChild(el("option", { value: "" }, "—"));
+
+  let matched = false;
+  for (const o of opts) {
+    const val = String(o.value);
+    const attrs = { value: val };
+    if (val === currentStr) {
+      attrs.selected = true;
+      matched = true;
+    }
+    select.appendChild(el("option", attrs, o.label));
+  }
+  // Current value not in the (possibly truncated) page: keep it as a
+  // provisional option so editing an unrelated field doesn't drop the FK.
+  if (currentStr && !matched) {
+    select.appendChild(
+      el("option", { value: currentStr, selected: true }, `${currentStr} (current)`)
+    );
+  }
 }
 
 function buildFormBody(fieldsets, fieldDivs, renderedOrder, layout) {
@@ -332,6 +377,19 @@ function buildInput(field, id, initial, disabled) {
   }
   if (field.widget === "textarea") {
     return el("textarea", { ...baseAttrs, rows: 4 }, initial == null ? "" : String(initial));
+  }
+
+  // Foreign-key picker: render a <select> that populateForeignKey() fills with
+  // {value, label} options after mount. Start with a placeholder plus (when
+  // editing) a provisional option for the current raw id, so the value is
+  // preserved even before the options arrive / if the fetch fails.
+  if (field.widget === "foreign_key") {
+    const options = [];
+    if (field.nullable) options.push(el("option", { value: "" }, "—"));
+    if (initial != null && initial !== "") {
+      options.push(el("option", { value: String(initial), selected: true }, String(initial)));
+    }
+    return el("select", baseAttrs, options);
   }
 
   if (type === "boolean") {

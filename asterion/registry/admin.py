@@ -165,6 +165,29 @@ class ModelAdmin:
 
     calculated_fields: dict[str, Callable[[Any], Any]] = {}
 
+    #: Optional column used as this model's human-readable label when it is the
+    #: *target* of a foreign-key picker (FK dropdowns). When a form on another
+    #: model renders a FK pointing here, the picker fetches ``{id, label}`` pairs
+    #: and shows ``label`` instead of the raw id. ``None`` falls back to the
+    #: :meth:`label_field` heuristic (first common label column, else a
+    #: ``list_display`` column, else the primary key).
+    display_field: str | None = None
+
+    #: Columns tried in order by :meth:`label_field` when ``display_field`` is
+    #: unset. Deliberately small + conventional; an app names its own column via
+    #: ``display_field`` when none of these fit.
+    LABEL_FIELD_CANDIDATES: tuple[str, ...] = (
+        "name",
+        "title",
+        "label",
+        "display_name",
+        "email",
+        "slug",
+        "username",
+        "code",
+        "key",
+    )
+
     #: Whether this resource appears in the admin sidebar nav. ``False`` keeps
     #: the resource fully routable (CRUD, contract, permission keys) but hides
     #: it from the sidebar — for tables managed through a dedicated UI rather
@@ -354,6 +377,33 @@ class ModelAdmin:
         admin's own ``protected_fields``.
         """
         return get_registry().as_frozenset() | frozenset(self.protected_fields)
+
+    @property
+    def label_field(self) -> str:
+        """Resolve the column used as this model's human-readable label.
+
+        Priority: explicit :attr:`display_field` (when it's a real column) →
+        first of :attr:`LABEL_FIELD_CANDIDATES` present on the model → first
+        non-PK name in :attr:`list_display` that is a real column → the primary
+        key. Always returns a real column name, so a FK picker can fall back to
+        showing the raw id when nothing more readable exists.
+        """
+        from sqlalchemy import inspect as sa_inspect
+
+        mapper = sa_inspect(self.model)
+        column_names = {col.name for col in mapper.columns}
+        pk = mapper.primary_key
+        pk_name = pk[0].name if len(pk) == 1 else None
+
+        if self.display_field and self.display_field in column_names:
+            return self.display_field
+        for candidate in self.LABEL_FIELD_CANDIDATES:
+            if candidate in column_names:
+                return candidate
+        for name in self.list_display:
+            if name in column_names and name != pk_name:
+                return name
+        return pk_name or next(iter(column_names))
 
     @property
     def model_name(self) -> str:

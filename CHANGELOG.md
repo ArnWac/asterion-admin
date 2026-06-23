@@ -16,6 +16,24 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-06-23
+
+### Added
+- **Foreign-key dropdowns in forms.** A FK column (e.g. `tickets.project_id`,
+  `tenant_membership_roles.role_id`) now renders as a `<select>` of
+  human-readable labels instead of a raw-id text input. New endpoint
+  `GET /{resource}/_options/{field}` enumerates the target table as
+  `{value, label}` pairs; the label is the target admin's `label_field`
+  (new `ModelAdmin.display_field`, or a heuristic: first of
+  `name`/`title`/`label`/`email`/`slug`/… present, else a `list_display`
+  column, else the primary key). Authorization requires `read` on the owning
+  resource and `list` on the target. The endpoint returns an empty option list
+  (never a 500) when the target isn't a registered admin or lives in a
+  different schema scope (cross-schema FKs — e.g. a tenant row referencing a
+  public table — are handled separately); in that case the form keeps the raw
+  input. Contract shape is unchanged (FK columns already carry
+  `widget="foreign_key"`), so `CONTRACT_VERSION` stays `"2"`.
+
 ## [0.1.22] - 2026-06-23
 
 ### Added

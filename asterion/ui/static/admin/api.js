@@ -136,6 +136,18 @@ export const admin = {
   remove: (resource, id) =>
     request("DELETE", `${cfg.adminPrefix}/${resource}/${encodeURIComponent(id)}`),
 
+  // Foreign-key picker options: {value, label} pairs for a FK column,
+  // resolved server-side from the column's target table. Returns
+  //   { options: [{value, label}, ...], truncated: bool, registered: bool }
+  fieldOptions: (resource, field, { q = "", limit = 100 } = {}) => {
+    const qs = new URLSearchParams({ limit });
+    if (q) qs.set("q", q);
+    return request(
+      "GET",
+      `${cfg.adminPrefix}/${resource}/_options/${encodeURIComponent(field)}?${qs}`
+    );
+  },
+
   runAction: (resource, action, ids) =>
     request("POST", `${cfg.adminPrefix}/${resource}/_actions/${action}`, { ids }),
 

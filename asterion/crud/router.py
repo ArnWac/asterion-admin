@@ -203,6 +203,86 @@ async def _update_impl(
     return result
 
 
+async def _fk_options_impl(
+    resource: str,
+    field: str,
+    request: Request,
+    *,
+    limit: int,
+    q: str | None,
+    session: AsyncSession,
+    ctx: AdminContext,
+) -> dict[str, Any]:
+    """Enumerate ``{value, label}`` options for a foreign-key column.
+
+    Powers the form FK dropdown: given the resource carrying the FK and the
+    column name, resolve the target table, look up its registered admin, and
+    return its rows as id → human-readable label (the target admin's
+    :attr:`~asterion.registry.ModelAdmin.label_field`).
+
+    Authorization: the caller must be able to ``read`` the resource that owns
+    the FK *and* ``list`` the target resource (the options come from it).
+
+    Returns an empty option list (never a 500) when the target isn't a
+    registered admin, or when it lives in a different schema scope than the
+    owning resource — the cross-schema case (e.g. a tenant row referencing a
+    public table) is resolved by a dedicated path, not the generic query here.
+    """
+    from sqlalchemy import String, cast, select
+
+    from asterion.contract.service import resolve_model_scope
+    from asterion.crud.query import get_model_column, primary_key_column
+
+    admin_class = _get_admin_class(request, resource)
+    _require_resource_permission(ctx, admin_class.model_name, "read")
+
+    try:
+        column = get_model_column(admin_class.model, field)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Field '{field}' is not a column of '{resource}'.",
+        ) from None
+    fks = list(column.foreign_keys)
+    if not fks:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Field '{field}' is not a foreign key.",
+        )
+
+    target_table = fks[0].column.table.name
+    target_admin = request.app.state.asterion.registry.get(target_table)
+    if target_admin is None:
+        # Target table isn't managed by the admin — nothing to enumerate.
+        return {"options": [], "truncated": False, "registered": False}
+
+    # Cross-schema FK (tenant ↔ public): the generic query below would run
+    # against the wrong search_path. Defer to the dedicated path; until then
+    # the form falls back to a raw input.
+    if resolve_model_scope(target_admin) != resolve_model_scope(admin_class):
+        return {"options": [], "truncated": False, "registered": True, "cross_scope": True}
+
+    _require_resource_permission(ctx, target_admin.model_name, "list")
+
+    target_model = target_admin.model
+    pk_col = primary_key_column(target_model)
+    label_col = getattr(target_model, target_admin.label_field)
+
+    stmt = select(pk_col, label_col)
+    if q and q.strip():
+        stmt = stmt.where(cast(label_col, String).ilike(f"%{q.strip()}%"))
+    # Fetch one extra row to detect truncation without a separate count.
+    stmt = stmt.order_by(label_col.asc()).limit(limit + 1)
+
+    rows = (await session.execute(stmt)).all()
+    truncated = len(rows) > limit
+    options = [
+        {"value": str(pk), "label": str(label) if label is not None else str(pk)}
+        for pk, label in rows[:limit]
+    ]
+    return {"options": options, "truncated": truncated, "registered": True}
+
+
 async def _delete_impl(
     resource: str,
     record_id: str,
@@ -263,6 +343,21 @@ def _register_resource(router: APIRouter, resource: str) -> None:
         ctx: AdminContext = Depends(require_admin_context),
     ) -> dict[str, Any]:
         return await _create_impl(resource, request, session=session, ctx=ctx)
+
+    # FK dropdown options. A 3-segment path (`/{resource}/_options/{field}`)
+    # so it never collides with the 2-segment `/{resource}/{record_id}` routes.
+    @router.get(f"/{resource}/_options/{{field}}", name=f"crud_options_{resource}")
+    async def crud_options(
+        field: str,
+        request: Request,
+        limit: int = 100,
+        q: str | None = None,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _fk_options_impl(
+            resource, field, request, limit=limit, q=q, session=session, ctx=ctx
+        )
 
     @router.get(f"/{resource}/{{record_id}}", name=f"crud_read_{resource}")
     async def crud_read(
