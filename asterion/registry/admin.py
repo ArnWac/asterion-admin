@@ -206,6 +206,26 @@ class ModelAdmin:
     #: filters on it.
     show_in_nav: bool = True
 
+    #: "Exactly one row per tenant" presentation + policy default (e.g. an
+    #: organization profile / settings / branding table). When ``True``:
+    #:
+    #: * the contract carries ``singleton: true`` so the UI renders a settings
+    #:   page — the nav entry jumps straight into the single row's detail/edit
+    #:   instead of a one-row list;
+    #: * create is allowed only while the (tenant-scoped) table is empty and
+    #:   delete is blocked — a 403 at the route, surfaced as
+    #:   ``capabilities.create``/``delete`` in the contract so the UI hides the
+    #:   controls.
+    #:
+    #: This is an admin-presentation-+-policy feature, NOT a data-integrity
+    #: guarantee: enforcement counts rows through the request session's
+    #: ``search_path`` (per-tenant on schema-per-tenant Postgres), with no DB
+    #: UNIQUE/constraint — a global constraint would wrongly allow only one row
+    #: across all tenants on a shared (SQLite) namespace. An explicitly set
+    #: :attr:`policy` takes precedence: ``singleton`` only supplies the default
+    #: create/delete behavior when no custom policy owns those decisions.
+    singleton: bool = False
+
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
         for attr in (
