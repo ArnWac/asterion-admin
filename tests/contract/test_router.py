@@ -319,3 +319,79 @@ def test_builtin_admin_contract_loadable(client):
 def test_admin_actions_default_empty(client):
     body = client.get("/api/v1/admin/_contract/projects").json()
     assert body["admin_actions"] == []
+
+
+# --- singleton (v0.1.34): contract reflects the live row count -------------
+
+
+class OrgSettings(_AppBase):
+    __tablename__ = "org_settings"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+
+
+class OrgSettingsAdmin(ModelAdmin):
+    model = OrgSettings
+    label = "Organization"
+    singleton = True
+    list_display = ["id", "name"]
+
+
+@pytest.fixture
+def singleton_client(tmp_path):
+    """An app with a registered singleton admin; tables created so the
+    contract endpoint can run its (per-session) row count."""
+    db_url = f"sqlite+aiosqlite:///{tmp_path / 'singleton_contract.db'}"
+    app = create_admin(
+        config=CoreAdminConfig(
+            database_url=db_url,
+            secret_key="test-singleton-secret",
+            enable_multi_tenant=False,
+            enable_builtin_ui=False,
+        ),
+        register=lambda reg: reg.register(OrgSettingsAdmin),
+    )
+    runtime = app.state.asterion
+
+    async def _setup():
+        async with runtime.db.engine.begin() as conn:
+            await conn.run_sync(GlobalModel.metadata.create_all)
+            await conn.run_sync(_AppBase.metadata.create_all)
+
+    asyncio.run(_setup())
+    override_admin_context(
+        app,
+        principal=make_admin_principal(is_superadmin=True),
+        permissions={"admin.*"},
+    )
+    with TestClient(app, raise_server_exceptions=False) as c:
+        yield c
+    asyncio.run(runtime.db.dispose())
+
+
+def test_singleton_contract_create_flips_when_row_exists(singleton_client):
+    # Empty table: singleton flag set, create still offered.
+    body = singleton_client.get("/api/v1/admin/_contract/org_settings").json()
+    assert body["singleton"] is True
+    assert body["capabilities"]["create"] is True
+    assert body["capabilities"]["delete"] is False
+
+    # Create the single row through the normal CRUD endpoint.
+    resp = singleton_client.post("/api/v1/admin/org_settings", json={"name": "Acme"})
+    assert resp.status_code == 201
+
+    # Now the contract hides create (settings row exists); update stays.
+    body = singleton_client.get("/api/v1/admin/_contract/org_settings").json()
+    assert body["singleton"] is True
+    assert body["capabilities"]["create"] is False
+    assert body["capabilities"]["update"] is True
+    assert body["capabilities"]["delete"] is False
+
+    # And a second create is refused at the route.
+    resp = singleton_client.post("/api/v1/admin/org_settings", json={"name": "Second"})
+    assert resp.status_code == 403
+
+
+def test_singleton_flag_absent_for_plain_resource(client):
+    body = client.get("/api/v1/admin/_contract/projects").json()
+    assert body["singleton"] is False

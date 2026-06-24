@@ -331,3 +331,17 @@ def apply_search(
 
 def count_statement_for(stmt: Select) -> Select:
     return select(func.count()).select_from(stmt.order_by(None).limit(None).offset(None).subquery())
+
+
+async def has_any_row(session: Any, model: type[Any]) -> bool:
+    """True when ``model``'s table holds at least one row in the current session.
+
+    Counts through the request-scoped (tenant-aware) session, so on
+    schema-per-tenant Postgres the answer is scoped to the active tenant's
+    ``search_path``. Backs the :attr:`~asterion.registry.ModelAdmin.singleton`
+    create guard (block create once a row exists) and the matching contract
+    capability — kept here, next to :func:`count_statement_for`, so the
+    enforcement path and the UI hint count rows identically.
+    """
+    result = await session.execute(select(func.count()).select_from(model))
+    return bool((result.scalar_one() or 0) > 0)

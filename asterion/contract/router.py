@@ -11,6 +11,7 @@ malformed paths fall through to 404 rather than reaching the registry.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from asterion.admin.context import AdminContext, require_admin_context
 from asterion.contract.service import (
@@ -20,6 +21,7 @@ from asterion.contract.service import (
     compute_field_permissions,
     resolve_model_scope,
 )
+from asterion.db.dependencies import get_async_session
 from asterion.security.validation import (
     InvalidResourceNameError,
     validate_resource_name,
@@ -28,10 +30,27 @@ from asterion.security.validation import (
 router = APIRouter()
 
 
+async def _singleton_full(session: AsyncSession, admin) -> bool:
+    """Whether a singleton admin's single row already exists.
+
+    Drives ``capabilities.create`` for a :attr:`ModelAdmin.singleton` resource:
+    the count runs through the request-scoped (tenant-aware) session so the
+    answer is per-tenant. ``False`` for non-singleton admins and for singletons
+    with an explicit ``policy`` (which owns the create decision itself), so no
+    count is run in those cases.
+    """
+    if not getattr(admin, "singleton", False) or getattr(admin, "policy", None) is not None:
+        return False
+    from asterion.crud.query import has_any_row
+
+    return await has_any_row(session, admin.model)
+
+
 @router.get("/_contract")
 async def get_full_contract(
     request: Request,
     ctx: AdminContext = Depends(require_admin_context),
+    session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     runtime = request.app.state.asterion
     # Context-aware sidebar filter (Phase A). In multi-tenant mode the full
@@ -59,6 +78,7 @@ async def get_full_contract(
                 permissions=ctx.permissions,
                 admin_registry=runtime.registry,
                 field_permissions=field_permissions,
+                singleton_full=await _singleton_full(session, admin),
             ).model_dump()
         )
     return {
@@ -77,6 +97,7 @@ async def get_model_contract(
     resource: str,
     request: Request,
     ctx: AdminContext = Depends(require_admin_context),
+    session: AsyncSession = Depends(get_async_session),
 ) -> ModelContractMeta:
     try:
         resource = validate_resource_name(resource)
@@ -99,4 +120,5 @@ async def get_model_contract(
         permissions=ctx.permissions,
         admin_registry=runtime.registry,
         field_permissions=field_permissions,
+        singleton_full=await _singleton_full(session, admin),
     )

@@ -15,6 +15,7 @@ from asterion.crud.query import (
     apply_search,
     coerce_primary_key_value,
     count_statement_for,
+    has_any_row,
     normalize_limit_offset,
     primary_key_column,
 )
@@ -274,6 +275,13 @@ async def create_record(
         policy = _policy(admin_class)
         if policy is not None and not await policy.can_create(ctx):
             raise _deny(admin_class.model_name, "create")
+        # Singleton default: when no explicit policy owns the create decision,
+        # a singleton admin allows create only while its (tenant-scoped) table
+        # is empty. Best-effort guard, not a DB constraint — see
+        # ModelAdmin.singleton.
+        if policy is None and getattr(admin_class, "singleton", False):
+            if await has_any_row(session, model):
+                raise _deny(admin_class.model_name, "create")
         # Field-level policy decisions on a brand-new record have no
         # ``obj`` yet — pass None. The policy decides solely on caller +
         # field name.
@@ -420,6 +428,11 @@ async def delete_record(
     if ctx is not None:
         policy = _policy(admin_class)
         if policy is not None and not await policy.can_delete_object(record, ctx):
+            raise _deny(admin_class.model_name, "delete")
+        # Singleton default: the single row is a settings/profile record whose
+        # lifecycle is create-or-edit, never delete (unless an explicit policy
+        # overrides). See ModelAdmin.singleton.
+        if policy is None and getattr(admin_class, "singleton", False):
             raise _deny(admin_class.model_name, "delete")
         await admin_class.before_delete(record, ctx)
 

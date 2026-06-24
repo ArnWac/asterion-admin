@@ -68,6 +68,7 @@ EXPECTED: dict = {
     "description": None,
     "scope": "global",
     "show_in_nav": True,
+    "singleton": False,
     "fields": [
         {
             "name": "id",

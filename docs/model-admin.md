@@ -54,6 +54,7 @@ class PostAdmin(ModelAdmin):
 | `field_dependencies` | `dict[str, dict]` | Dependent select choices keyed by a controlling field's value (Roadmap 5.4). |
 | `placeholders` | `dict[str, str]` | Per-field placeholder text shown in form inputs (Roadmap 5.4). |
 | `field_conditions` | `dict[str, dict]` | Per-field conditional visibility, e.g. `{"vat_id": {"field": "is_business", "equals": True}}` (Roadmap 5.4). |
+| `singleton` | `bool` | "Exactly one row per tenant" settings page — create blocked once a row exists, delete blocked; UI jumps straight into the single row's detail. |
 
 Everything older (`field_policies`, `record_filter`, `widget_overrides`,
 `inline_fields`, `allow_import`, `requires_approval`, …) was dropped in the
@@ -82,6 +83,34 @@ with an `admin.*` grant cannot reach them and read across tenants:
 | `TenantAdmin` | `tenants` | Update-only (no create/delete; `slug`/`schema_name` read-only) |
 | `ImpersonationLogAdmin` | `impersonation_logs` | Read-only |
 | `AuditLogAdmin` | `audit_logs` | Read-only |
+
+## Singleton admins
+
+For the "exactly one config/profile row per tenant" pattern (organization
+profile, settings, branding), set `singleton = True`:
+
+```python
+class OrganizationProfileAdmin(ModelAdmin):
+    model = OrganizationProfile
+    singleton = True
+```
+
+The framework then:
+
+- allows **create** only while the (tenant-scoped) table is empty and blocks
+  **delete** — a `403` at the route, mirrored in `capabilities.create` /
+  `capabilities.delete` so the built-in UI hides the New/Delete controls;
+- stamps `singleton: true` on the contract so the UI renders a settings page —
+  the nav entry jumps straight into the single row's detail/edit instead of a
+  one-row list (create form when no row exists yet);
+- counts rows through the **request session**, so independence is **per-tenant**
+  on schema-per-tenant Postgres — there is **no** DB UNIQUE/constraint (a global
+  one would wrongly cap the table at one row across all tenants on a shared
+  SQLite namespace). This is an admin-presentation-+-policy feature, not a
+  data-integrity guarantee.
+
+An explicitly set `policy` takes precedence: `singleton` only supplies the
+default create/delete behavior when no custom policy owns those decisions.
 
 ## Calculated fields
 

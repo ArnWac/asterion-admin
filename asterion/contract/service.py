@@ -309,6 +309,13 @@ class ModelContractMeta(BaseModel):
     #: Whether the resource appears in the sidebar nav. ``False`` hides it
     #: while keeping it routable (e.g. a table managed via a dedicated UI).
     show_in_nav: bool = True
+    #: "Exactly one row per tenant" resource (e.g. an organization profile /
+    #: settings page). When ``True`` the UI renders a settings page and the nav
+    #: entry jumps straight into the single row's detail instead of a one-row
+    #: list. Pairs with ``capabilities`` (create blocked once a row exists,
+    #: delete always blocked). Defaults ``False`` so existing clients are
+    #: unaffected. See :attr:`asterion.registry.ModelAdmin.singleton`.
+    singleton: bool = False
     fields: list[FieldMeta]
     crud_actions: list[str]
     admin_actions: list[AdminActionMeta]
@@ -700,6 +707,7 @@ def _build_capabilities(
     model_admin: ModelAdmin,
     *,
     permissions: Collection[str] | None,
+    singleton_full: bool = False,
 ) -> CapabilitiesMeta:
     resource = model_admin.model_name
     bulk_actions: list[str] = []
@@ -720,6 +728,15 @@ def _build_capabilities(
     read_only = bool(getattr(policy, "read_only", False))
     no_create = read_only or bool(getattr(policy, "disable_create", False))
     no_delete = read_only or bool(getattr(policy, "disable_delete", False))
+
+    # Singleton default (only when no explicit policy owns the decision): delete
+    # is always hidden, and create is hidden once the single row exists
+    # (``singleton_full`` — resolved by the contract router via a row count). The
+    # route enforces the same; this just keeps the UI controls in sync.
+    if getattr(model_admin, "singleton", False) and policy is None:
+        no_delete = True
+        if singleton_full:
+            no_create = True
 
     return CapabilitiesMeta(
         create=(not no_create) and _has(permissions, resource, "create"),
@@ -966,6 +983,7 @@ def build_model_contract(
     permissions: Collection[str] | None = None,
     admin_registry: AdminRegistry | None = None,
     field_permissions: dict[str, str] | None = None,
+    singleton_full: bool = False,
 ) -> ModelContractMeta:
     """Render the contract for one admin.
 
@@ -981,6 +999,11 @@ def build_model_contract(
     admin's :class:`AdminPolicy`) before invoking this sync builder.
     None means "no per-caller policy ran" — every field falls back to
     the default ``"write"``.
+
+    ``singleton_full`` (only meaningful for a :attr:`ModelAdmin.singleton`
+    resource) is True when the single row already exists; the contract router
+    resolves it with a row count so ``capabilities.create`` is hidden once the
+    settings row has been created.
     """
     field_metas = build_field_metadata(
         model_admin, registry=registry, field_permissions=field_permissions
@@ -993,10 +1016,13 @@ def build_model_contract(
         description=model_admin.description,
         scope=resolve_model_scope(model_admin),
         show_in_nav=bool(getattr(model_admin, "show_in_nav", True)),
+        singleton=bool(getattr(model_admin, "singleton", False)),
         fields=field_metas,
         crud_actions=list(CRUD_ACTIONS),
         admin_actions=[_admin_action_meta(a) for a in model_admin.actions],
-        capabilities=_build_capabilities(model_admin, permissions=permissions),
+        capabilities=_build_capabilities(
+            model_admin, permissions=permissions, singleton_full=singleton_full
+        ),
         relations=build_relation_metadata(model_admin, admin_registry=admin_registry),
         fieldsets=build_fieldset_metadata(model_admin),
         form_layout=(
