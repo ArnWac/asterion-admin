@@ -121,14 +121,20 @@ def test_full_contract_includes_builtin_tenant_admins(client):
     assert "tenant_membership_roles" in resources
 
 
-def test_full_contract_excludes_global_user_model(client):
-    """User is a global/root model — must not be registered as a
-    tenant-local admin by default."""
-    resp = client.get("/api/v1/admin/_contract")
-    resources = {m["resource"] for m in resp.json()["models"]}
-    assert "users" not in resources
-    assert "tenants" not in resources
-    assert "tenant_memberships" not in resources
+def test_full_contract_includes_builtin_global_admins(client):
+    """v0.1.33 — User / Tenant / ImpersonationLog ship as built-in global
+    admins, registered as ``global``-scoped (superadmin) resources."""
+    models = {m["resource"]: m for m in resp_models(client)}
+    for resource in ("users", "tenants", "impersonation_logs"):
+        assert resource in models
+        assert models[resource]["scope"] == "global"
+    # TenantMembership is intentionally NOT a built-in admin (managed via the
+    # dedicated _members UI), so it stays unregistered.
+    assert "tenant_memberships" not in models
+
+
+def resp_models(client):
+    return client.get("/api/v1/admin/_contract").json()["models"]
 
 
 def test_full_contract_requires_authentication(app):

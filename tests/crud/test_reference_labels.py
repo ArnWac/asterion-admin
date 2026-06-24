@@ -59,6 +59,7 @@ async def seeded(tmp_path):
                 "role_id": str(role.id),
                 "role_name": role.name,
                 "membership_id": str(membership.id),
+                "tenant_id": str(tenant.id),
                 "email": user.email,
             }
     try:
@@ -89,16 +90,53 @@ async def test_role_permission_list_resolves_role_name(seeded):
     assert "membership_id__label" not in row
 
 
+def _ctx_for_tenant(tenant_id: str):
+    from asterion.admin.context import AdminContext
+    from asterion.providers.base import AdminTenant
+
+    return AdminContext(
+        request=None,
+        principal=None,
+        tenant=AdminTenant(id=tenant_id, slug="acme"),
+    )
+
+
 @pytest.mark.asyncio
 async def test_membership_role_fk_options_resolve_member_email(seeded):
     """The FK-picker options for the cross-schema membership_id resolve to
-    member emails via the membership → user join (no DB FK)."""
+    member emails via the membership → user join (no DB FK), scoped to the
+    active tenant in ``ctx``."""
     factory, ids = seeded
     async with factory() as session:
         opts = await TenantMembershipRoleAdmin().resolve_fk_options(
-            "membership_id", session=session
+            "membership_id", session=session, ctx=_ctx_for_tenant(ids["tenant_id"])
         )
     assert opts == [{"value": ids["membership_id"], "label": ids["email"]}]
+
+
+@pytest.mark.asyncio
+async def test_membership_role_fk_options_require_tenant_context(seeded):
+    """Cross-tenant disclosure guard: without a tenant in ``ctx`` the picker
+    offers nothing rather than every tenant's members (public-schema join)."""
+    factory, _ = seeded
+    async with factory() as session:
+        assert (
+            await TenantMembershipRoleAdmin().resolve_fk_options("membership_id", session=session)
+            == []
+        )
+
+
+@pytest.mark.asyncio
+async def test_membership_role_fk_options_excludes_other_tenant_members(seeded):
+    """A foreign tenant's members never appear in the picker options."""
+    factory, _ = seeded
+    import uuid
+
+    async with factory() as session:
+        opts = await TenantMembershipRoleAdmin().resolve_fk_options(
+            "membership_id", session=session, ctx=_ctx_for_tenant(str(uuid.uuid4()))
+        )
+    assert opts == []
 
 
 @pytest.mark.asyncio

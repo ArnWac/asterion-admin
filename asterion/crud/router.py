@@ -52,12 +52,25 @@ def _get_admin_class(request: Request, resource: str) -> ModelAdmin:
 
 def _require_resource_permission(
     ctx: AdminContext,
-    resource: str,
+    admin_class: ModelAdmin,
     action: str,
 ) -> None:
-    """Authorize ``action`` on ``resource`` — see
-    :func:`asterion.authz.permissions.require_resource_access`."""
-    require_resource_access(ctx, resource, action)
+    """Authorize ``action`` on ``admin_class`` for the caller.
+
+    Layers the admin's ``superadmin_only`` scope on top of the per-resource
+    permission-key check: a superadmin-only admin (global/public-schema models
+    such as ``User`` / ``Tenant`` / ``ImpersonationLog``) is unreachable by a
+    non-superadmin even inside a tenant where an ``admin.*`` grant would
+    otherwise match the key — closing a cross-tenant read of a public table.
+    """
+    if getattr(admin_class, "superadmin_only", False) and not getattr(
+        ctx, "is_superadmin", False
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Superadmin privileges required.",
+        )
+    require_resource_access(ctx, admin_class.model_name, action)
 
 
 async def _audit_crud(
@@ -126,7 +139,7 @@ async def _list_impl(
     from asterion.crud.query import parse_filter_query
 
     admin_class = _get_admin_class(request, resource)
-    _require_resource_permission(ctx, admin_class.model_name, "list")
+    _require_resource_permission(ctx, admin_class, "list")
     filters = parse_filter_query(request.query_params, admin_class)
     return await list_records(
         session,
@@ -149,7 +162,7 @@ async def _create_impl(
     ctx: AdminContext,
 ) -> dict[str, Any]:
     admin_class = _get_admin_class(request, resource)
-    _require_resource_permission(ctx, admin_class.model_name, "create")
+    _require_resource_permission(ctx, admin_class, "create")
     payload = await request.json()
     result = await create_record(session, admin_class, payload, ctx=ctx)
     await _audit_crud(
@@ -174,7 +187,7 @@ async def _read_impl(
     ctx: AdminContext,
 ) -> dict[str, Any]:
     admin_class = _get_admin_class(request, resource)
-    _require_resource_permission(ctx, admin_class.model_name, "read")
+    _require_resource_permission(ctx, admin_class, "read")
     return await read_record(session, admin_class, record_id, ctx=ctx)
 
 
@@ -187,7 +200,7 @@ async def _update_impl(
     ctx: AdminContext,
 ) -> dict[str, Any]:
     admin_class = _get_admin_class(request, resource)
-    _require_resource_permission(ctx, admin_class.model_name, "update")
+    _require_resource_permission(ctx, admin_class, "update")
     payload = await request.json()
     result = await update_record(session, admin_class, record_id, payload, ctx=ctx)
     await _audit_crud(
@@ -242,7 +255,7 @@ async def _fk_options_impl(
     # Clamp the page size through the same validator the list endpoints use.
     limit, _ = normalize_limit_offset(limit=limit, offset=0)
     admin_class = _get_admin_class(request, resource)
-    _require_resource_permission(ctx, admin_class.model_name, "read")
+    _require_resource_permission(ctx, admin_class, "read")
 
     try:
         column = get_model_column(admin_class.model, field)
@@ -282,7 +295,7 @@ async def _fk_options_impl(
     if resolve_model_scope(target_admin) != resolve_model_scope(admin_class):
         return {"options": []}
 
-    _require_resource_permission(ctx, target_admin.model_name, "list")
+    _require_resource_permission(ctx, target_admin, "list")
 
     target_model = target_admin.model
     pk_col = primary_key_column(target_model)
@@ -310,7 +323,7 @@ async def _delete_impl(
     ctx: AdminContext,
 ) -> dict[str, Any]:
     admin_class = _get_admin_class(request, resource)
-    _require_resource_permission(ctx, admin_class.model_name, "delete")
+    _require_resource_permission(ctx, admin_class, "delete")
     result = await delete_record(session, admin_class, record_id, ctx=ctx)
     await _audit_crud(
         session,

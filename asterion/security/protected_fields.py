@@ -41,6 +41,7 @@ DEFAULT_PROTECTED_FIELDS: frozenset[str] = frozenset(
         "password_hash",
         "pin_hash",
         "shared_secret",
+        "totp_secret",
         "tenant_salt",
         "setup_code",
         "qr_bootstrap_token",

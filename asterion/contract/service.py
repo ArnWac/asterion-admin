@@ -714,12 +714,17 @@ def _build_capabilities(
     # impersonation admins) overrides the permission-key answer: the write
     # gates 403 at the route regardless of the caller's keys, so the contract
     # must report no create/update/delete and the UI hides those controls.
-    read_only = bool(getattr(getattr(model_admin, "policy", None), "read_only", False))
+    # ``disable_create`` / ``disable_delete`` (NoCreateDeletePolicy) tighten
+    # only their own capability — an editable admin that still hides New/Delete.
+    policy = getattr(model_admin, "policy", None)
+    read_only = bool(getattr(policy, "read_only", False))
+    no_create = read_only or bool(getattr(policy, "disable_create", False))
+    no_delete = read_only or bool(getattr(policy, "disable_delete", False))
 
     return CapabilitiesMeta(
-        create=(not read_only) and _has(permissions, resource, "create"),
+        create=(not no_create) and _has(permissions, resource, "create"),
         update=(not read_only) and _has(permissions, resource, "update"),
-        delete=(not read_only) and _has(permissions, resource, "delete"),
+        delete=(not no_delete) and _has(permissions, resource, "delete"),
         bulk_actions=[] if read_only else bulk_actions,
     )
 

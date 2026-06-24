@@ -129,7 +129,7 @@ FastAPI(lifespan=composed)
      │  app.state.asterion = runtime
      │  register_error_handlers(app)                       # consistent envelope
      │  install_middleware(app, config)                    # request_id ▸ access_log ▸ security_headers ▸ cors ▸ tenant
-     │  install_builtin_admins(registry)                   # tenant_roles, tenant_role_permissions, tenant_membership_roles
+     │  install_builtin_admins(registry)                   # tenant RBAC + audit + global (users/tenants/impersonation_logs, superadmin_only)
      │  register(registry)                                 # user-supplied
      │  run_setup_phase(extensions, ExtensionContext, app) # configure → register_{permissions,protected_fields,contract_contributions,navigation,routes}
      │     └─► freezes every registry afterwards

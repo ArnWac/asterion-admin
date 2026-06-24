@@ -61,14 +61,27 @@ v1 cleanup and is not coming back.
 
 ## Built-in admins
 
-Three tenant-local admins ship pre-registered when
-`enable_builtin_admins=True` (default):
+Several admins ship pre-registered when `enable_builtin_admins=True` (default).
+Each is registered only if the model isn't already in the registry, so an app
+can re-register its own variant and win.
+
+Tenant-local (RBAC) admins:
 
 | Class | Resource | Purpose |
 |---|---|---|
 | `TenantRoleAdmin` | `tenant_roles` | Manage tenant-local roles |
 | `TenantRolePermissionAdmin` | `tenant_role_permissions` | Manage role-to-permission-key assignments |
 | `TenantMembershipRoleAdmin` | `tenant_membership_roles` | Manage which membership has which role |
+
+Global (public-schema) admins — `superadmin_only`, so a tenant-scoped caller
+with an `admin.*` grant cannot reach them and read across tenants:
+
+| Class | Resource | Write scope |
+|---|---|---|
+| `UserAdmin` | `users` | Update-only (no create/delete; accounts come from invite, password/totp hidden) |
+| `TenantAdmin` | `tenants` | Update-only (no create/delete; `slug`/`schema_name` read-only) |
+| `ImpersonationLogAdmin` | `impersonation_logs` | Read-only |
+| `AuditLogAdmin` | `audit_logs` | Read-only |
 
 ## Calculated fields
 
