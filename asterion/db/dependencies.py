@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from asterion.tenancy.context import current_tenant_schema
 from asterion.tenancy.schema_strategy import set_search_path
 
 
@@ -30,11 +31,22 @@ async def get_async_session(
     async with runtime.db.session() as session:
         async with session.begin():
             tenant = getattr(request.state, "tenant", None)
-            if tenant is not None and "postgresql" in runtime.config.database_url:
-                await set_search_path(session, tenant.schema_name)
+            schema_token = None
+            if tenant is not None:
+                # Publish the tenant schema so domain code can open an
+                # independent, tenant-scoped transaction on the same engine via
+                # independent_tenant_session(). Set regardless of dialect; the
+                # SET LOCAL itself stays Postgres-only.
+                schema_token = current_tenant_schema.set(tenant.schema_name)
+                if "postgresql" in runtime.config.database_url:
+                    await set_search_path(session, tenant.schema_name)
             # Expose the request-scoped session so notifiers / extensions can
             # join this transaction (e.g. the email outbox writes its row in the
             # same transaction as the invite/user that triggered it). Neutral
             # hook — nothing in core depends on it being read.
             request.state.db_session = session
-            yield session
+            try:
+                yield session
+            finally:
+                if schema_token is not None:
+                    current_tenant_schema.reset(schema_token)

@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from asterion.models.tenant import Tenant
+
+
+# Schema name of the tenant resolved for the current request, or None when no
+# tenant is in scope (out-of-request work, or a request that resolved no
+# tenant). ``get_async_session`` sets this for the duration of the request
+# transaction; ``independent_tenant_session`` reads it to scope a *separate*
+# transaction to the same tenant. Set once per request and reset on teardown,
+# so it never leaks onto the next request reusing the same worker task.
+current_tenant_schema: ContextVar[str | None] = ContextVar(
+    "current_tenant_schema", default=None
+)
 
 
 @dataclass
