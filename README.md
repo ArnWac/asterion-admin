@@ -185,11 +185,16 @@ asterion doctor
 
 ## Documentation
 
-- [`docs/architecture.md`](docs/architecture.md) — package layout + request lifecycle
-- [`docs/security.md`](docs/security.md) — auth, permissions, secret handling, audit
-- [`docs/tenancy.md`](docs/tenancy.md) — schema-per-tenant strategy + bootstrap
-- [`docs/model-admin.md`](docs/model-admin.md) — `ModelAdmin` API reference
-- [`docs/deployment.md`](docs/deployment.md) — Docker, env, health probes, observability
+- [`docs/feature-index.md`](docs/feature-index.md) — **start here**: dense map of every feature → one-liner → gotcha → full doc
+- [`docs/model-admin.md`](docs/model-admin.md) — full `ModelAdmin` reference: every option, lifecycle hooks, inlines, actions, fieldsets, policies, built-in admins
+- [`docs/architecture.md`](docs/architecture.md) — package layout, wiring, request lifecycle
+- [`docs/tenancy.md`](docs/tenancy.md) — schema-per-tenant strategy, provisioning, members
+- [`docs/auth-architecture.md`](docs/auth-architecture.md) — the four providers, DTOs, custom identity, service accounts
+- [`docs/security.md`](docs/security.md) — auth, permissions, field protection, audit, limitations
+- [`docs/extensions.md`](docs/extensions.md) — extension SPI, registries, shipping models
+- [`docs/email.md`](docs/email.md) — SMTP/Resend/SES delivery, templates, outbox
+- [`docs/auth-oauth.md`](docs/auth-oauth.md) — OAuth/OIDC sign-in
+- [`docs/deployment.md`](docs/deployment.md) — Docker, env, migrations, health probes, backups
 - [`docs/roadmap.md`](docs/roadmap.md) — consolidated roadmap: open pre-1.0 hardening, scope, phases, deliberate non-goals
 
 ---
