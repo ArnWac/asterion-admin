@@ -36,14 +36,53 @@ def test_install_with_extra_admin():
     assert "custom_things" in registry.model_names()
 
 
-def test_skip_tenant_admins():
+def test_skip_all_admins():
     registry = AdminRegistry()
     install_builtin_admins(
         registry,
         include_tenant_admins=False,
         include_audit_admins=False,
+        include_global_admins=False,
     )
     assert registry.model_names() == []
+
+
+def test_install_registers_global_admins_by_default():
+    """v0.1.33 — User / Tenant / ImpersonationLog ship as built-in admins."""
+    registry = AdminRegistry()
+    install_builtin_admins(registry)
+    names = registry.model_names()
+    assert "users" in names
+    assert "tenants" in names
+    assert "impersonation_logs" in names
+
+
+def test_skip_global_admins():
+    registry = AdminRegistry()
+    install_builtin_admins(registry, include_global_admins=False)
+    names = registry.model_names()
+    assert "users" not in names
+    assert "tenants" not in names
+    assert "impersonation_logs" not in names
+    # Tenant admins still install — independent flag.
+    assert "tenant_roles" in names
+
+
+def test_global_admin_can_be_overridden():
+    """An app re-registering its own User admin wins over the built-in."""
+    from asterion.registry import ModelAdmin
+
+    class _CustomUser:
+        __tablename__ = "users"
+
+    class CustomUserAdmin(ModelAdmin):
+        model = _CustomUser
+        label = "Custom User"
+
+    registry = AdminRegistry()
+    registry.register(CustomUserAdmin)
+    install_builtin_admins(registry)  # must not clobber the app's override
+    assert registry.get("users").label == "Custom User"
 
 
 def test_install_registers_audit_admin_by_default():

@@ -96,6 +96,17 @@ class AdminPolicy:
     #: route. Set by :class:`ReadOnlyPolicy`; custom policies can set it too.
     read_only: bool = False
 
+    #: Finer-grained capability markers for admins that are writable but should
+    #: never gain or lose rows through the framework (e.g. a ``User`` admin that
+    #: edits profiles but where accounts are created via invite and deleted via
+    #: a provisioning path). When ``True`` the contract reports the matching
+    #: capability as ``False`` so the UI hides that control — the actual guard
+    #: stays the object-level ``can_create`` / ``can_delete_object`` gate. They
+    #: are independent of :attr:`read_only`, which implies both. Set by
+    #: :class:`NoCreateDeletePolicy`.
+    disable_create: bool = False
+    disable_delete: bool = False
+
     async def can_view_model(self, ctx: AdminContext) -> bool:
         """Gate the entire admin (list + read + write). Use for
         resource-level visibility ("hide the Orders admin from
@@ -168,6 +179,33 @@ class ReadOnlyPolicy(AdminPolicy):
         return False
 
     async def can_update_object(self, obj: Any, ctx: AdminContext) -> bool:
+        return False
+
+    async def can_delete_object(self, obj: Any, ctx: AdminContext) -> bool:
+        return False
+
+
+class NoCreateDeletePolicy(AdminPolicy):
+    """Allows list / read / update but blocks create and delete.
+
+    For framework-owned tables that are *editable* but whose row lifecycle
+    belongs to a dedicated path, not raw CRUD — e.g. the built-in
+    :class:`~asterion.builtins.admin.UserAdmin` (accounts are born via
+    invite/``_members`` so a raw insert would skip password hashing, and a
+    raw delete would orphan tenant memberships) and
+    :class:`~asterion.builtins.admin.TenantAdmin` (schema provisioning /
+    teardown owns tenant creation + deletion, so a raw insert/delete would
+    leave a tenant row with no schema, or a schema with no row).
+
+    Create and delete return ``False`` so the CRUD router answers 403; update
+    + read stay open. ``disable_create`` / ``disable_delete`` surface the same
+    in the contract so the UI hides New / Delete while keeping Edit.
+    """
+
+    disable_create = True
+    disable_delete = True
+
+    async def can_create(self, ctx: AdminContext) -> bool:
         return False
 
     async def can_delete_object(self, obj: Any, ctx: AdminContext) -> bool:

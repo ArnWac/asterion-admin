@@ -4,8 +4,10 @@ from typing import Any
 
 from sqlalchemy import select
 
-from asterion.admin.policy import ReadOnlyPolicy
+from asterion.admin.policy import NoCreateDeletePolicy, ReadOnlyPolicy
 from asterion.models.audit_log import AuditLog
+from asterion.models.impersonation_log import ImpersonationLog
+from asterion.models.tenant import Tenant
 from asterion.models.tenant_audit_log import TenantAuditLog
 from asterion.models.tenant_membership import TenantMembership
 from asterion.models.tenant_rbac import (
@@ -28,6 +30,24 @@ async def _role_name_labels(session: Any, role_ids: set) -> dict[str, str]:
         )
     ).all()
     return {str(rid): name for rid, name in rows}
+
+
+async def _email_labels(session: Any, user_ids: set) -> dict[str, str]:
+    """Batched ``user_id`` → email map for the given ids (one query)."""
+    ids = {u for u in user_ids if u is not None}
+    if not ids:
+        return {}
+    rows = (await session.execute(select(User.id, User.email).where(User.id.in_(ids)))).all()
+    return {str(uid): email for uid, email in rows}
+
+
+async def _tenant_slug_labels(session: Any, tenant_ids: set) -> dict[str, str]:
+    """Batched ``tenant_id`` → slug map for the given ids (one query)."""
+    ids = {t for t in tenant_ids if t is not None}
+    if not ids:
+        return {}
+    rows = (await session.execute(select(Tenant.id, Tenant.slug).where(Tenant.id.in_(ids)))).all()
+    return {str(tid): slug for tid, slug in rows}
 
 
 def _membership_email_stmt():
@@ -97,10 +117,18 @@ class TenantMembershipRoleAdmin(ModelAdmin):
         (``TenantMembership`` → ``User``) through the request session, the same
         cross-schema path :meth:`resolve_list_labels` uses. ``role_id`` returns
         ``None`` so the generic resolver lists ``tenant_roles`` by name.
+
+        ``tenant_memberships`` lives in the **public** schema, so the request
+        session's tenant ``search_path`` does NOT scope this join — without an
+        explicit ``tenant_id`` filter the picker would offer members of *other*
+        tenants (cross-tenant disclosure). We restrict to the active tenant; if
+        there is no tenant in context we offer nothing rather than everyone.
         """
         if field != "membership_id":
             return None
-        stmt = _membership_email_stmt()
+        if ctx is None or ctx.tenant is None:
+            return []
+        stmt = _membership_email_stmt().where(TenantMembership.tenant_id == ctx.tenant.id)
         if q and q.strip():
             stmt = stmt.where(User.email.ilike(f"%{q.strip()}%"))
         stmt = stmt.order_by(User.email.asc()).limit(limit)
@@ -113,14 +141,17 @@ class TenantMembershipRoleAdmin(ModelAdmin):
         }
         # membership_id points at a public TenantMembership (cross-schema, no
         # FK); resolve it to the member's email via the request session, whose
-        # search_path includes public. One batched query.
+        # search_path includes public. One batched query. The rows here already
+        # belong to the active tenant's schema, so their membership_ids are
+        # tenant-local — but we defensively re-apply the tenant_id filter so a
+        # stray cross-tenant membership_id resolves to no label rather than
+        # leaking a foreign member's email.
         membership_ids = {o.membership_id for o in objs if o.membership_id is not None}
         if membership_ids:
-            rows = (
-                await session.execute(
-                    _membership_email_stmt().where(TenantMembership.id.in_(membership_ids))
-                )
-            ).all()
+            stmt = _membership_email_stmt().where(TenantMembership.id.in_(membership_ids))
+            if ctx is not None and ctx.tenant is not None:
+                stmt = stmt.where(TenantMembership.tenant_id == ctx.tenant.id)
+            rows = (await session.execute(stmt)).all()
             labels["membership_id"] = {str(mid): email for mid, email in rows}
         return labels
 
@@ -260,11 +291,148 @@ class TenantAuditLogAdmin(ModelAdmin):
     ]
 
 
+class UserAdmin(ModelAdmin):
+    """Built-in admin on the global :class:`User` table.
+
+    Editable but **update-only** (:class:`NoCreateDeletePolicy`): accounts are
+    born through invite / ``_members`` (a raw insert here would bypass password
+    hashing and produce a login-broken row) and removed through a path that also
+    cleans up tenant memberships (a raw delete would orphan them). So the UI
+    keeps Edit but hides New / Delete; the policy 403s those at the route too.
+
+    ``hashed_password`` and ``totp_secret`` are in the global protected-field
+    set, so they never reach the client at all; the rest of the security-
+    sensitive columns are read-only so the detail form shows them disabled.
+    """
+
+    model = User
+
+    label = "User"
+    label_plural = "Users"
+    description = "Global user accounts. Tenant membership is managed separately."
+
+    superadmin_only = True
+    policy = NoCreateDeletePolicy()
+
+    list_display = [
+        "email",
+        "full_name",
+        "is_active",
+        "is_superadmin",
+        "is_service_account",
+        "created_at",
+    ]
+    search_fields = ["email", "full_name"]
+    ordering = ["email"]
+    readonly_fields = [
+        "id",
+        "hashed_password",
+        "totp_secret",
+        "totp_enabled",
+        "token_version",
+        "created_at",
+        "updated_at",
+    ]
+
+
+class TenantAdmin(ModelAdmin):
+    """Built-in admin on the global :class:`Tenant` table.
+
+    Editable but **update-only** (:class:`NoCreateDeletePolicy`): a tenant's
+    schema is provisioned / torn down by the provisioning path, so creating or
+    deleting a row here would leave a tenant with no schema (or a schema with no
+    row). ``name`` / ``is_active`` / locale + ``allowed_cidrs`` stay editable;
+    ``slug`` and ``schema_name`` are read-only because they map onto the
+    physical schema.
+    """
+
+    model = Tenant
+
+    label = "Tenant"
+    label_plural = "Tenants"
+    description = "Tenant rows. Per-tenant schema provisioning is handled by tenancy.bootstrap."
+
+    superadmin_only = True
+    policy = NoCreateDeletePolicy()
+
+    list_display = ["slug", "name", "is_active", "schema_name", "created_at"]
+    search_fields = ["slug", "name", "schema_name"]
+    ordering = ["slug"]
+    readonly_fields = ["id", "slug", "schema_name", "created_at", "updated_at"]
+
+
+class ImpersonationLogAdmin(ModelAdmin):
+    """Read-only admin on the global :class:`ImpersonationLog` table.
+
+    Append-only record of superadmin → user impersonation sessions, written by
+    :mod:`asterion.root.impersonation`. :class:`ReadOnlyPolicy` blocks
+    create/update/delete at the route (so even a caller whose ``admin.*``
+    wildcard would match ``admin.impersonation_logs.delete`` cannot mutate it)
+    and the UI hides the write controls. ``superadmin_id`` / ``target_user_id``
+    resolve to emails and ``tenant_id`` to the tenant slug for readable lists.
+    """
+
+    model = ImpersonationLog
+
+    label = "Impersonation Log"
+    label_plural = "Impersonation Logs"
+    description = "Record of superadmin → user impersonation sessions."
+
+    superadmin_only = True
+    policy = ReadOnlyPolicy()
+
+    list_display = [
+        "created_at",
+        "superadmin_id",
+        "target_user_id",
+        "tenant_id",
+        "revoked_at",
+    ]
+    search_fields = ["jti"]
+    ordering = ["-created_at"]
+    readonly_fields = [
+        "id",
+        "superadmin_id",
+        "target_user_id",
+        "tenant_id",
+        "jti",
+        "revoked_at",
+        "created_at",
+        "updated_at",
+    ]
+
+    async def resolve_list_labels(self, objs, *, session, ctx=None):
+        # superadmin_id + target_user_id both resolve from one batched
+        # user→email map; tenant_id → slug.
+        emails = await _email_labels(
+            session,
+            {o.superadmin_id for o in objs} | {o.target_user_id for o in objs},
+        )
+        return {
+            "superadmin_id": emails,
+            "target_user_id": emails,
+            "tenant_id": await _tenant_slug_labels(session, {o.tenant_id for o in objs}),
+        }
+
+
 BUILTIN_TENANT_ADMINS: tuple[type[ModelAdmin], ...] = (
     TenantRoleAdmin,
     TenantRolePermissionAdmin,
     TenantMembershipRoleAdmin,
     TenantAuditLogAdmin,
+)
+
+#: Admins on framework-owned global (public-schema) tables: ``User`` /
+#: ``Tenant`` (update-only) and ``ImpersonationLog`` (read-only). Installed by
+#: default alongside the tenant + audit admins so any app with
+#: ``enable_builtin_admins=True`` gets a superadmin UI for the core global
+#: models for free. All three are overridable — an app that re-registers its
+#: own ``User`` / ``Tenant`` / ``ImpersonationLog`` admin wins (the installer
+#: skips models already registered).
+BUILTIN_GLOBAL_ADMINS: tuple[type[ModelAdmin], ...] = (
+    UserAdmin,
+    TenantAdmin,
+    ImpersonationLogAdmin,
 )
 
 #: Read-only admins on framework-owned tables (Roadmap 5.1). Installed
@@ -275,10 +443,14 @@ BUILTIN_AUDIT_ADMINS: tuple[type[ModelAdmin], ...] = (AuditLogAdmin,)
 
 __all__ = [
     "BUILTIN_AUDIT_ADMINS",
+    "BUILTIN_GLOBAL_ADMINS",
     "BUILTIN_TENANT_ADMINS",
     "AuditLogAdmin",
+    "ImpersonationLogAdmin",
+    "TenantAdmin",
     "TenantAuditLogAdmin",
     "TenantMembershipRoleAdmin",
     "TenantRoleAdmin",
     "TenantRolePermissionAdmin",
+    "UserAdmin",
 ]

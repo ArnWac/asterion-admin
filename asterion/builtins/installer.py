@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from asterion.builtins.admin import BUILTIN_AUDIT_ADMINS, BUILTIN_TENANT_ADMINS
+from asterion.builtins.admin import (
+    BUILTIN_AUDIT_ADMINS,
+    BUILTIN_GLOBAL_ADMINS,
+    BUILTIN_TENANT_ADMINS,
+)
 from asterion.registry import AdminRegistry, ModelAdmin
 
 
@@ -9,15 +13,20 @@ def install_builtin_admins(
     *,
     include_tenant_admins: bool = True,
     include_audit_admins: bool = True,
+    include_global_admins: bool = True,
     extra_admins: tuple[type[ModelAdmin], ...] = (),
 ) -> None:
     """Register the framework's own admins on ``registry``.
 
     Tenant admins (``TenantRole`` / ``TenantRolePermission`` /
     ``TenantMembershipRole``) cover the RBAC surface; audit admins
-    (``AuditLog``) give every app a read-only Audit-UI (Roadmap 5.1).
-    Both flags are on by default — flip them off only when the host
-    app is replacing the framework's models with its own.
+    (``AuditLog``) give every app a read-only Audit-UI (Roadmap 5.1);
+    global admins (``User`` / ``Tenant`` / ``ImpersonationLog``) give the
+    superadmin a managed UI for the core global models. All flags are on by
+    default — flip them off only when the host app is replacing the
+    framework's models with its own. Each model already registered (e.g. an
+    app-supplied override) is skipped, so apps can re-register a custom
+    variant and win.
     """
     if include_tenant_admins:
         for admin_class in BUILTIN_TENANT_ADMINS:
@@ -26,6 +35,11 @@ def install_builtin_admins(
 
     if include_audit_admins:
         for admin_class in BUILTIN_AUDIT_ADMINS:
+            if not registry.is_registered(admin_class.model):
+                registry.register(admin_class)
+
+    if include_global_admins:
+        for admin_class in BUILTIN_GLOBAL_ADMINS:
             if not registry.is_registered(admin_class.model):
                 registry.register(admin_class)
 
