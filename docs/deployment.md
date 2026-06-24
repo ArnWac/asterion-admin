@@ -1,16 +1,20 @@
 # Deployment
 
-This guide covers a real production deployment. For a 30-second
-quickstart see [`README.md`](../README.md).
+This guide covers a real production deployment: required configuration,
+containerization, first-run bootstrap, health probes, logging, migrations,
+multi-worker considerations, and backups. For a 30-second quickstart see the
+[README](../README.md).
 
-## Required environment
+## Configuration
+
+### Required environment
 
 | Variable | Purpose |
 |---|---|
 | `ASTERION_DATABASE_URL` | `postgresql+asyncpg://user:pass@host:port/db` |
-| `ASTERION_SECRET_KEY`   | Random 32+ bytes (`openssl rand -hex 32`). Must NOT equal `change-me-in-production`. |
+| `ASTERION_SECRET_KEY` | Random 32+ bytes (`openssl rand -hex 32`). Must **not** equal `change-me-in-production`. |
 
-## Strongly recommended
+### Strongly recommended
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -21,10 +25,11 @@ quickstart see [`README.md`](../README.md).
 | `ASTERION_DB_MAX_OVERFLOW` | `20` | Per worker. |
 | `ASTERION_ENABLE_BUILTIN_UI` | `true` | Set `false` if you serve the UI separately. |
 
-For the full list see `CoreAdminConfig` in
-[`asterion/core/config.py`](../asterion/core/config.py).
-
-A starter `.env.example` ships at the repo root.
+For the full list, see `CoreAdminConfig` in
+[`asterion/core/config.py`](../asterion/core/config.py). A starter
+`.env.example` ships at the repo root. Behind a reverse proxy, also set
+`ASTERION_TRUSTED_PROXY_COUNT` and run `uvicorn --proxy-headers` — see
+[Security § Known limitations](security.md#known-limitations).
 
 ## Docker
 
@@ -42,14 +47,14 @@ EXPOSE 8000
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
 ```
 
-A reference `Dockerfile` + `docker-compose.yml` are at the repo root.
+A reference `Dockerfile` and `docker-compose.yml` are at the repo root:
 
 ```bash
 docker-compose up -d db
 docker-compose up --build app
 ```
 
-## Initial bootstrap
+## First-run bootstrap
 
 ```bash
 # 1. Public schema
@@ -66,17 +71,15 @@ asterion tenant create --name "Acme" --slug acme --owner-email owner@example.com
 asterion db upgrade-tenant acme
 ```
 
-`asterion doctor` verifies config + DB connectivity. Run it in your
+`asterion doctor` verifies configuration and DB connectivity — run it in your
 deployment pipeline.
 
 ## Health probes
 
 | Endpoint | Purpose | Suitable for |
 |---|---|---|
-| `GET /healthz` | Process is alive. Does NOT touch the DB. | `livenessProbe`, load balancer keep-alive |
+| `GET /healthz` | Process is alive. Does **not** touch the DB. | `livenessProbe`, LB keep-alive |
 | `GET /readyz` | Returns 200 only when `SELECT 1` succeeds. | `readinessProbe` |
-
-Sample kubernetes spec:
 
 ```yaml
 livenessProbe:
@@ -87,17 +90,15 @@ readinessProbe:
   periodSeconds: 5
 ```
 
-## Logging + correlation
+## Logging and correlation
 
 `configure_logging(config)` is called from `create_admin`. With
-`ASTERION_LOG_JSON=true` each log line is one JSON object including
-the `request_id` when set in the request context. Every response
-carries `X-Request-ID`; if your client sends one, the server echoes it,
-otherwise it generates a UUID.
-
-Funnel your logs into your aggregator and search by
-`request_id="..."` to correlate audit rows, error envelopes, and log
-lines for one request.
+`ASTERION_LOG_JSON=true`, each log line is one JSON object, including the
+`request_id` when set in the request context. Every response carries
+`X-Request-ID`; if the client sends one, the server echoes it, otherwise it
+generates a UUID. Funnel logs into your aggregator and search by
+`request_id="..."` to correlate audit rows, error envelopes, and log lines for a
+single request.
 
 ## Migrations
 
@@ -111,10 +112,10 @@ asterion migrate generate -m "add tenant_roles.color" --env tenant
 asterion db upgrade-tenants
 ```
 
-`db upgrade-tenants` iterates every active tenant. Run it after every
-deploy that introduces a tenant schema migration.
+`db upgrade-tenants` iterates every active tenant — run it after every deploy
+that introduces a tenant-schema migration.
 
-### Where the migrations live
+### Where migrations live
 
 asterion's **shared** (public) migrations ship inside the wheel
 (`asterion/_migrations/shared`). `db upgrade-public` runs them
@@ -122,11 +123,11 @@ package-relatively, so it works from a pip-installed asterion in any working
 directory — no repo checkout or `alembic_shared.ini` required.
 
 The **tenant** tree is owned by your app (your domain tables live alongside
-asterion's `tenant_rbac`). `db upgrade-tenant` / `db upgrade-tenants` resolve
-the tenant migrations in this order:
+asterion's `tenant_rbac`). `db upgrade-tenant` / `db upgrade-tenants` resolve the
+tenant migrations in this order:
 
 1. an explicit `--config/-c <path>` (or `ASTERION_ALEMBIC_TENANT_INI`),
-2. a project-local `alembic_tenant.ini` in the current directory (your app),
+2. a project-local `alembic_tenant.ini` in the current directory,
 3. asterion's bundled tenant migrations (pure-asterion / asterion's own tests).
 
 So an embedding app drops its own `alembic_tenant.ini` (pointing at its
@@ -134,36 +135,41 @@ So an embedding app drops its own `alembic_tenant.ini` (pointing at its
 
 ## Multi-worker considerations
 
-- `uvicorn --workers N` runs `N` independent processes. Each gets its
-  own `DatabaseManager` pool, its own in-memory rate limiter, and its
-  own in-memory tenant cache. The first two are listed as known
-  limitations in [`docs/security.md`](security.md).
-
-- CSRF is not an issue for token-in-`Authorization`-header auth. If you
-  switch to cookie auth, add CSRF protection.
+* `uvicorn --workers N` runs `N` independent processes. Each gets its own
+  `DatabaseManager` pool, its own in-memory login rate limiter, and its own
+  in-memory tenant cache. The first two are listed as known limitations in
+  [Security](security.md#known-limitations) — wire a shared rate-limit backend
+  for production.
+* CSRF is not an issue for token-in-`Authorization`-header auth. If you switch
+  to cookie auth, add CSRF protection.
 
 ## Static assets
 
-`/admin/static/*` serves the bundled `admin.css` and `admin.js`. The
-shell is intentionally minimal — drive real UI work via the
-`/api/v1/admin/_contract` endpoint from your own frontend if you need
-something richer than a shell.
+`/admin/static/*` serves the bundled `admin.css` and `admin.js`. The shell is
+intentionally minimal — drive richer UI work from the
+`/api/v1/admin/_contract` endpoint with your own frontend.
 
 ## Backup
 
-Two schemas matter:
+Two kinds of schema matter:
 
 1. `public` — global user table, tenants, audit, impersonation log.
-2. Every `tenant_<slug>` — tenant-local RBAC.
+2. every `tenant_<slug>` — tenant-local RBAC (plus your domain tables).
 
-`pg_dump` the whole database. Restoring a single tenant is a
-schema-level restore (`pg_dump --schema=tenant_acme`).
+`pg_dump` the whole database. Restoring a single tenant is a schema-level restore
+(`pg_dump --schema=tenant_acme`).
 
 ## Operating notes
 
-- `audit_logs` grows unbounded. Schedule:
+* `audit_logs` grows unbounded. Schedule:
   `DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '90 days';`
-- `impersonation_logs.revoked_at` is set when a future revocation
-  endpoint lands. Today the column is set only manually.
-- Avoid `is_system=True` rows for things you ever want to delete via
-  the API — the CRUD `DELETE` returns 409 for them.
+* `impersonation_logs.revoked_at` is set when a future revocation endpoint lands;
+  today the column is set only manually.
+* Avoid `is_system=True` rows for anything you ever want to delete via the API —
+  the CRUD `DELETE` returns `409` for them.
+
+## See also
+
+* [Multi-tenancy](tenancy.md) — provisioning and bootstrap.
+* [Security](security.md) — proxy/IP config, rate limiting, audit retention.
+* [Email](email.md) — production mail delivery and the outbox worker.

@@ -1,28 +1,29 @@
-# Auth architecture
+# Authentication architecture
 
-`asterion` separates **identity** (who is calling) from **the
-framework's view of that identity** (what it can see) so apps with their
-own user/auth systems can integrate without forking the package.
+asterion separates **identity** (who is calling) from **the framework's view of
+that identity** (what it can see), so an application with its own user or auth
+system can integrate without forking the package. This document describes the
+four providers that make up that seam, the neutral DTOs they exchange, the
+`AdminContext` every route consumes, the built-in defaults, and how to write
+your own provider.
 
-The whole story:
+The whole story in one diagram:
 
 ```text
 Request → AuthProvider.authenticate_request   → AuthIdentity (user_id + claims)
         → UserProvider.get_by_id              → AdminPrincipal (neutral DTO)
         → TenantProvider.resolve_tenant       → AdminTenant | None
         → PermissionProvider.get_permissions  → frozenset[str]
-        ────────────────────────────────────────────────────────────────
-                                  ▼
-                         AdminContext(principal, tenant, permissions, …)
-                                  ▼
-                       Every route reads exactly this.
+        ──────────────────────────────────────────────────────────
+                              ▼
+                  AdminContext(principal, tenant, permissions, …)
+                              ▼
+                   Every route reads exactly this.
 ```
 
-The four providers are the **only** seams between `asterion` and the
-host application's identity layer. Routes never look at JWT internals,
-SQLAlchemy User rows, tenant memberships, or role-permission joins.
-
----
+The four providers are the **only** seams between asterion and the host
+application's identity layer. Routes never look at JWT internals, SQLAlchemy
+`User` rows, tenant memberships, or role-permission joins.
 
 ## The neutral DTOs
 
@@ -47,10 +48,8 @@ class AdminTenant:
     name: str | None = None
 ```
 
-These live in [`asterion/providers/base.py`](../asterion/providers/base.py).
-The framework only ever sees these — never a concrete `User` ORM row.
-
----
+These live in [`asterion/providers/base.py`](../asterion/providers/base.py). The
+framework only ever sees these — never a concrete `User` ORM row.
 
 ## The four provider protocols
 
@@ -71,15 +70,12 @@ class TenantProvider(Protocol):
 class PermissionProvider(Protocol):
     def is_superadmin(self, user: AdminPrincipal) -> bool: ...
     async def get_permissions(
-        self,
-        user: AdminPrincipal,
-        tenant: AdminTenant | None,
-        *,
-        request: Request,
+        self, user: AdminPrincipal, tenant: AdminTenant | None, *, request: Request,
     ) -> frozenset[str]: ...
 ```
 
-Pass implementations to `create_admin()`:
+Pass implementations to `create_admin()`; each defaults to the framework's
+`Builtin*` implementation when omitted, so a vanilla app passes none:
 
 ```python
 app = create_admin(
@@ -91,12 +87,7 @@ app = create_admin(
 )
 ```
 
-Each one defaults to the framework's `Builtin*` implementation if
-omitted — so a vanilla v1 app passes none.
-
----
-
-## `AdminContext` — the one thing routes consume
+## AdminContext — the one thing routes consume
 
 ```python
 @dataclass(slots=True)
@@ -116,7 +107,7 @@ class AdminContext:
     def has_permission(self, key: str) -> bool: ...
 ```
 
-Routes inject it via FastAPI:
+Routes inject it through FastAPI:
 
 ```python
 from asterion.admin import AdminContext, require_admin_context
@@ -128,63 +119,49 @@ async def list_widgets(ctx: AdminContext = Depends(require_admin_context)):
     ...
 ```
 
-- `require_admin_context` — raises 401 if `principal is None`. Default
-  for every CRUD/contract/actions route.
-- `build_admin_context` — anonymous-tolerant; use for routes that
-  legitimately serve unauthenticated callers (login, health).
+* `require_admin_context` — raises `401` if `principal is None`. The default for
+  every CRUD / contract / actions route.
+* `build_admin_context` — anonymous-tolerant; use for routes that legitimately
+  serve unauthenticated callers (login, health).
 
----
-
-## What each `Builtin*` does
+## The built-in providers
 
 | Provider | Module | Behaviour |
 |---|---|---|
-| `BuiltinJWTAuthProvider` | `providers/auth.py` | Validates `Authorization: Bearer <jwt>`, returns `AuthIdentity(user_id, claims=token_payload)`. Anonymous → `None`. |
-| `BuiltinSQLAlchemyUserProvider` | `providers/users.py` | Loads `User` from the framework's `User` table, converts to `AdminPrincipal`. Inactive → 403. |
-| `BuiltinTenantProvider` | `providers/tenants.py` | Wraps the existing `TenantMiddleware`; reads `request.state.tenant`. Returns `None` for root/public requests. |
-| `BuiltinPermissionProvider` | `providers/permissions.py` | Superadmin → `frozenset({"admin.*"})`. Otherwise tenant-scoped lookup via `TenantMembership` → `TenantRole` → `TenantRolePermission` over a `SET LOCAL search_path` (PostgreSQL only). |
+| `BuiltinJWTAuthProvider` | `providers/auth.py` | Validates `Authorization: Bearer <jwt>`; returns `AuthIdentity(user_id, claims=token_payload)`. Anonymous → `None`. |
+| `BuiltinSQLAlchemyUserProvider` | `providers/users.py` | Loads `User` from the framework's table, converts to `AdminPrincipal`. Inactive → `403`. |
+| `BuiltinTenantProvider` | `providers/tenants.py` | Wraps `TenantMiddleware`; reads `request.state.tenant`. Root/public requests → `None`. |
+| `BuiltinPermissionProvider` | `providers/permissions.py` | Superadmin → `frozenset({"admin.*"})`. Otherwise a tenant-scoped lookup via `TenantMembership` → `TenantRole` → `TenantRolePermission` over a `SET LOCAL search_path` (PostgreSQL only). |
 
-PostgreSQL-only caveat: tenant-scoped permission lookup needs
-`SET LOCAL search_path`, which SQLite doesn't support. On SQLite, the
-built-in provider returns `frozenset()` — the same legacy behaviour the
-framework had before v1-providers.
+> **PostgreSQL-only caveat.** Tenant-scoped permission lookup needs
+> `SET LOCAL search_path`, which SQLite doesn't support. On SQLite the built-in
+> provider returns `frozenset()`.
 
-### Boundary: where external auth stops (Roadmap A0.5)
+### Where external auth stops
 
-External `user_mode` (your own providers) fully covers **auth, CRUD and
-contract**. It does **not** yet cover the superadmin/root tooling
-(`root/*`), audit-actor resolution (`audit/service.py`), tenant
-bootstrap, or the CLI — those still import the concrete builtin `User`
-model. So an external IdP runs the admin surface, but root/audit/CLI
-remain builtin-coupled by design for now. This is a deliberate, documented
-limitation, not an oversight; full decoupling is tracked in
-[roadmap.md](roadmap.md).
-
----
+External `user_mode` (your own providers) fully covers **auth, CRUD, and
+contract**. It does **not** yet cover the superadmin/root tooling (`root/*`),
+audit-actor resolution (`audit/service.py`), tenant bootstrap, or the CLI —
+those still import the concrete built-in `User`. So an external IdP runs the
+admin surface, but root/audit/CLI remain built-in-coupled by design for now.
 
 ## Superadmin
 
-A user with `is_superadmin=True` on the `User` row gets
-`frozenset({"admin.*"})` from `BuiltinPermissionProvider`.
-
-That key matches every `admin.<resource>.<action>` permission via the
-wildcard rule, but **does not** match permissions in other namespaces
-(e.g. `oauth.identities.list`). For features whose permission key
-isn't under `admin.*`, consumers that want "platform owner sees
-everything" must short-circuit on `ctx.is_superadmin` themselves.
-
-The `GET /_navigation` endpoint already does this — see
-[extensions.md § NavigationRegistry](extensions.md#navigationregistry--runtimenavigation).
-
----
+A user with `is_superadmin=True` gets `frozenset({"admin.*"})` from
+`BuiltinPermissionProvider`. That key matches every `admin.<resource>.<action>`
+permission via the wildcard rule, but **does not** match permissions in other
+namespaces (e.g. `oauth.identities.list`). For features whose permission key is
+not under `admin.*`, consumers that want "platform owner sees everything" must
+short-circuit on `ctx.is_superadmin` themselves. The `GET /_navigation` endpoint
+already does this — see
+[Extensions § NavigationRegistry](extensions.md#navigationregistry).
 
 ## Service / machine accounts
 
 A device or service-to-service caller (e.g. a stationary time-clock terminal)
 needs an account that authenticates **only** via a minted access token, never a
 password. `asterion.auth.service_accounts.create_service_account` provisions one
-in a single call instead of hand-assembling `User` + `TenantMembership` +
-tenant RBAC:
+in a single call instead of hand-assembling `User` + `TenantMembership` + RBAC:
 
 ```python
 from asterion.auth.service_accounts import create_service_account
@@ -207,21 +184,19 @@ token = create_access_token(
 ```
 
 It creates an **active, passwordless** user (`is_active=True`,
-`is_superadmin=False`, `is_service_account=True`; an unusable password hash so
-`POST /auth/login` rejects it), a `TenantMembership`, and a dedicated
-`service:<label>` role granting the permission keys. It does **not** mint
-tokens — that's the caller's job. A token for this account resolves through the
-normal tenant-RBAC path to a principal carrying exactly those keys.
+`is_superadmin=False`, `is_service_account=True`, with an unusable password hash
+so `POST /auth/login` rejects it), a `TenantMembership`, and a dedicated
+`service:<label>` role granting the permission keys. It does **not** mint tokens
+— that is the caller's job. A token for this account resolves through the normal
+tenant-RBAC path to a principal carrying exactly those keys.
 
-The `is_service_account` flag makes the account a first-class type: it's
-excluded from the password-reset flow (`POST /auth/password-reset/request`
-never issues it a token), so a reset can't turn the token-only account into a
-login-capable one, and you can identify service accounts in queries / UI.
+The `is_service_account` flag makes the account a first-class type: it is
+excluded from the password-reset flow (so a reset can't turn a token-only
+account into a login-capable one) and is identifiable in queries / UI.
 
 **Revocation** is the standard per-user invariant: bump `user.token_version` or
-set `user.is_active = False` to invalidate the account's existing tokens. To
-tear an account down entirely (user + membership + dedicated role), use
-`delete_service_account(session, user_id=..., tenant_id=...)`.
+set `user.is_active = False`. To tear an account down entirely (user + membership
++ dedicated role), use `delete_service_account(session, user_id=…, tenant_id=…)`.
 
 The CLI wraps both helpers (and prints one freshly minted token on create):
 
@@ -231,12 +206,10 @@ asterion service-account create --tenant acme --label lobby-terminal \
 asterion service-account delete --tenant acme --email <account-email>
 ```
 
----
-
 ## Writing a custom provider
 
-The common case: your app already has an identity system and you want
-`asterion` to defer to it instead of hosting its own user table.
+The common case: your app already has an identity system and you want asterion
+to defer to it instead of hosting its own user table.
 
 ```python
 from asterion.providers.base import (
@@ -284,33 +257,29 @@ app = create_admin(
 )
 ```
 
-Things to know:
+Three things to know:
 
-1. **`AuthIdentity.user_id`** is whatever opaque string your auth
-   provider returns. Your `UserProvider.get_by_id` is the only thing
-   that has to know what it means.
-2. **Failures are not exceptions.** Return `None` for "no identity" /
-   "user not found" — the framework converts that to 401. Raise only
-   for genuinely exceptional conditions (signing-key error, DB down).
-3. **`request` is passed through** so providers can read tenant
-   headers, opt out for health endpoints, or pull request-scoped DB
-   sessions. Don't store the `request` between calls — it's per-call.
+1. **`AuthIdentity.user_id` is opaque.** It is whatever string your auth
+   provider returns; your `UserProvider.get_by_id` is the only thing that needs
+   to know what it means.
+2. **Failures are not exceptions.** Return `None` for "no identity" / "user not
+   found" — the framework converts that to `401`. Raise only for genuinely
+   exceptional conditions (signing-key error, DB down).
+3. **`request` is passed through** so providers can read tenant headers, opt out
+   for health endpoints, or pull a request-scoped DB session. Don't store the
+   `request` between calls — it is per-call.
 
-`tests/providers/test_external_e2e.py` exercises a "no framework User
-table at all" scenario as a regression guard.
+`tests/providers/test_external_e2e.py` exercises a "no framework `User` table at
+all" scenario as a regression guard.
 
----
+## Optional capabilities: OAuthCapableUserProvider
 
-## Optional capabilities: `OAuthCapableUserProvider`
-
-The four core Protocols above answer "who is this principal" (read
-path). Some extensions also need a *write* path — the OAuth extension,
-for example, may need to find or create a user from a verified
-external identity after the IdP redirect lands.
-
-Forcing every `UserProvider` implementation to grow an OAuth-shaped
-method they may never use would be wrong. So that capability is its
-own opt-in Protocol that lives in the auth_oauth extension:
+The four core Protocols answer "who is this principal" (the read path). Some
+extensions also need a *write* path — the OAuth extension, for example, may need
+to find or create a user from a verified external identity after the IdP
+redirect. Forcing every `UserProvider` to grow an OAuth-shaped method it may
+never use would be wrong, so that capability is its own opt-in Protocol that
+lives in the `auth_oauth` extension:
 
 ```python
 from asterion.extensions.auth_oauth import OAuthCapableUserProvider
@@ -318,61 +287,47 @@ from asterion.extensions.auth_oauth import OAuthCapableUserProvider
 
 class CompanyOAuthUserProvider:
     async def find_or_create_by_external_identity(
-        self, *,
-        provider: str,
-        provider_subject: str,
-        claims,                # ExternalIdentityData
-        allow_create: bool,
-        request,
+        self, *, provider, provider_subject, claims, allow_create, request,
     ):
-        # Look up the IdP identity in your IAM, return AdminPrincipal,
-        # or raise one of the OAuthCapabilityError subclasses to refuse.
+        # Look up the IdP identity, return AdminPrincipal, or raise an
+        # OAuthCapabilityError subclass to refuse.
         ...
 
 
-# Wire it into the extension, not into create_admin():
 app = create_admin(
     config=cfg,
     extensions=[
         OAuthExtension(
             providers=[GoogleOIDCProvider(client_id=…, client_secret=…)],
-            user_provider=CompanyOAuthUserProvider(),  # opt-in
-            auto_create_users=False,                   # safe default
+            user_provider=CompanyOAuthUserProvider(),   # opt-in
+            auto_create_users=False,                    # safe default
         ),
     ],
 )
 ```
 
-The default `BuiltinOAuthUserProvider` operates on the framework's
-`User` table and applies four security defaults — see
-[auth-oauth.md](auth-oauth.md) for the full setup walkthrough.
+The default `BuiltinOAuthUserProvider` operates on the framework's `User` table
+and applies four security defaults — see [OAuth / OIDC sign-in](auth-oauth.md).
+This pattern is the model for any future "extension X needs a write operation on
+the user store" Protocol: define it in the extension's own module, ship a
+`Builtin*` that wraps the framework's `User`, and make it runtime-checkable so
+the extension can `isinstance`-check before using it.
 
-This pattern is the model for any future "extension X needs a write
-operation on the user store" Protocol: define it in the extension's
-own module, ship a `Builtin*` that wraps the framework's `User`,
-runtime-checkable so the extension can `isinstance(provider,
-ProtocolName)` before using it.
+## Background: why four providers
 
----
-
-## Why not just override `get_current_user`?
-
-The old shape (`get_current_user(request, credentials, session) → User`)
+The earlier shape — `get_current_user(request, credentials, session) → User` —
 coupled identity, ORM, and the framework's `User` model into a single
-dependency. Replacing that dep gave you a hand-wavy promise that "most
-things still work" but in practice broke:
+dependency, so swapping it broke `require_tenant_auth_context`,
+`assert_permission`, audit `actor_user_id`, and impersonation token validation.
+Splitting the responsibilities across four providers means none of the
+framework's downstream code reaches into your `User` model — routes read
+`AdminContext`, and that is it. `get_current_user` still lives in
+`auth/dependencies.py` because the auth endpoints (`/me`, `/logout-all`)
+genuinely need the full `User` row to bump `token_version` — the single place
+that JWT primitive belongs.
 
-- `require_tenant_auth_context` — needed the framework `User`'s `id`.
-- `assert_permission(ctx.permission_keys, …)` — needed
-  `TenantAuthContext`.
-- Audit log `actor_user_id` — needed `request.state.current_user`.
-- Impersonation token validation — needed JWT internals.
+## See also
 
-Splitting the responsibilities across four providers means **none** of
-the framework's downstream code reaches into your User model. Routes
-read `AdminContext`. That's it.
-
-`get_current_user` itself still lives in `auth/dependencies.py` because
-the auth endpoints (`/me`, `/logout-all`) genuinely need the full
-`User` row to bump `token_version` — that's not legacy, that's the
-single place the JWT primitive belongs.
+* [Security](security.md) — token claims, revocation, authorization.
+* [Extensions](extensions.md) — provider-vs-extension decision, OAuth wiring.
+* [Multi-tenancy](tenancy.md) — how the tenant + permission providers resolve.
