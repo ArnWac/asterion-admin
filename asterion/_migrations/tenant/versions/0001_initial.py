@@ -33,7 +33,22 @@ branch_labels = None
 depends_on = None
 
 
+def _has_table(name: str) -> bool:
+    """True when ``name`` already exists in the active search_path schema.
+
+    Theme H: the framework tenant tree is now applied to every tenant schema,
+    including schemas where a downstream app's *previous* tree already created
+    these tables. Guarding each ``create_table`` keeps the framework upgrade
+    idempotent there — it simply stamps its version table instead of failing on
+    "table already exists" — while a fresh schema gets all tables created."""
+    return sa.inspect(op.get_bind()).has_table(name)
+
+
 def upgrade() -> None:
+    if _has_table("tenant_roles"):
+        # Pre-existing schema (legacy app tree owned these). Nothing to create;
+        # the framework version table gets stamped to head by Alembic.
+        return
     op.create_table(
         "tenant_roles",
         sa.Column("id", GUID(), primary_key=True, nullable=False),

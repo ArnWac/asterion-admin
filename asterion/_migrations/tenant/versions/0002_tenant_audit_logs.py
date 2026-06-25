@@ -30,6 +30,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Idempotent (Theme H): a downstream app that already added this table in
+    # its own tenant tree (the common case the framework tree now backstops)
+    # must not get a duplicate-table error when the framework base runs.
+    if sa.inspect(op.get_bind()).has_table("tenant_audit_logs"):
+        return
     op.create_table(
         "tenant_audit_logs",
         sa.Column("id", GUID(), primary_key=True, nullable=False),

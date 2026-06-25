@@ -122,16 +122,31 @@ asterion's **shared** (public) migrations ship inside the wheel
 package-relatively, so it works from a pip-installed asterion in any working
 directory — no repo checkout or `alembic_shared.ini` required.
 
-The **tenant** tree is owned by your app (your domain tables live alongside
-asterion's `tenant_rbac`). `db upgrade-tenant` / `db upgrade-tenants` resolve the
-tenant migrations in this order:
+asterion **owns its tenant tables too** (RBAC + `tenant_audit_logs`), split like
+the public/shared tree. `db upgrade-tenant` / `db upgrade-tenants` (and tenant
+bootstrap) apply **two** trees per schema, in order:
 
-1. an explicit `--config/-c <path>` (or `ASTERION_ALEMBIC_TENANT_INI`),
-2. a project-local `alembic_tenant.ini` in the current directory,
-3. asterion's bundled tenant migrations (pure-asterion / asterion's own tests).
+1. asterion's bundled **framework tenant base** — always applied, tracked in its
+   own `alembic_version_asterion_tenant` version table.
+2. your app's **tenant tree** for your domain tables, tracked in the default
+   `alembic_version`. Resolved from an explicit `--config/-c <path>` (or
+   `ASTERION_ALEMBIC_TENANT_INI`), else a project-local `alembic_tenant.ini`.
+   When you own no tenant tree the framework base is the whole schema.
 
-So an embedding app drops its own `alembic_tenant.ini` (pointing at its
-`migrations/tenant`) next to where it runs the CLI, and it wins automatically.
+This is the key change from earlier versions, which ran exactly one resolved
+tree: now the framework tables are guaranteed present even if your app's tree
+never imported a framework model — the silent "missing table → 500" footgun is
+gone. The framework base migrations are idempotent (they skip tables that
+already exist), so an existing app whose own tree already created those tables
+upgrades cleanly (the framework version table is simply stamped). Going forward,
+**drop the framework tenant tables from your app's tree** and stop importing the
+framework tenant models; wire `exclude_framework_tenant_tables` into your tenant
+`env.py`'s `include_object` so autogenerate ignores them:
+
+```python
+from asterion.db.alembic_support import exclude_framework_tenant_tables
+context.configure(..., include_object=exclude_framework_tenant_tables)
+```
 
 ## Multi-worker considerations
 

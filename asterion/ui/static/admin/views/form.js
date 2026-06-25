@@ -93,7 +93,13 @@ export async function mountForm(root, resource, mode, recordId) {
   const inlineCollectors = [];
   for (const inlineMeta of contract.inlines || []) {
     const existingRows = (existing && existing.inlines && existing.inlines[inlineMeta.model]) || [];
-    const section = buildInlineSection(inlineMeta, existingRows);
+    // Theme F: an inline declaring widget="dual_list" renders as a transfer
+    // widget (available | assigned) over its value_field; everything else
+    // keeps the editable add-row table.
+    const section =
+      inlineMeta.widget === "dual_list"
+        ? buildInlineTransfer(inlineMeta, existingRows, resource)
+        : buildInlineSection(inlineMeta, existingRows);
     form.appendChild(section.node);
     inlineCollectors.push(section);
   }
@@ -467,6 +473,137 @@ function buildInlineSection(meta, existingRows) {
           out.push(values);
         }
       }
+    }
+    return out;
+  }
+
+  return { node, model: meta.model, collect };
+}
+
+// Dual-list / transfer inline (Theme F). Renders a Django-style two-list
+// assign/unassign widget over the inline's single `value_field`, fed by the
+// `_inline_options` endpoint (the universe of assignable values). Returns
+// { node, model, collect } — `collect` diffs the assigned set against the
+// existing rows and emits the same row payloads the add-row table does:
+// `{ [value_field]: value }` for newly-assigned values and `{ id, _delete }`
+// for removed ones. Unchanged assignments are omitted (the server's inline
+// writer only touches rows present in the payload).
+function buildInlineTransfer(meta, existingRows, resource) {
+  const valueField = meta.value_field || (meta.fields && meta.fields[0]);
+
+  // value -> existing row id (only rows already persisted carry an id).
+  const existingByValue = new Map();
+  for (const row of existingRows) {
+    if (row && row[valueField] != null && row.id != null) {
+      existingByValue.set(String(row[valueField]), row.id);
+    }
+  }
+
+  const assigned = new Set(existingByValue.keys());
+  const labels = new Map(); // value -> display label
+  for (const v of existingByValue.keys()) labels.set(v, v);
+  // Display order for the whole universe; seeded with existing values, then
+  // replaced/extended once the option fetch resolves.
+  let order = [...existingByValue.keys()];
+
+  const availBox = el("select", {
+    multiple: "",
+    size: "12",
+    class: "dual-list",
+    "aria-label": `Available ${meta.label}`,
+  });
+  const assignedBox = el("select", {
+    multiple: "",
+    size: "12",
+    class: "dual-list",
+    "aria-label": `Assigned ${meta.label}`,
+  });
+  const availSearch = el("input", {
+    type: "search",
+    class: "dual-search",
+    placeholder: "Filter…",
+    "aria-label": `Filter available ${meta.label}`,
+  });
+  const assignedSearch = el("input", {
+    type: "search",
+    class: "dual-search",
+    placeholder: "Filter…",
+    "aria-label": `Filter assigned ${meta.label}`,
+  });
+
+  const labelFor = (v) => labels.get(v) || v;
+  const matches = (v, needle) =>
+    !needle || labelFor(v).toLowerCase().includes(needle) || v.toLowerCase().includes(needle);
+
+  function rebuild() {
+    const availNeedle = availSearch.value.trim().toLowerCase();
+    const assignedNeedle = assignedSearch.value.trim().toLowerCase();
+    availBox.replaceChildren(
+      ...order
+        .filter((v) => !assigned.has(v) && matches(v, availNeedle))
+        .map((v) => el("option", { value: v }, labelFor(v)))
+    );
+    assignedBox.replaceChildren(
+      ...order
+        .filter((v) => assigned.has(v) && matches(v, assignedNeedle))
+        .map((v) => el("option", { value: v }, labelFor(v)))
+    );
+  }
+
+  function move(fromBox, add) {
+    const values = [...fromBox.selectedOptions].map((o) => o.value);
+    if (!values.length) return;
+    for (const v of values) (add ? assigned.add(v) : assigned.delete(v));
+    rebuild();
+  }
+
+  const addBtn = el("button", { type: "button", class: "btn" }, "Add →");
+  const removeBtn = el("button", { type: "button", class: "btn" }, "← Remove");
+  addBtn.addEventListener("click", () => move(availBox, true));
+  removeBtn.addEventListener("click", () => move(assignedBox, false));
+  availSearch.addEventListener("input", rebuild);
+  assignedSearch.addEventListener("input", rebuild);
+
+  rebuild();
+
+  // Fetch the assignable universe after mount; a failure leaves the widget
+  // in "remove-only" mode (existing assignments still render and can be
+  // unassigned) rather than erroring the whole form.
+  admin
+    .inlineOptions(resource, meta.model)
+    .then((data) => {
+      const opts = (data && data.options) || [];
+      const next = [];
+      for (const o of opts) {
+        const val = String(o.value);
+        labels.set(val, o.label != null ? String(o.label) : val);
+        next.push(val);
+      }
+      const seen = new Set(next);
+      for (const v of existingByValue.keys()) if (!seen.has(v)) next.push(v);
+      order = next;
+      rebuild();
+    })
+    .catch(() => {
+      /* keep remove-only — nothing to add */
+    });
+
+  const node = el("details", { class: "fieldset inline-section", open: true }, [
+    el("summary", { class: "fieldset-legend" }, meta.label),
+    el("div", { class: "dual-list-wrap" }, [
+      el("div", { class: "dual-col" }, [el("label", {}, "Available"), availSearch, availBox]),
+      el("div", { class: "dual-col dual-actions" }, [addBtn, removeBtn]),
+      el("div", { class: "dual-col" }, [el("label", {}, "Assigned"), assignedSearch, assignedBox]),
+    ]),
+  ]);
+
+  function collect() {
+    const out = [];
+    for (const v of assigned) {
+      if (!existingByValue.has(v)) out.push({ [valueField]: v });
+    }
+    for (const [v, id] of existingByValue) {
+      if (!assigned.has(v)) out.push({ id, _delete: true });
     }
     return out;
   }

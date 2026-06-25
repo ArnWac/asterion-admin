@@ -253,6 +253,11 @@ class InlineMeta(BaseModel):
     * ``ordering`` — sort order for existing rows.
     * ``extra``, ``max_num`` — UI capacity hints.
     * ``can_delete`` — whether the row delete control is shown.
+    * ``widget`` — ``"dual_list"`` renders a transfer widget over
+      ``value_field`` instead of the add-row table (Theme F); ``None``
+      keeps the table.
+    * ``value_field`` — the assignment column for ``widget="dual_list"``
+      (the value moved between the two lists). ``None`` for table inlines.
     """
 
     model: str
@@ -264,6 +269,8 @@ class InlineMeta(BaseModel):
     extra: int = 0
     max_num: int | None = None
     can_delete: bool = True
+    widget: str | None = None
+    value_field: str | None = None
 
 
 class FieldsetMeta(BaseModel):
@@ -920,6 +927,12 @@ def build_inline_metadata(model_admin: ModelAdmin) -> list[InlineMeta]:
     for entry in declared:
         inline = _resolve_inline_instance(entry)
         fields = _inline_default_fields(inline)
+        widget = getattr(inline, "widget", None)
+        # The dual-list widget needs a single assignment column; default to the
+        # first declared field when the inline didn't name one explicitly.
+        value_field = getattr(inline, "value_field", None)
+        if not value_field and widget == "dual_list":
+            value_field = fields[0] if fields else None
         metas.append(
             InlineMeta(
                 model=inline.model_name,
@@ -931,6 +944,8 @@ def build_inline_metadata(model_admin: ModelAdmin) -> list[InlineMeta]:
                 extra=int(getattr(inline, "extra", 0)),
                 max_num=getattr(inline, "max_num", None),
                 can_delete=bool(getattr(inline, "can_delete", True)),
+                widget=widget if isinstance(widget, str) and widget else None,
+                value_field=value_field,
             )
         )
     return metas

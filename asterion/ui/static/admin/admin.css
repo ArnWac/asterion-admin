@@ -182,6 +182,10 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
 .dual-actions .btn {
   width: 100%;
 }
+/* Per-side filter for the transfer widget (Theme F dual-list inlines). */
+.dual-col .dual-search {
+  width: 100%;
+}
 
 /* Impersonation banner — a fixed bar at the bottom of the viewport while a
  * superadmin is acting as another user. Fixed (not in flow) so it never

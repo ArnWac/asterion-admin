@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 import asterion.models.tenant_rbac  # noqa: F401 — registers TenantBase tables
 from asterion.models.base import TenantBase
+from asterion.models.tenant_audit_log import TenantAuditLog  # noqa: F401 — registers table
 
 config = context.config
 
@@ -41,12 +42,21 @@ target_metadata = TenantBase.metadata
 
 _schema = context.get_x_argument(as_dictionary=True).get("schema")
 
+# Theme H: the framework base tree is tracked in its own version table
+# (``alembic_version_asterion_tenant``) so it coexists with the downstream
+# app's tenant history in the same schema. ``upgrade_tenant_schema`` sets this
+# via ``version_table`` on the Config; default ``None`` → Alembic's standard
+# ``alembic_version`` for any plain invocation of this env.
+_version_table = config.get_main_option("version_table") or None
+
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     opts = {}
     if _schema:
         opts["include_schemas"] = True
+    if _version_table:
+        opts["version_table"] = _version_table
     context.configure(url=url, target_metadata=target_metadata, literal_binds=True, **opts)
     with context.begin_transaction():
         context.run_migrations()
@@ -62,10 +72,13 @@ def do_run_migrations(connection):
         # the autobegun transaction that the outer ``connect()`` context rolls
         # back on exit, so the tables silently never persist.
         connection.commit()
+    opts = {"version_table_schema": _schema}
+    if _version_table:
+        opts["version_table"] = _version_table
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        version_table_schema=_schema,
+        **opts,
     )
     with context.begin_transaction():
         context.run_migrations()

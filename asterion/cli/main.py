@@ -26,9 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from asterion.auth.password import hash_password
 from asterion.core.config import CoreAdminConfig
 from asterion.db.alembic_support import (
-    set_x_schema,
     shared_alembic_config,
-    tenant_alembic_config,
+    upgrade_tenant_schema,
 )
 from asterion.db.session import DatabaseManager
 from asterion.models.tenant import Tenant
@@ -408,10 +407,11 @@ def db_upgrade_tenant(
     """Apply pending tenant-schema migrations for one tenant.
 
     Resolves the tenant's schema_name via the slug and passes it to alembic as
-    ``-x schema=<schema_name>``. The tenant migrations tree is owned by the
-    downstream app — see :func:`asterion.db.alembic_support.tenant_alembic_config` for the resolution
-    order (explicit ``-c`` > local ``alembic_tenant.ini`` > asterion's bundled
-    tenant migrations).
+    ``-x schema=<schema_name>``. Theme H: asterion's bundled framework tenant
+    base is applied FIRST (tracked in its own version table), then the
+    downstream app's tenant tree (explicit ``-c`` > env var > local
+    ``alembic_tenant.ini``; none → the framework base is the whole schema). See
+    :func:`asterion.db.alembic_support.upgrade_tenant_schema`.
     """
     try:
         validated = validate_tenant_slug(slug)
@@ -419,15 +419,11 @@ def db_upgrade_tenant(
         typer.echo(f"Invalid slug: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
-    from alembic import command
-
     from asterion.tenancy.schema_names import make_tenant_schema_name
 
     schema_name = make_tenant_schema_name(validated)
-    cfg = tenant_alembic_config(config)
-    set_x_schema(cfg, schema_name)
     try:
-        command.upgrade(cfg, "head")
+        upgrade_tenant_schema(schema_name, explicit_ini=config)
     except Exception as exc:
         typer.echo(f"[db] upgrade-tenant failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -448,15 +444,11 @@ def db_upgrade_tenants(
         typer.echo("No active tenants found.")
         return
 
-    from alembic import command
-
     failures: list[str] = []
     for slug, schema_name in tenants:
         typer.echo(f"[upgrade] {slug} ({schema_name})")
-        cfg = tenant_alembic_config(config)
-        set_x_schema(cfg, schema_name)
         try:
-            command.upgrade(cfg, "head")
+            upgrade_tenant_schema(schema_name, explicit_ini=config)
         except Exception as exc:
             typer.echo(f"  FAILED: {exc}", err=True)
             failures.append(slug)

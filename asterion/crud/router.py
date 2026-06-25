@@ -314,6 +314,48 @@ async def _fk_options_impl(
     return {"options": options}
 
 
+async def _inline_options_impl(
+    resource: str,
+    inline_table: str,
+    request: Request,
+    *,
+    limit: int,
+    q: str | None,
+    session: AsyncSession,
+    ctx: AdminContext,
+) -> dict[str, Any]:
+    """Available ``{value, label}`` options for a ``dual_list`` inline (Theme F).
+
+    Powers the transfer widget in the parent's edit form: given the parent
+    resource and the child table name, resolve the parent admin's matching
+    :class:`~asterion.admin.inline.InlineAdmin` and return its
+    :meth:`~asterion.admin.inline.InlineAdmin.resolve_options` (the universe of
+    assignable values for the inline's ``value_field``).
+
+    Authorization mirrors :func:`_fk_options_impl`: the caller must be able to
+    ``read`` the parent resource. The inline's resolver is responsible for any
+    further (e.g. tenant) scoping of the values it returns.
+
+    Returns ``{"options": []}`` when the inline has no option source, so the
+    widget degrades to "remove only" rather than erroring.
+    """
+    from asterion.admin.inline import _inline_index
+    from asterion.crud.query import normalize_limit_offset
+
+    limit, _ = normalize_limit_offset(limit=limit, offset=0)
+    admin_class = _get_admin_class(request, resource)
+    _require_resource_permission(ctx, admin_class, "read")
+
+    inline = _inline_index(admin_class).get(inline_table)
+    if inline is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"'{inline_table}' is not an inline of '{resource}'.",
+        )
+    options = await inline.resolve_options(session=session, ctx=ctx, q=q, limit=limit)
+    return {"options": list(options or [])[:limit]}
+
+
 async def _delete_impl(
     resource: str,
     record_id: str,
@@ -388,6 +430,24 @@ def _register_resource(router: APIRouter, resource: str) -> None:
     ) -> dict[str, Any]:
         return await _fk_options_impl(
             resource, field, request, limit=limit, q=q, session=session, ctx=ctx
+        )
+
+    # Dual-list (Theme F) inline option source. 3-segment path so it never
+    # collides with the 2-segment `/{resource}/{record_id}` routes.
+    @router.get(
+        f"/{resource}/_inline_options/{{inline}}",
+        name=f"crud_inline_options_{resource}",
+    )
+    async def crud_inline_options(
+        inline: str,
+        request: Request,
+        limit: int = 1000,
+        q: str | None = None,
+        session: AsyncSession = Depends(get_async_session),
+        ctx: AdminContext = Depends(require_admin_context),
+    ) -> dict[str, Any]:
+        return await _inline_options_impl(
+            resource, inline, request, limit=limit, q=q, session=session, ctx=ctx
         )
 
     @router.get(f"/{resource}/{{record_id}}", name=f"crud_read_{resource}")

@@ -80,6 +80,10 @@ export async function mountList(root, resource) {
   const bulkActions = allActions.filter((a) => a.bulk !== false);
   const rowActions = allActions.filter((a) => a.bulk === false);
   const canDelete = !contract.capabilities || contract.capabilities.delete !== false;
+  // Theme E: a per-row Edit icon, shown only when the caller may update this
+  // resource (read-only policies / singleton settings pages report
+  // capabilities.update=false and get no Edit icon).
+  const canUpdate = !contract.capabilities || contract.capabilities.update !== false;
 
   const actionSelect = el(
     "select",
@@ -424,6 +428,11 @@ export async function mountList(root, resource) {
   function buildRowActions(id) {
     const viewHref = `${cfg.uiPath}/${resource}/${encodeURIComponent(id)}`;
     const bar = [iconLinkBtn(viewHref, "View", "eye")];
+
+    if (canUpdate) {
+      const editHref = `${cfg.uiPath}/${resource}/${encodeURIComponent(id)}/edit`;
+      bar.push(iconLinkBtn(editHref, "Edit", "pencil"));
+    }
 
     for (const action of rowActions) {
       bar.push(

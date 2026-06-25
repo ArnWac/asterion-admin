@@ -129,7 +129,13 @@ asterion tenant bootstrap acme
    programmatically — the CLI form does not auto-discover; run
    `asterion permissions sync --app app:app` first for useful defaults).
 2. `CREATE SCHEMA IF NOT EXISTS "tenant_acme"`.
-3. Run `alembic_tenant.ini` against the schema.
+3. Run the tenant migrations against the schema: asterion's bundled **framework
+   tenant base** first (RBAC + `tenant_audit_logs`, tracked in its own
+   `alembic_version_asterion_tenant`), **then** your app's `alembic_tenant.ini`
+   tree (your domain tables, tracked in `alembic_version`). The framework base
+   is always applied, so a tenant schema can never be missing a framework table
+   because the app's tree forgot to import a model. See
+   [Deployment](deployment.md).
 4. Create three default roles inside `tenant_acme`:
    * `owner` — always granted `admin.*` (plus everything in the catalog).
    * `admin` — all catalog keys **except** `admin.audit_logs.delete` and

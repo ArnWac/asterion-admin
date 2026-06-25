@@ -209,22 +209,17 @@ async def provision_tenant_schema(
 async def _run_tenant_migrations(schema_name: str, *, database_url: str) -> None:
     """Apply the tenant Alembic migrations against ``schema_name``.
 
-    Runs in-process (no subprocess) via the shared resolver, so a
-    pip-installed asterion with no repo checkout still provisions tenants:
-    the tenant tree is resolved package-relatively / cwd-aware exactly like
-    the ``db upgrade-tenant(s)`` CLI (project-local ``alembic_tenant.ini``
-    wins, else asterion's bundled tenant migrations). ``alembic.command``
-    calls ``asyncio.run`` internally, so it must run off the event loop —
-    hence ``asyncio.to_thread``.
+    Runs in-process (no subprocess), so a pip-installed asterion with no repo
+    checkout still provisions tenants. Theme H: applies asterion's bundled
+    framework tenant base FIRST (tracked in its own version table), then the
+    downstream app's tenant tree (project-local ``alembic_tenant.ini`` / env
+    var), so every tenant schema gets the framework RBAC + audit tables even if
+    the app's tree forgot them. ``alembic.command`` calls ``asyncio.run``
+    internally, so it must run off the event loop — hence ``asyncio.to_thread``.
     """
-    from alembic import command
+    from asterion.db.alembic_support import upgrade_tenant_schema
 
-    from asterion.db.alembic_support import set_x_schema, tenant_alembic_config
-
-    cfg = tenant_alembic_config()
-    cfg.set_main_option("sqlalchemy.url", database_url)
-    set_x_schema(cfg, schema_name)
-    await asyncio.to_thread(command.upgrade, cfg, "head")
+    await asyncio.to_thread(upgrade_tenant_schema, schema_name, database_url=database_url)
 
 
 async def bootstrap_tenant(

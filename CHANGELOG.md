@@ -16,6 +16,57 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.37] - 2026-06-25
+
+More admin-UI polish + a tenant-migration ownership fix, surfaced while building
+a real multi-tenant app on `0.1.36`.
+
+### Added
+- **Per-row Edit icon in the list view.** Each row's icon bar now includes an
+  **Edit** icon (next to View / Delete / action icons) that jumps straight into
+  the row's edit form. Shown only when `capabilities.update` is true, so
+  read-only policies and singleton settings pages get no Edit icon.
+- **Dual-list transfer widget for inline M:N assignments.** An `InlineAdmin` can
+  declare `widget = "dual_list"` (plus an optional `value_field`) to render a
+  Django-style **available | assigned** transfer widget — with →/← and a
+  per-side filter — instead of an add-row table. The universe of options comes
+  from `InlineAdmin.resolve_options()`, served by a new
+  `GET /{resource}/_inline_options/{inline}` endpoint; saving diffs the assigned
+  set against the existing rows and rides the existing inline write path. The
+  built-in `TenantRoleAdmin`'s **Permissions** (keys from `PermissionCatalog`)
+  and **Members** (tenant member emails) inlines now use it. `InlineMeta` gained
+  `widget` / `value_field`.
+- **Schema-driven widgets in action-input forms.** The action-input dialog now
+  maps the JSON-schema `format` to a native widget — `date-time` → datetime
+  picker, `date` → date picker, `time` → time picker — surfaces `enum` as a
+  select, and applies `minLength` / `maxLength` / `pattern` / `minimum` /
+  `maximum` as input validation, using the field's `title` / `description` as
+  label / help text. (e.g. a "correct timestamp" action's `occurred_at` now gets
+  a real date-time picker.)
+
+### Changed
+- **asterion owns its tenant tables (split like public/shared).** Tenant-schema
+  provisioning now *always* applies asterion's bundled framework tenant base
+  first — tracked in its own `alembic_version_asterion_tenant` version table —
+  and *then* the downstream app's tenant tree, instead of running exactly one
+  resolved tree. So every tenant schema gets the framework tables (RBAC +
+  `tenant_audit_logs`) even if the app's tree forgot to import a framework model
+  — the silent "missing table → 500 in the built-in audit admin" footgun is gone
+  structurally. The framework base migrations are idempotent (they skip tables
+  that already exist), so existing apps whose own tree already created those
+  tables migrate without data loss or double-creation. New helpers:
+  `framework_tenant_alembic_config`, `app_tenant_alembic_config`,
+  `upgrade_tenant_schema`, and `exclude_framework_tenant_tables` (an
+  `include_object` filter an app's tenant `env.py` uses to keep framework tables
+  out of its own autogenerate). The `db upgrade-tenant` / `upgrade-tenants` CLI
+  and tenant bootstrap apply both trees in order.
+
+  **Migration note:** `asterion.db.alembic_support.tenant_alembic_config` is
+  removed; use `upgrade_tenant_schema` (or the new config helpers). An app that
+  had been carrying asterion's tenant tables in its own tree should drop those
+  migrations and stop importing the framework tenant models — the framework base
+  now owns them.
+
 ## [0.1.36] - 2026-06-25
 
 Admin-UI polish surfaced while building a real multi-tenant app on `0.1.34`.

@@ -48,13 +48,17 @@ async def test_run_tenant_migrations_persists_tables(pg_engine):
                 .scalars()
                 .all()
             )
-        # The v1 tenant tables AND the per-schema alembic version table must
-        # actually persist in the tenant schema (not silently roll back).
+        # The framework tenant tables AND the framework's own per-schema version
+        # table must actually persist in the tenant schema (not silently roll
+        # back). Theme H: the framework base is tracked in
+        # ``alembic_version_asterion_tenant`` (the default ``alembic_version`` is
+        # owned by the app tree, if any).
         assert {
             "tenant_roles",
             "tenant_role_permissions",
             "tenant_membership_roles",
-            "alembic_version",
+            "tenant_audit_logs",
+            "alembic_version_asterion_tenant",
         }.issubset(names), f"missing tenant tables in {schema}: {names}"
     finally:
         async with pg_engine.begin() as conn:

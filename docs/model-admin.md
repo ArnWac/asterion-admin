@@ -622,11 +622,40 @@ class PostAdmin(ModelAdmin):
 | `can_delete` | `bool` | Whether the per-row delete control is shown. Default `True`. |
 | `ordering` | `list[str]` | Sort order for existing rows. |
 | `policy` | `AdminPolicy \| None` | Object-level gate enforced per child row. `None` inherits the parent's gate. |
+| `widget` | `str \| None` | `"dual_list"` renders a transfer widget over `value_field` instead of the add-row table. `None` (default) keeps the table. |
+| `value_field` | `str \| None` | The single assignment column for `widget="dual_list"`. `None` defaults to the first declared field. |
 
 Inline writes happen in the **same transaction** as the parent: a failure on a
 child rolls the parent write back (all-or-nothing). A child `policy` is
 consulted independently — `can_create` for new rows, `can_update_object` for
 edits, `can_delete_object` for removals.
+
+### Dual-list (transfer) inlines
+
+For M:N-style links — assigning permission keys or members to a role — an
+add-row table is clumsy. Set `widget = "dual_list"` to render a Django-style
+**available | assigned** transfer widget (with →/← and a per-side filter) over a
+single `value_field`, and override `resolve_options` to supply the universe of
+assignable values:
+
+```python
+class RolePermissionInline(InlineAdmin):
+    model = TenantRolePermission
+    fk_name = "role_id"
+    fields = ["permission_key"]
+    widget = "dual_list"
+    value_field = "permission_key"
+
+    async def resolve_options(self, *, session, ctx=None, q=None, limit=1000):
+        return [{"value": k, "label": k} for k in await load_permission_keys(session)]
+```
+
+The widget fetches the options from `GET /{resource}/_inline_options/{inline}`
+(authorized by `read` on the parent; the resolver scopes the values). Saving
+**diffs** the assigned set against the existing rows — newly-assigned values are
+created, removed ones are deleted — riding the same inline write path as the
+table, so unchanged assignments are left untouched. With no `resolve_options`
+the widget degrades to "remove only".
 
 ---
 

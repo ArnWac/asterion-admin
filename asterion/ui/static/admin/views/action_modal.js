@@ -99,6 +99,43 @@ function schemaType(spec) {
   return "string";
 }
 
+// Theme G: the schema's `format` drives the widget for string fields.
+// pydantic emits `date-time` / `date` / `time` for datetime/date/time
+// fields, `uuid` for UUIDs. Optionals carry the format on the non-null
+// branch of `anyOf`, so look there too.
+function schemaFormat(spec) {
+  if (spec.format) return spec.format;
+  if (Array.isArray(spec.anyOf)) {
+    const real = spec.anyOf.find((s) => s.format && s.type !== "null");
+    if (real) return real.format;
+  }
+  return null;
+}
+
+// String validation hints (Theme G) — pydantic surfaces these on the spec
+// (directly or on the non-null anyOf branch). Mapped onto the input so the
+// browser flags bad values before the round-trip.
+function schemaConstraints(spec) {
+  const src =
+    (Array.isArray(spec.anyOf) && spec.anyOf.find((s) => s.type && s.type !== "null")) || spec;
+  const out = {};
+  if (src.minLength != null) out.minlength = String(src.minLength);
+  if (src.maxLength != null) out.maxlength = String(src.maxLength);
+  if (src.pattern != null) out.pattern = src.pattern;
+  if (src.minimum != null) out.min = String(src.minimum);
+  if (src.maximum != null) out.max = String(src.maximum);
+  return out;
+}
+
+// HTML input `type` for a string format (Theme G). Returns null for formats
+// with no native widget (e.g. uuid) so the caller falls back to text.
+function inputTypeForFormat(format) {
+  if (format === "date-time") return "datetime-local";
+  if (format === "date") return "date";
+  if (format === "time") return "time";
+  return null;
+}
+
 function buildInput(name, spec, id) {
   const enumValues = spec.enum || (Array.isArray(spec.anyOf) && spec.anyOf.find((s) => s.enum)?.enum);
   if (Array.isArray(enumValues)) {
@@ -118,13 +155,26 @@ function buildInput(name, spec, id) {
       name,
       type: "number",
       step: type === "integer" ? "1" : "any",
+      ...schemaConstraints(spec),
       value: spec.default != null ? String(spec.default) : "",
+    });
+  }
+  // String: a recognised `format` picks a native date/time widget; otherwise
+  // a plain text input carrying any pattern/length validation hints.
+  const fmtType = inputTypeForFormat(schemaFormat(spec));
+  if (fmtType) {
+    return el("input", {
+      id,
+      name,
+      type: fmtType,
+      value: fmtType === "datetime-local" ? toDatetimeLocal(spec.default) : spec.default || "",
     });
   }
   return el("input", {
     id,
     name,
     type: "text",
+    ...schemaConstraints(spec),
     value: spec.default != null ? String(spec.default) : "",
   });
 }
@@ -147,11 +197,29 @@ function collect(props, inputs) {
     } else if (type === "number") {
       const n = parseFloat(raw);
       data[name] = Number.isNaN(n) ? raw : n;
+    } else if (schemaFormat(spec) === "date-time") {
+      // datetime-local has no timezone — send ISO with the local offset so
+      // the server stores the user's intended instant.
+      const d = new Date(raw);
+      data[name] = Number.isNaN(d.getTime()) ? raw : d.toISOString();
     } else {
       data[name] = raw;
     }
   }
   return data;
+}
+
+// Format an ISO/parseable timestamp for a `datetime-local` input's value
+// (which wants `YYYY-MM-DDTHH:mm` in local time, no timezone suffix).
+function toDatetimeLocal(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
 }
 
 function clearErrors(errorBoxes, summary) {

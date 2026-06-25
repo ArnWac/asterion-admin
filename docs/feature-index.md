@@ -37,7 +37,7 @@ Full reference: [model-admin.md](model-admin.md). Resource name = model
 | `field_dependencies` | Narrow `<select>` by a controlling field. | Only meaningful for selects; bad rule → static choices. |
 | `display_field` | Label column when this model is an FK target. | Unset → `label_field` heuristic. |
 | `actions` | `[AdminAction(...)]` bulk ops. | Permission key = `admin.<resource>.<action.name>`. |
-| `inlines` | `[InlineAdmin]` child rows. | Inline writes share the parent transaction (all-or-nothing). |
+| `inlines` | `[InlineAdmin]` child rows. | Inline writes share the parent transaction (all-or-nothing). `widget="dual_list"` → transfer widget over `value_field`, options from `resolve_options` via `/{resource}/_inline_options/{inline}`. |
 | `policy` | `AdminPolicy` object/field gates. | Can only tighten, never loosen, static field perms. |
 | `superadmin_only` | Restrict all routes to superadmins. | Closes the in-tenant `admin.*` → global-resource cross-tenant read. |
 | `singleton` | One-row-per-tenant settings page. | Counts via the request session (per-tenant); **no** DB constraint; explicit `policy` wins. |
@@ -133,7 +133,7 @@ can_update_object / can_delete_object / field_permission`. `FieldPermission`:
 | Command / topic | One-liner | Gotcha |
 |---|---|---|
 | `db upgrade-public` | Run shared migrations (bundled in wheel). | Works package-relatively; no checkout needed. |
-| `db upgrade-tenant(s)` | Run tenant migrations per schema. | App's local `alembic_tenant.ini` wins over bundled. |
+| `db upgrade-tenant(s)` | Run tenant migrations per schema. | Applies asterion's framework tenant base first (own `alembic_version_asterion_tenant`), **then** the app's `alembic_tenant.ini` tree — both, in order, not either/or. |
 | `permissions sync` | Write catalog from registry. | Needs `ASTERION_APP=app:app`. |
 | `create-superadmin` / `tenant create` / `service-account` | Bootstrap helpers. | — |
 | `doctor` | Verify config + DB connectivity. | Run in the deploy pipeline. |

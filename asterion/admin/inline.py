@@ -76,6 +76,22 @@ class InlineAdmin:
     max_num: int | None = None
     can_delete: bool = True
 
+    #: Optional UI widget for the whole inline section (Theme F).
+    #: ``"dual_list"`` renders a Django-style transfer widget
+    #: (available | assigned, with →/← and per-side search) over a single
+    #: assignment column instead of an add-row table — the natural shape for
+    #: M:N-style links (role↔permission, role↔member). ``None`` keeps the
+    #: default editable add-row table.
+    widget: str | None = None
+
+    #: For ``widget="dual_list"``: the single column that identifies the
+    #: assignment (the value moved between the two lists). ``None`` defaults
+    #: to the first declared field at contract-build time. The dual list diffs
+    #: the assigned set against the existing rows and emits the same
+    #: ``{id, _delete}`` / ``{<value_field>: value}`` row payloads the add-row
+    #: table does, so it rides the existing inline write path unchanged.
+    value_field: str | None = None
+
     #: Optional :class:`~asterion.admin.policy.AdminPolicy` enforced
     #: on each inline child row independently of the parent's policy
     #: (Roadmap 2.2 / Gap-Analysis §4 "permission checks per inline").
@@ -107,6 +123,27 @@ class InlineAdmin:
         if self.label:
             return self.label
         return self.model.__name__
+
+    async def resolve_options(
+        self,
+        *,
+        session: AsyncSession,
+        ctx: AdminContext | None = None,
+        q: str | None = None,
+        limit: int = 1000,
+    ) -> list[dict[str, str]] | None:
+        """Available ``{value, label}`` options for a ``dual_list`` inline (F).
+
+        Returns the universe of assignable values for :attr:`value_field`
+        (e.g. every permission key, every tenant member). The default
+        returns ``None`` — "no option source", so the UI can still remove
+        existing assignments but has nothing to offer for adding. Override
+        on inlines that declare ``widget="dual_list"``.
+
+        ``q`` is an optional case-insensitive filter the caller may apply
+        server-side; ``limit`` caps the returned count.
+        """
+        return None
 
 
 # ---------------------------------------------------------------------------

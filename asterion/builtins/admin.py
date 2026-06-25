@@ -77,15 +77,30 @@ class TenantRolePermissionInline(InlineAdmin):
     ordering = ["permission_key"]
     extra = 1
     can_delete = True
+    # Theme F: assign permission keys with a Django-style transfer widget
+    # (available | assigned) instead of an add-row table — the universe of
+    # keys comes from the public PermissionCatalog.
+    widget = "dual_list"
+    value_field = "permission_key"
+
+    async def resolve_options(self, *, session, ctx=None, q=None, limit=1000):
+        from asterion.authz.catalog import load_permission_keys
+
+        keys = sorted(await load_permission_keys(session))
+        if q and q.strip():
+            needle = q.strip().lower()
+            keys = [k for k in keys if needle in k.lower()]
+        return [{"value": k, "label": k} for k in keys[:limit]]
 
 
 class TenantMembershipRoleInline(InlineAdmin):
     """User→role assignments for a role, edited inline on the role detail.
 
     ``membership_id`` references a public ``TenantMembership`` (cross-schema,
-    no DB-level FK), so the inline renders it as a raw id field; the
-    standalone :class:`TenantMembershipRoleAdmin` keeps the email-resolving
-    picker for callers that prefer the dedicated table view."""
+    no DB-level FK). The dual-list widget (Theme F) resolves those ids to
+    member emails via :meth:`resolve_options`; the standalone
+    :class:`TenantMembershipRoleAdmin` keeps the same picker for callers that
+    prefer the dedicated table view."""
 
     model = TenantMembershipRole
     fk_name = "role_id"
@@ -94,6 +109,25 @@ class TenantMembershipRoleInline(InlineAdmin):
     ordering = ["membership_id"]
     extra = 1
     can_delete = True
+    widget = "dual_list"
+    value_field = "membership_id"
+
+    async def resolve_options(self, *, session, ctx=None, q=None, limit=1000):
+        """Member-email options for the cross-schema ``membership_id`` picker.
+
+        ``tenant_memberships`` lives in the **public** schema, so the request
+        session's tenant ``search_path`` does NOT scope this join — we restrict
+        to the active tenant to avoid offering members of *other* tenants. With
+        no tenant in context we offer nothing rather than everyone.
+        """
+        if ctx is None or ctx.tenant is None:
+            return []
+        stmt = _membership_email_stmt().where(TenantMembership.tenant_id == ctx.tenant.id)
+        if q and q.strip():
+            stmt = stmt.where(User.email.ilike(f"%{q.strip()}%"))
+        stmt = stmt.order_by(User.email.asc()).limit(limit)
+        rows = (await session.execute(stmt)).all()
+        return [{"value": str(mid), "label": email} for mid, email in rows]
 
 
 class TenantRoleAdmin(ModelAdmin):

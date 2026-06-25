@@ -148,6 +148,18 @@ export const admin = {
     );
   },
 
+  // Dual-list (Theme F) inline option source: {value, label} pairs for an
+  // inline's assignment column (e.g. all permission keys, all tenant members).
+  // Returns { options: [{value, label}, ...] }.
+  inlineOptions: (resource, inline, { q = "", limit = 1000 } = {}) => {
+    const qs = new URLSearchParams({ limit });
+    if (q) qs.set("q", q);
+    return request(
+      "GET",
+      `${cfg.adminPrefix}/${resource}/_inline_options/${encodeURIComponent(inline)}?${qs}`
+    );
+  },
+
   // Bulk action over a row selection. ``data`` carries the typed input for
   // actions that declare an ``input_schema`` (omitted otherwise).
   runAction: (resource, action, ids, data = undefined) =>
