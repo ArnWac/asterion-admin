@@ -490,6 +490,37 @@ datenschutzfreundlichem Default:
 
 # Offene Follow-ups (kein 1.0-Blocker)
 
+### Bundled-UI: gemeinsames `widgets.js`-Modul (Schema → Widget)
+
+**Ziel:** Das Schema→Widget-Mapping der **gebündelten** Admin-UI in einem
+einzigen Modul `asterion/ui/static/admin/widgets.js` zentralisieren, das sowohl
+Model-Forms als auch Action-`input_schema`-Forms bedient.
+
+**Befund (Stand v0.1.37):** Die Render-Logik liegt doppelt vor —
+[views/form.js](../asterion/ui/static/admin/views/form.js) `buildInput()` rendert
+aus `FieldMeta` (`type`/`widget`/`metadata.choices`/`validation`),
+[views/action_modal.js](../asterion/ui/static/admin/views/action_modal.js)
+`buildInput()` rendert aus rohem JSON-Schema (`format`/`enum`/`title`/
+`min*`/`max*`/`pattern`). Date-/Time-Picker, Select, Number-/Text-Inputs samt
+Validierungs-Attributen sind dadurch konzeptionell zweimal implementiert.
+
+**Abgrenzung — reine UI-Aufgabe, nicht Contract:** Betrifft ausschließlich das
+mitgelieferte UI. Die Datenbasis (`FieldMeta.widget`/`type`/`validation`/
+`metadata.choices`, `AdminActionMeta.input_schema`, `InlineMeta.widget`/
+`value_field`) ist bereits im Contract und damit für jedes Fremd-Frontend
+nutzbar; ein eigenes Frontend konsumiert diese JS-Dateien gar nicht. Daher
+**kosmetisch/intern**, kein funktionaler Bedarf solange nur die Bundled-UI
+verwendet wird.
+
+**Vorgehen wenn aufgegriffen:** Eine gemeinsame „widget spec" definieren, auf
+die sowohl `FieldMeta` als auch JSON-Schema normalisiert werden
+(date-time/date/time → Picker, enum → Select, boolean → Toggle, FK → Picker,
+min/max/length/pattern → Validierung, `title`/`description` → Label/Hilfetext);
+`form.js` + `action_modal.js` auf das Modul umstellen; Dual-List-Inline
+(`widget="dual_list"`) als weiteren Widget-Typ einsortieren.
+
+**Status:** offen, **kein 1.0-Blocker**.
+
 ### mypy aufs Gesamtpaket
 
 **Ziel:** mypy von der Vertragsschicht (`providers/` + `core/config.py`) auf
