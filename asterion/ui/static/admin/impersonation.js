@@ -100,4 +100,8 @@ export async function renderImpersonationBanner() {
     stop,
   ]);
   document.body.prepend(bar);
+  // Flag the shell so the toast lifts above the fixed bottom banner
+  // (see `.is-impersonating .toast` in admin.css) — otherwise an error
+  // toast would render behind the orange bar and be unreadable.
+  document.body.classList.add("is-impersonating");
 }

@@ -327,7 +327,8 @@ def test_admin_action_base_execute_not_implemented():
 def test_admin_action_to_dict_shape():
     """C3 adds ``confirm``, ``bulk``, ``input_schema`` (all with safe
     defaults) so the UI can render confirmation prompts and typed
-    forms without a second round-trip."""
+    forms without a second round-trip. D adds ``icon`` (default None)
+    for per-row action buttons."""
 
     class Foo(AdminAction):
         name = "foo"
@@ -338,5 +339,6 @@ def test_admin_action_to_dict_shape():
         "label": "Foo!",
         "confirm": False,
         "bulk": True,
+        "icon": None,
         "input_schema": None,
     }

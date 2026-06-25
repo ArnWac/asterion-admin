@@ -818,11 +818,78 @@ form .tabs .tab.active {
   padding: 0.6rem 1rem;
   border-radius: var(--radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 999;
+  /* Above the impersonation banner (z-index 1000) so an error in
+   * impersonate mode is never hidden behind the orange bar. */
+  z-index: 1001;
   max-width: 320px;
   font-size: 0.875rem;
 }
 .toast.error { background: var(--danger); }
+/* While impersonating, the fixed bottom banner occupies the bottom edge —
+ * lift the toast above it so the two stack instead of overlapping. */
+body.is-impersonating .toast {
+  bottom: 4rem;
+}
+
+/* --- per-row action icon bar (Theme D) --- */
+.row-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  line-height: 0;
+}
+.icon-btn svg {
+  display: block;
+}
+/* Danger icon button stays subtle until hovered, so a row of icons doesn't
+ * read as a wall of red. */
+.icon-btn.btn-danger {
+  color: var(--danger);
+  background: transparent;
+  border-color: var(--border, #d0d0d0);
+}
+.icon-btn.btn-danger:hover {
+  color: #fff;
+}
+
+/* --- inline child tables (Theme C) --- */
+.inline-section {
+  margin-top: 1rem;
+}
+.inline-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+.inline-table th,
+.inline-table td {
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.inline-table th {
+  font-size: 0.8rem;
+  color: var(--muted, #57606a);
+  font-weight: 600;
+}
+.inline-table input[type="text"] {
+  width: 100%;
+}
+.inline-table .inline-del {
+  width: 2.5rem;
+  text-align: center;
+}
+.inline-actions {
+  margin-top: 0.25rem;
+}
 
 /* --- misc --- */
 .sr-only {

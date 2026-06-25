@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import select
 
+from asterion.admin.inline import InlineAdmin
 from asterion.admin.policy import NoCreateDeletePolicy, ReadOnlyPolicy
 from asterion.models.audit_log import AuditLog
 from asterion.models.impersonation_log import ImpersonationLog
@@ -62,6 +63,39 @@ def _membership_email_stmt():
     )
 
 
+class TenantRolePermissionInline(InlineAdmin):
+    """Permission keys for a role, edited inline on the role detail.
+
+    Replaces the standalone per-role permission picker: one ``Edit`` on
+    the role now writes role fields + permission rows + member rows in a
+    single transaction (the parent admin's inline write path)."""
+
+    model = TenantRolePermission
+    fk_name = "role_id"
+    label = "Permissions"
+    fields = ["permission_key"]
+    ordering = ["permission_key"]
+    extra = 1
+    can_delete = True
+
+
+class TenantMembershipRoleInline(InlineAdmin):
+    """User→role assignments for a role, edited inline on the role detail.
+
+    ``membership_id`` references a public ``TenantMembership`` (cross-schema,
+    no DB-level FK), so the inline renders it as a raw id field; the
+    standalone :class:`TenantMembershipRoleAdmin` keeps the email-resolving
+    picker for callers that prefer the dedicated table view."""
+
+    model = TenantMembershipRole
+    fk_name = "role_id"
+    label = "Members"
+    fields = ["membership_id"]
+    ordering = ["membership_id"]
+    extra = 1
+    can_delete = True
+
+
 class TenantRoleAdmin(ModelAdmin):
     model = TenantRole
 
@@ -73,6 +107,10 @@ class TenantRoleAdmin(ModelAdmin):
     search_fields = ["name", "description"]
     ordering = ["name"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    # Permission assignment + user→role assignment are edited inline on the
+    # role detail (one "Edit" writes role + permissions + members atomically),
+    # replacing the separate "Edit permissions" picker.
+    inlines = [TenantRolePermissionInline, TenantMembershipRoleInline]
 
 
 class TenantRolePermissionAdmin(ModelAdmin):
@@ -104,6 +142,9 @@ class TenantMembershipRoleAdmin(ModelAdmin):
     list_display = ["membership_id", "role_id", "created_at"]
     ordering = ["membership_id"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    # Managed through the Tenant Role detail's "Members" inline, so it stays
+    # routable (and keeps its email-resolving picker) but off the sidebar.
+    show_in_nav = False
     # membership_id has no DB-level foreign key (cross-schema → public
     # tenant_memberships), so force the FK-picker widget; resolve_fk_options
     # below supplies its member-email options. role_id has a real FK and is

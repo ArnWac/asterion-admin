@@ -16,6 +16,42 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.36] - 2026-06-25
+
+Admin-UI polish surfaced while building a real multi-tenant app on `0.1.34`.
+
+### Added
+- **Per-row action icon bar in the list view.** Each row now shows a compact
+  icon bar — a **View** icon, a **Delete** icon (only when
+  `capabilities.delete` is true, so read-only / singleton / no-delete resources
+  hide it), and one icon per single-row action. `AdminAction` gained an optional
+  `icon: str | None`; actions declared `bulk = False` render as per-row icon
+  buttons that open their `input_schema` form dialog (when set) and act on that
+  one row — no selection, no dropdown. `bulk = True` actions stay in the bulk
+  dropdown. The contract's `AdminActionMeta` now carries
+  `confirm` / `bulk` / `icon` / `input_schema`.
+- **Inline editing of tenant-role permissions and members.** The built-in
+  `TenantRoleAdmin` now bundles `TenantRolePermission` and
+  `TenantMembershipRole` as inlines, so one **Edit** on a role writes role
+  fields + permission rows + member rows in a single transaction. The admin
+  form renders and submits inline child tables (the read path already attached
+  them); the separate "Edit permissions" picker is gone.
+
+### Changed
+- **Singleton resources open as a settings page.** Clicking a
+  `singleton = True` resource in the nav now jumps straight into the single
+  row's edit form (or the create form when no row exists yet) instead of
+  rendering a one-row list. Pairs with the existing `capabilities` gating
+  (create blocked once the row exists, delete always blocked).
+- **`TenantMembershipRoleAdmin` is hidden from the sidebar** (`show_in_nav =
+  False`); it stays routable and keeps its email-resolving picker, but member
+  assignment is now managed via the role's "Members" inline.
+
+### Fixed
+- **Error/toast banner was hidden behind the impersonation banner.** The toast
+  now renders above the fixed bottom impersonation bar and lifts clear of it
+  while impersonating, so an error is fully readable in impersonate mode.
+
 ## [0.1.30] - 2026-06-24
 
 ### Fixed

@@ -185,6 +185,23 @@ class FieldMeta(BaseModel):
 class AdminActionMeta(BaseModel):
     name: str
     label: str
+    #: UI hint that the action should prompt before firing. Pure metadata —
+    #: the framework does not enforce it; the list view renders a
+    #: ``confirm()`` for bulk actions / a "are you sure" affordance for rows.
+    confirm: bool = False
+    #: ``True`` for bulk-style actions (operate on a multi-row selection via
+    #: the bulk dropdown), ``False`` for single-row actions the list view
+    #: renders as a per-row icon button. Defaults ``True`` to match the
+    #: historical bulk-only behaviour.
+    bulk: bool = True
+    #: Optional glyph name for the per-row icon button (``None`` → the UI
+    #: picks a generic action icon). See :attr:`AdminAction.icon`.
+    icon: str | None = None
+    #: JSON schema for the action's typed input (``AdminAction.input_schema``
+    #: rendered via ``model_json_schema()``), or ``None`` when the action
+    #: takes no extra input. The UI renders a form dialog from this before
+    #: dispatching the action.
+    input_schema: dict[str, Any] | None = None
 
 
 RelationKind = Literal["belongs_to", "has_many", "many_to_many"]
@@ -681,7 +698,22 @@ async def compute_field_permissions(
 def _admin_action_meta(action) -> AdminActionMeta:
     name = str(getattr(action, "name", None) or getattr(action, "__name__", "unknown"))
     label = str(getattr(action, "label", None) or name.replace("_", " ").title())
-    return AdminActionMeta(name=name, label=label)
+    icon = getattr(action, "icon", None)
+    schema_cls = getattr(action, "input_schema", None)
+    input_schema: dict[str, Any] | None = None
+    if schema_cls is not None:
+        try:
+            input_schema = schema_cls.model_json_schema()
+        except Exception:  # pragma: no cover — defensive against a bad schema
+            input_schema = None
+    return AdminActionMeta(
+        name=name,
+        label=label,
+        confirm=bool(getattr(action, "confirm", False)),
+        bulk=bool(getattr(action, "bulk", True)),
+        icon=str(icon) if isinstance(icon, str) and icon else None,
+        input_schema=input_schema,
+    )
 
 
 # ---------------------------------------------------------------------------
