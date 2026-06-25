@@ -162,7 +162,16 @@ EXPECTED: dict = {
         },
     ],
     "crud_actions": ["list", "read", "create", "update", "delete"],
-    "admin_actions": [{"name": "publish", "label": "Publish"}],
+    "admin_actions": [
+        {
+            "name": "publish",
+            "label": "Publish",
+            "confirm": False,
+            "bulk": True,
+            "icon": None,
+            "input_schema": None,
+        }
+    ],
     "capabilities": {
         "create": True,
         "update": True,

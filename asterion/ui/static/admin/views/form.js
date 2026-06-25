@@ -85,6 +85,27 @@ export async function mountForm(root, resource, mode, recordId) {
     form.appendChild(node);
   }
 
+  // Inline child tables (Theme C): render each declared inline as an editable
+  // sub-table so one Edit on the parent writes the parent + all children in a
+  // single transaction. Existing rows come from `existing.inlines[table]`
+  // (attached by the read path). `collectInlines()` produces the `inlines`
+  // payload block consumed by the server's inline writer.
+  const inlineCollectors = [];
+  for (const inlineMeta of contract.inlines || []) {
+    const existingRows = (existing && existing.inlines && existing.inlines[inlineMeta.model]) || [];
+    const section = buildInlineSection(inlineMeta, existingRows);
+    form.appendChild(section.node);
+    inlineCollectors.push(section);
+  }
+  function collectInlines() {
+    const out = {};
+    for (const c of inlineCollectors) {
+      const rows = c.collect();
+      if (rows.length) out[c.model] = rows;
+    }
+    return out;
+  }
+
   // Conditional fields (Roadmap 5.4): show/hide a dependent field based on
   // another field's live value, and exclude hidden fields from the payload
   // so the server never receives a value the user couldn't see.
@@ -167,6 +188,8 @@ export async function mountForm(root, resource, mode, recordId) {
     event.preventDefault();
     clearErrors(errorBoxes, summary);
     const payload = collectPayload(editableFields, inputs, isEdit, hiddenByCondition);
+    const inlinePayload = collectInlines();
+    if (Object.keys(inlinePayload).length) payload.inlines = inlinePayload;
     submitBtn.disabled = true;
     try {
       let result;
@@ -327,6 +350,138 @@ function buildTabs(groups, leftovers) {
   });
 
   return [tablist, panelsWrap];
+}
+
+// Inline child table (Theme C). Returns { node, model, collect } — `collect`
+// yields the row payloads (`{id, _delete}` / `{id, ...fields}` / `{...fields}`)
+// for the server's inline writer. The inline contract carries field *names*
+// only (no per-field type), so every column renders as a text input — enough
+// for the built-in RBAC inlines (permission keys, membership ids).
+function buildInlineSection(meta, existingRows) {
+  const readonly = new Set(meta.readonly_fields || []);
+  // Editable columns: declared fields minus the synthetic pk (sent as a hidden
+  // id, not an editable column). The fk column is already excluded upstream.
+  const columns = (meta.fields || []).filter((name) => name !== "id");
+  const canDelete = meta.can_delete !== false;
+
+  const tbody = el("tbody");
+  const rowModels = [];
+
+  function addRow(rowData) {
+    const id = rowData && rowData.id != null ? rowData.id : null;
+    const inputs = new Map();
+    const cells = columns.map((name) => {
+      const value = rowData ? rowData[name] : null;
+      const input = el("input", {
+        type: "text",
+        value: value == null ? "" : String(value),
+        disabled: readonly.has(name),
+        "aria-label": prettify(name),
+      });
+      inputs.set(name, input);
+      return el("td", {}, [input]);
+    });
+
+    let deleteCb = null;
+    if (canDelete) {
+      // New (unsaved) rows get a "remove" affordance that just drops the row
+      // from the DOM; saved rows get a delete checkbox so the server removes
+      // them on submit.
+      if (id != null) {
+        deleteCb = el("input", { type: "checkbox", "aria-label": "Delete row" });
+        cells.push(el("td", { class: "inline-del" }, [deleteCb]));
+      } else {
+        cells.push(
+          el("td", { class: "inline-del" }, [
+            el(
+              "button",
+              {
+                type: "button",
+                class: "btn btn-sm btn-link",
+                "aria-label": "Remove row",
+                onClick: () => {
+                  tr.remove();
+                  const idx = rowModels.indexOf(model);
+                  if (idx >= 0) rowModels.splice(idx, 1);
+                  syncAddBtn();
+                },
+              },
+              "✕"
+            ),
+          ])
+        );
+      }
+    }
+
+    const tr = el("tr", {}, cells);
+    const model = { id, inputs, deleteCb };
+    rowModels.push(model);
+    tbody.appendChild(tr);
+    syncAddBtn();
+  }
+
+  for (const row of existingRows) addRow(row);
+  // Pre-render `extra` blank rows for new entries (skip in pure-readonly cases
+  // where there are no editable columns).
+  if (columns.length) {
+    for (let i = 0; i < (meta.extra || 0); i += 1) addRow(null);
+  }
+
+  const addBtn = el(
+    "button",
+    { type: "button", class: "btn btn-sm", onClick: () => addRow(null) },
+    "+ Add row"
+  );
+  function syncAddBtn() {
+    if (meta.max_num == null) return;
+    addBtn.disabled = rowModels.length >= meta.max_num;
+  }
+  syncAddBtn();
+
+  const headCells = columns.map((name) => el("th", {}, prettify(name)));
+  if (canDelete) headCells.push(el("th", { class: "inline-del" }, ""));
+
+  const node = el("details", { class: "fieldset inline-section", open: true }, [
+    el("summary", { class: "fieldset-legend" }, meta.label),
+    el("table", { class: "inline-table" }, [
+      el("thead", {}, el("tr", {}, headCells)),
+      tbody,
+    ]),
+    columns.length ? el("div", { class: "inline-actions" }, [addBtn]) : null,
+  ]);
+
+  function collect() {
+    const out = [];
+    for (const m of rowModels) {
+      if (m.id != null) {
+        if (m.deleteCb && m.deleteCb.checked) {
+          out.push({ id: m.id, _delete: true });
+          continue;
+        }
+        const values = readRow(m, columns, readonly);
+        out.push({ id: m.id, ...values });
+      } else {
+        const values = readRow(m, columns, readonly);
+        // Skip wholly-empty blank rows so an untouched `extra` row isn't sent.
+        if (Object.values(values).some((v) => v !== "" && v != null)) {
+          out.push(values);
+        }
+      }
+    }
+    return out;
+  }
+
+  return { node, model: meta.model, collect };
+}
+
+function readRow(rowModel, columns, readonly) {
+  const values = {};
+  for (const name of columns) {
+    if (readonly.has(name)) continue; // never send readonly columns
+    const input = rowModel.inputs.get(name);
+    if (input) values[name] = input.value;
+  }
+  return values;
 }
 
 function buildSection(label, description, collapsed, fieldNodes) {

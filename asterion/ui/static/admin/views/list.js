@@ -5,15 +5,28 @@ import { APIError, admin } from "../api.js";
 import { getFullContract, getResourceContract } from "../contract.js";
 import { clear, el, mount, setBreadcrumb, showToast } from "../dom.js";
 import { formatValue } from "../format.js";
+import { icon } from "../icons.js";
 import { openTenant } from "../tenant_access.js";
 import { composeDateHierarchy, editIsDirty, nextSortState } from "../logic.js";
 import { openImportModal } from "./import_modal.js";
+import { openActionModal } from "./action_modal.js";
 
 const cfg = window.ASTERION || {};
 const PAGE_SIZE = 25;
 
 export async function mountList(root, resource) {
   const contract = await getResourceContract(resource);
+
+  // Singleton resources (e.g. an organization profile / settings page) have
+  // exactly one row per tenant, so there is no list to show: jump straight
+  // into the single row's edit form, or the create form when it doesn't
+  // exist yet. The nav entry links here (`/{resource}`), so this is where
+  // the "settings page" behaviour lives.
+  if (contract.singleton) {
+    await mountSingleton(root, resource, contract);
+    return;
+  }
+
   setBreadcrumb([
     { label: "Home", href: `${cfg.uiPath}/dashboard` },
     { label: contract.label_plural },
@@ -59,13 +72,20 @@ export async function mountList(root, resource) {
     disabled: contract.search_fields.length === 0,
   });
 
+  // Theme D: split declared actions. `bulk=true` actions stay in the
+  // multi-row dropdown; `bulk=false` actions become per-row icon buttons
+  // (rendered in the row's action cell). Default `bulk` is true, so an
+  // action that doesn't set it keeps the historical dropdown behaviour.
+  const allActions = contract.admin_actions || [];
+  const bulkActions = allActions.filter((a) => a.bulk !== false);
+  const rowActions = allActions.filter((a) => a.bulk === false);
+  const canDelete = !contract.capabilities || contract.capabilities.delete !== false;
+
   const actionSelect = el(
     "select",
     { "aria-label": "Bulk action" },
     [el("option", { value: "" }, "— Bulk action —")].concat(
-      (contract.admin_actions || []).map((a) =>
-        el("option", { value: a.name }, a.label || a.name)
-      )
+      bulkActions.map((a) => el("option", { value: a.name }, a.label || a.name))
     )
   );
   const actionRun = el("button", { class: "btn btn-sm", disabled: true }, "Run");
@@ -266,7 +286,7 @@ export async function mountList(root, resource) {
     el("div", { class: "card" }, [
       el("div", { class: "toolbar" }, [
         searchInput,
-        (contract.admin_actions || []).length
+        bulkActions.length
           ? el("div", { class: "toolbar", style: "padding:0;border:none" }, [
               actionSelect,
               actionRun,
@@ -391,26 +411,104 @@ export async function mountList(root, resource) {
         if (formatted.mono) td.style.fontFamily = "ui-monospace, SFMono-Regular, monospace";
         cells.push(td);
       }
-      cells.push(
-        el("td", { class: "actions" }, [
-          el(
-            "a",
-            { class: "btn btn-sm", href: `${cfg.uiPath}/${resource}/${encodeURIComponent(id)}` },
-            "View"
-          ),
-          // Superadmin "enter tenant" shortcut straight from the row.
-          // Header mode sets the tenant header; subdomain mode navigates to
-          // the tenant's subdomain (openTenant picks based on the config).
-          resource === "tenants"
-            ? el(
-                "button",
-                { type: "button", class: "btn btn-sm", onClick: () => openTenant(id) },
-                "Open"
-              )
-            : null,
-        ])
-      );
+      cells.push(el("td", { class: "actions" }, buildRowActions(id)));
       tableBody.appendChild(el("tr", {}, cells));
+    }
+  }
+
+  // --- per-row action bar (Theme D) ---
+
+  // A compact icon bar per row: View, each `bulk=false` action, and Delete.
+  // Delete only when the contract grants delete; row actions open their typed
+  // input dialog when they declare an `input_schema`, else fire directly.
+  function buildRowActions(id) {
+    const viewHref = `${cfg.uiPath}/${resource}/${encodeURIComponent(id)}`;
+    const bar = [iconLinkBtn(viewHref, "View", "eye")];
+
+    for (const action of rowActions) {
+      bar.push(
+        iconActionBtn(action.label || action.name, action.icon, () =>
+          runRowActionFlow(action, id)
+        )
+      );
+    }
+
+    if (canDelete) {
+      bar.push(
+        iconActionBtn("Delete", "trash", () => deleteRow(id), { danger: true })
+      );
+    }
+
+    // Superadmin "enter tenant" shortcut straight from the row. Header mode
+    // sets the tenant header; subdomain mode navigates to the subdomain.
+    if (resource === "tenants") {
+      bar.push(
+        el(
+          "button",
+          { type: "button", class: "btn btn-sm icon-btn", title: "Open", "aria-label": "Open", onClick: () => openTenant(id) },
+          icon("eye")
+        )
+      );
+    }
+    return el("div", { class: "row-actions" }, bar);
+  }
+
+  function iconLinkBtn(href, label, glyph) {
+    return el("a", { class: "btn btn-sm icon-btn", href, title: label, "aria-label": label }, icon(glyph));
+  }
+
+  function iconActionBtn(label, glyph, onClick, { danger = false } = {}) {
+    return el(
+      "button",
+      {
+        type: "button",
+        class: "btn btn-sm icon-btn" + (danger ? " btn-danger" : ""),
+        title: label,
+        "aria-label": label,
+        onClick,
+      },
+      icon(glyph || "action")
+    );
+  }
+
+  async function runRowActionFlow(action, id) {
+    // With a typed input schema, collect the input in a dialog (the dialog
+    // performs the POST and surfaces 422s). Otherwise confirm (when asked)
+    // and fire directly.
+    if (action.input_schema) {
+      openActionModal({
+        title: action.label || action.name,
+        schema: action.input_schema,
+        submit: (data) => admin.runRowAction(resource, id, action.name, data),
+        onDone: (res) => {
+          showToast((res && res.summary) || `${action.label || action.name} ok`);
+          load();
+        },
+      });
+      return;
+    }
+    if (action.confirm && !confirm(`Run "${action.label || action.name}" on this record?`)) {
+      return;
+    }
+    try {
+      const res = await admin.runRowAction(resource, id, action.name);
+      showToast((res && res.summary) || `${action.label || action.name} ok`);
+      load();
+    } catch (err) {
+      const message = err instanceof APIError ? err.message : String(err);
+      showToast(`Action failed: ${message}`, { type: "error" });
+    }
+  }
+
+  async function deleteRow(id) {
+    if (!confirm("Delete this record? This cannot be undone.")) return;
+    try {
+      await admin.remove(resource, id);
+      showToast("Deleted.");
+      load();
+    } catch (err) {
+      const message = err instanceof APIError ? err.message : String(err);
+      showToast(`Delete failed: ${message}`, { type: "error" });
     }
   }
 
@@ -613,6 +711,29 @@ export async function mountList(root, resource) {
   });
 
   load();
+}
+
+// Singleton settings page: resolve the one row (if any) and hand off to the
+// shared form view in edit mode, or create mode when no row exists yet.
+async function mountSingleton(root, resource, contract) {
+  const pkField = contract.fields.find((f) => f.primary_key) || { name: "id" };
+  let id = null;
+  try {
+    const data = await admin.list(resource, { limit: 1, offset: 0 });
+    const items = (data && data.items) || [];
+    if (items.length) id = String(items[0][pkField.name]);
+  } catch (err) {
+    const message = err instanceof APIError ? err.message : String(err);
+    showToast(`Load failed: ${message}`, { type: "error" });
+    mount(root, el("div", { class: "card" }, el("p", { class: "form-error" }, message)));
+    return;
+  }
+  const { mountForm } = await import("./form.js");
+  if (id != null) {
+    await mountForm(root, resource, "edit", id);
+  } else {
+    await mountForm(root, resource, "create", null);
+  }
 }
 
 function prettify(name) {

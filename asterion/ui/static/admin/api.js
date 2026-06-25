@@ -148,8 +148,19 @@ export const admin = {
     );
   },
 
-  runAction: (resource, action, ids) =>
-    request("POST", `${cfg.adminPrefix}/${resource}/_actions/${action}`, { ids }),
+  // Bulk action over a row selection. ``data`` carries the typed input for
+  // actions that declare an ``input_schema`` (omitted otherwise).
+  runAction: (resource, action, ids, data = undefined) =>
+    request("POST", `${cfg.adminPrefix}/${resource}/_actions/${action}`, { ids, data }),
+
+  // Single-row action: the record id is in the URL, so the body carries only
+  // the optional typed ``data``. Used by the per-row action icons (bulk=false).
+  runRowAction: (resource, id, action, data = undefined) =>
+    request(
+      "POST",
+      `${cfg.adminPrefix}/${resource}/${encodeURIComponent(id)}/_actions/${action}`,
+      { data }
+    ),
 
   // import_export extension. Returns a Blob and triggers a browser download.
   // If ``ids`` is non-empty, the server returns ONLY those primary keys and

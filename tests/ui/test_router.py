@@ -225,6 +225,7 @@ def test_static_admin_layout():
         "diff.js",
         "dom.js",
         "format.js",
+        "icons.js",
         "impersonation.js",
         "logic.js",
         "tenant_access.js",
@@ -233,6 +234,7 @@ def test_static_admin_layout():
     assert views_dir.is_dir(), "views/ directory must exist"
     view_files = sorted(p.name for p in views_dir.iterdir() if p.is_file())
     assert view_files == [
+        "action_modal.js",
         "dashboard.js",
         "delete.js",
         "detail.js",

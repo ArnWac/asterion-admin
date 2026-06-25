@@ -82,17 +82,9 @@ export async function mountDetail(root, resource, recordId) {
           },
           "Delete"
         ),
-    // Tenant roles get a dedicated two-list permission picker.
-    resource === "tenant_roles"
-      ? el(
-          "a",
-          {
-            class: "btn",
-            href: `${cfg.uiPath}/${resource}/${encodeURIComponent(recordId)}/permissions`,
-          },
-          "Edit permissions"
-        )
-      : null,
+    // Tenant role permissions + member assignments are now edited inline on
+    // the role's Edit form (Theme C), so the separate permission picker is
+    // gone — one "Edit" writes role fields + permissions + members.
     // A tenant can be "entered" as superadmin (scoped context switch).
     // Works in both resolution modes: header mode sets the tenant header,
     // subdomain mode navigates to the tenant's subdomain (openTenant decides).

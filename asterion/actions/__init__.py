@@ -49,12 +49,19 @@ class AdminAction:
     extra inputs. When set, the request body must include a ``data``
     object that validates against this model; ``run`` then receives
     the validated pydantic instance via the ``data`` argument.
+
+    ``icon`` — optional UI hint naming the glyph the admin should render
+    for this action (e.g. ``"pencil"``, ``"clock"``). Pure metadata; the
+    framework does not interpret it. ``None`` lets the UI fall back to a
+    generic action icon. Most relevant for ``bulk=False`` actions, which
+    the list view renders as per-row icon buttons.
     """
 
     name: str = ""
     label: str = ""
     confirm: bool = False
     bulk: bool = True
+    icon: str | None = None
     input_schema: type[BaseModel] | None = None
 
     async def execute(
@@ -112,6 +119,7 @@ class AdminAction:
         out: dict[str, Any] = {"name": self.name, "label": self.label}
         out["confirm"] = bool(self.confirm)
         out["bulk"] = bool(self.bulk)
+        out["icon"] = self.icon
         if self.input_schema is not None:
             try:
                 out["input_schema"] = self.input_schema.model_json_schema()
