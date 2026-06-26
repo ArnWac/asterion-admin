@@ -39,7 +39,6 @@ DEFAULT_PROTECTED_FIELDS: frozenset[str] = frozenset(
         "hashed_password",
         "password",
         "password_hash",
-        "pin_hash",
         "shared_secret",
         "totp_secret",
         "tenant_salt",

@@ -16,6 +16,26 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.39] - 2026-06-27
+
+### Removed
+- **`pin_hash` dropped from the default protected-fields set.** It was a
+  consumer-domain field name (a time-tracking app's employee-PIN hash), not a
+  framework field — no asterion model has a `pin_hash` column — so seeding it
+  into `DEFAULT_PROTECTED_FIELDS` was domain leakage mislabeled as a "core
+  framework invariant." Apps that store a `pin_hash` (or any other app-specific
+  secret column) should register it themselves — `get_registry().register("pin_hash")`
+  before `create_admin` finishes, or `protected_fields=["pin_hash"]` on the owning
+  `ModelAdmin`. The framework default now contains only framework-owned secrets
+  (password hashes, `tenant_salt`, 2FA `totp_secret`/`setup_code`/`qr_bootstrap_token`).
+
+### Internal
+- **Write-payload preparation composed into one entry point.** `clean_write_payload`
+  + `validate_uuid_fields` + `coerce_temporal_fields` always ran as a fixed trio at
+  each create/update site; they're now wrapped in `prepare_write_payload(...)` so a
+  new write path can't apply the name-clean and silently skip a type pass.
+  Behaviour-preserving.
+
 ## [0.1.38] - 2026-06-26
 
 ### Fixed
