@@ -7,11 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import Result, Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from asterion.crud.payload import (
-    clean_write_payload,
-    coerce_temporal_fields,
-    validate_uuid_fields,
-)
+from asterion.crud.payload import prepare_write_payload
 from asterion.crud.query import (
     apply_date_hierarchy,
     apply_filters,
@@ -299,13 +295,7 @@ async def create_record(
     if ctx is not None:
         payload_in = await admin_class.before_validate(payload_in, ctx)
 
-    cleaned = clean_write_payload(
-        payload_in,
-        schema,
-        partial=False,
-    )
-    validate_uuid_fields(cleaned, model)
-    coerce_temporal_fields(cleaned, model)
+    cleaned = prepare_write_payload(payload_in, schema, model, partial=False)
 
     if ctx is not None:
         await admin_class.validate_create(cleaned, ctx)
@@ -366,9 +356,7 @@ async def update_record(
     # still happen so non-HTTP callers (tests, scripts) can use the
     # same wire format.
     if ctx is None:
-        cleaned = clean_write_payload(parent_payload, schema, partial=True)
-        validate_uuid_fields(cleaned, admin_class.model)
-        coerce_temporal_fields(cleaned, admin_class.model)
+        cleaned = prepare_write_payload(parent_payload, schema, admin_class.model, partial=True)
         record = await get_record_or_404(session, admin_class, record_id)
         for field_name, value in cleaned.items():
             setattr(record, field_name, value)
@@ -390,13 +378,7 @@ async def update_record(
     payload_in: dict[str, Any] = dict(parent_payload)
     payload_in = await admin_class.before_validate(payload_in, ctx)
 
-    cleaned = clean_write_payload(
-        payload_in,
-        schema,
-        partial=True,
-    )
-    validate_uuid_fields(cleaned, admin_class.model)
-    coerce_temporal_fields(cleaned, admin_class.model)
+    cleaned = prepare_write_payload(payload_in, schema, admin_class.model, partial=True)
 
     await admin_class.validate_update(record, cleaned, ctx)
     cleaned = await admin_class.before_update(record, cleaned, ctx)

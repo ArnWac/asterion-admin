@@ -100,11 +100,7 @@ def test_passes_through_non_strings_and_non_temporal_columns():
 # with a parsed ``date`` and rejects garbage with a 422 (not a 500).
 
 
-class _AppBase(DeclarativeBase):
-    pass
-
-
-class Booking(_AppBase):
+class Booking(_Base):
     __tablename__ = "bookings"
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(200), nullable=False)
@@ -134,7 +130,7 @@ def app(tmp_path):
     async def _setup():
         async with runtime.db.engine.begin() as conn:
             await conn.run_sync(GlobalModel.metadata.create_all)
-            await conn.run_sync(_AppBase.metadata.create_all)
+            await conn.run_sync(_Base.metadata.create_all)
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
             async with session.begin():

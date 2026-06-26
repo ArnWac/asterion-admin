@@ -161,21 +161,19 @@ def coerce_temporal_fields(cleaned: dict[str, Any], model: type) -> None:
         if not isinstance(value, str) or name not in columns:
             continue
         col_type = columns[name].type
-        # ``DateTime`` is not a subclass of ``Date``, but check it first anyway
-        # so the intent is unambiguous.
-        if isinstance(col_type, DateTime):
-            parser: Any = _parse_datetime
-        elif isinstance(col_type, Date):
-            parser = _parse_date
-        elif isinstance(col_type, Time):
-            parser = _parse_time
-        else:
+        if not isinstance(col_type, (Date, DateTime, Time)):
             continue
         text = value.strip()
         if not text:
-            cleaned[name] = None
+            cleaned[name] = None  # a cleared form field
             continue
-        parsed = parser(text)
+        parsed: dt.date | dt.time | None
+        if isinstance(col_type, DateTime):  # not a subclass of Date — siblings
+            parsed = _parse_datetime(text)
+        elif isinstance(col_type, Date):
+            parsed = _parse_date(text)
+        else:
+            parsed = _parse_time(text)
         if parsed is None:
             bad.append(name)
         else:
@@ -185,3 +183,25 @@ def coerce_temporal_fields(cleaned: dict[str, Any], model: type) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"message": "Invalid date/time value for field(s).", "fields": sorted(bad)},
         )
+
+
+def prepare_write_payload(
+    payload: Mapping[str, Any],
+    schema: AdminModelSchema,
+    model: type,
+    *,
+    partial: bool,
+) -> dict[str, Any]:
+    """Clean a write payload and coerce its values to the column types.
+
+    The single entry point every CRUD write path uses: validate field
+    names/writability (:func:`clean_write_payload`), then turn the two classes
+    of string input the driver can't coerce into 422-able errors or cast values
+    (:func:`validate_uuid_fields`, :func:`coerce_temporal_fields`). Keeping the
+    sequence in one place means a new write site can't apply the name-clean but
+    silently forget a type pass.
+    """
+    cleaned = clean_write_payload(payload, schema, partial=partial)
+    validate_uuid_fields(cleaned, model)
+    coerce_temporal_fields(cleaned, model)
+    return cleaned
