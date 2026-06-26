@@ -521,6 +521,66 @@ min/max/length/pattern → Validierung, `title`/`description` → Label/Hilfetex
 
 **Status:** offen, **kein 1.0-Blocker**.
 
+### Custom-Domain-/Host-basierter Tenant-Resolver
+
+**Ziel:** Eine vierte `tenant_resolution`-Strategie, die einen Tenant aus dem
+**vollen Host** auflöst — sowohl für SaaS-Subdomains (`acme.simpletimes.de`) als
+auch für **kundeneigene Domains** (`zeiterfassung.pizzaxyz.de`), die der Kunde
+per `CNAME` auf die Plattform zeigt.
+
+**Problem (Stand v0.1.37):** Es gibt nur `tenant_resolution="header"` und
+`"subdomain"`. Die Subdomain-Variante extrahiert stumpf `host.split(".")[0]`
+([tenancy/resolver.py:71-79](../asterion/tenancy/resolver.py)). Das bricht bei
+allem, was nicht `"<slug>.<basis-domain>"` ist:
+
+- `www.acme.simpletimes.de` → Slug `"www"` (falscher/kein Tenant),
+- eine **fremde** Kundendomain `zeiterfassung.pizzaxyz.de` → Slug
+  `"zeiterfassung"` statt des Tenants `pizzaxyz` — der häufigste echte Fall, weil
+  im Hostnamen der Kundendomain der Slug gar nicht vorkommt.
+
+Heute lässt sich „Kunde bringt eigene Domain mit" nur über den Header-Resolver
++ Reverse-Proxy-Konfiguration pro Domain lösen — manuell, fehleranfällig, nicht
+mandantenfähig.
+
+**Design (Skizze, noch nicht festgelegt):**
+
+- **Datenmodell (public schema, `GlobalModel`):** ein `tenant_domains`-Mapping
+  `host (unique, lowercase) → tenant_id`, plus `is_primary`/`verified_at`. Eine
+  einfachere Variante (`Tenant.custom_domain`-Spalte) deckt nur **eine** Domain
+  pro Tenant ab — die Tabelle erlaubt mehrere (Apex + `www` + Vanity).
+- **Resolver:** neue Strategie `tenant_resolution="domain"`, die den **vollen,
+  normalisierten Host** (ohne Port, lowercase) gegen `tenant_domains` schlägt.
+  Optional eine Fallback-Kette „exakter Host-Treffer → sonst Subdomain unter der
+  konfigurierten Basis-Domain", damit eigene SaaS-Subdomains **und** Custom
+  Domains nebeneinander funktionieren. Cache wie heute (`_tenant_cache`), aber
+  per **Host** statt per Slug gekeyt; `invalidate_tenant` müsste host-aware
+  werden.
+- **Verifikation:** ein Domain-Ownership-Check (CNAME-/TXT-Record-Prüfung) bevor
+  ein Host scharf geschaltet wird — verhindert Domain-Hijacking (fremden Host auf
+  einen falschen Tenant zeigen).
+
+**Betriebs-/TLS-Hinweis (Doku, nicht Core):** Custom Domains schließen ein
+Wildcard-Zertifikat aus (fremde Domain). Der Betrieb braucht **On-Demand-TLS**
+(z. B. Caddy `on_demand_tls`, gegen einen Ask-Endpoint der die `tenant_domains`
+prüft) oder ein per-Domain-ACME-Skript. Das ist Deployment-Sache und gehört in
+[deployment.md](deployment.md)/`shared-responsibility.md`, nicht in den Core —
+der Core liefert nur die Host→Tenant-Auflösung + den Verifikations-Hook.
+
+**Abgrenzung:** Reines Tenant-Routing — **keine** Änderung an der
+Isolations-Garantie (die bleibt der `search_path`, siehe
+[tenancy.md](tenancy.md)). Der Resolver bestimmt nur, *welcher* Tenant-Kontext
+gesetzt wird; das nachgelagerte Verhalten ist unverändert.
+
+**Test (Abnahmekriterium, wenn umgesetzt):** (1) Exakter Custom-Host →
+korrekter Tenant; (2) SaaS-Subdomain unter der Basis-Domain via Fallback →
+korrekter Tenant; (3) `www.`-Präfix und Port im Host stören nicht;
+(4) unbekannter/unverifizierter Host → `None` (kein Tenant, kein falscher
+Treffer); (5) Cache-Eviction greift host-genau.
+
+**Status:** offen, **kein 1.0-Blocker** — Produktfeature, erst bei konkretem
+Kundenbedarf (erster Custom-Domain-Kunde) scopen; bis dahin trägt die
+Wildcard-Subdomain `*.<basis-domain>` alle Tenants ohne pro-Kunde-Aufwand.
+
 ### mypy aufs Gesamtpaket
 
 **Ziel:** mypy von der Vertragsschicht (`providers/` + `core/config.py`) auf
