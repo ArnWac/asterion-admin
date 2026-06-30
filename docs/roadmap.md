@@ -68,7 +68,7 @@ bereits abgedeckt (R1–R17); die hier gelisteten Punkte schließen die
 | **Sollte** | G10 | XSS-Härtung abschließen (CSP-Nonce / HttpOnly-Cookie) — ex-R14 | mittel | ✅ erledigt |
 | **Sollte** | G11 | Governance-Doku (GOVERNANCE/THREAT_MODEL/ADRs/Berechtigungsmatrix/Shared-Responsibility) | mittel | ✅ erledigt |
 | **Sollte** | G12 | Security-CI-Härtung (Dependency-/Secret-Scan, SBOM, PII-freie Testdaten) | mittel | ✅ erledigt |
-| **Sollte** | G13 | IDOR-/Tenant-Leak-Testsuite ausbauen | mittel | geplant |
+| **Sollte** | G13 | IDOR-/Tenant-Leak-Testsuite ausbauen | mittel | ✅ erledigt |
 | **Sollte** | G19 | Per-Tenant Rate-Limiting / Quotas (Noisy-Neighbor) | mittel | geplant |
 | **Sollte** | G20 | Observability: OpenTelemetry-Tracing + Metriken (Core, optional) | mittel | geplant |
 | **Sollte** | G21 | Passwort-Policy nach NIST 800-63B (inkl. Breach-Check) | klein | geplant |
@@ -350,7 +350,15 @@ bereits abgedeckt (R1–R17); die hier gelisteten Punkte schließen die
 - **Änderung:** Parametrisierte Negativ-Tests pro registrierter Ressource:
   fremder-Tenant-Datensatz → 404; Cross-Tenant-Mutation → 404; Member-Router
   bereits abgedeckt ([member_router.py:152](../asterion/admin/member_router.py)).
-- **Aufwand:** mittel. **Status:** geplant.
+- **Aufwand:** mittel. **Status:** ✅ erledigt (v0.1.43).
+  [tests/postgres/test_idor_crud.py](../tests/postgres/test_idor_crud.py): über
+  GET/PATCH/DELETE parametrisierter Sweep — fremder-Tenant-Datensatz → 404 (nicht
+  403, kein Erfolg) inkl. Nachweis, dass die Zeile unberührt bleibt; nicht
+  existierende ID → 404 je Verb; Positiv-Kontrolle (Eigentümer-Tenant darf
+  mutieren/löschen). Ergänzt den Read-only-Nachweis aus
+  [test_http_tenant_isolation.py](../tests/postgres/test_http_tenant_isolation.py);
+  der generische CRUD-Router macht eine synthetische Ressource repräsentativ für
+  alle tenant-lokalen Ressourcen. Verifiziert durch den grünen PG-CI-Job.
 
 ### G19 — Per-Tenant Rate-Limiting / Quotas (Noisy-Neighbor-Schutz)
 
