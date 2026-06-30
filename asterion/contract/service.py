@@ -540,40 +540,18 @@ def _normalize_dependency(raw: Any, valid_names: set[str]) -> dict[str, Any] | N
     return {"field": ref, "options": norm}
 
 
-def build_field_metadata(
+def _column_field_metas(
     model_admin: ModelAdmin,
     *,
-    registry: FieldRegistry | None = None,
-    field_permissions: dict[str, str] | None = None,
+    registry: FieldRegistry,
+    perms: dict[str, str],
+    readonly_set: set[str],
+    placeholders: dict[str, str],
 ) -> list[FieldMeta]:
-    """Build the list of :class:`FieldMeta` for one admin.
-
-    ``registry`` defaults to a fresh
-    :func:`~asterion.fields.build_default_registry` — sufficient for
-    every column type used in core. Routers that have an
-    extension-augmented registry on the runtime pass it in to expose
-    extension-contributed adapters.
-
-    ``field_permissions`` (Roadmap 2.4) maps column name → ``"read" |
-    "write" | "hidden"`` (the string values of
-    :class:`asterion.admin.policy.FieldPermission`). Columns mapped
-    to ``"hidden"`` are dropped from the output entirely — same shape
-    as a protected field. Other fields receive the value in
-    :attr:`FieldMeta.field_permission`; ``"read"`` also forces
-    ``read_only=True``. ``None`` means "no per-caller policy was run"
-    and every field falls through to the default ``"write"``.
-    """
-    if registry is None:
-        registry = build_default_registry()
-    perms = field_permissions or {}
-
+    """Mapped-column fields, skipping protected and ``"hidden"``-policy columns."""
     mapper: Mapper[Any] = sa_inspect(model_admin.model)
     protected = model_admin.all_protected
-    readonly_set = set(model_admin.readonly_fields)
-    placeholders = dict(getattr(model_admin, "placeholders", {}) or {})
-
     fields: list[FieldMeta] = []
-
     for col in mapper.columns:
         if col.name in protected:
             continue
@@ -589,7 +567,17 @@ def build_field_metadata(
                 placeholders=placeholders,
             )
         )
+    return fields
 
+
+def _calculated_field_metas(
+    model_admin: ModelAdmin,
+    *,
+    perms: dict[str, str],
+    placeholders: dict[str, str],
+) -> list[FieldMeta]:
+    """Calculated (inherently read-only) fields, skipping ``"hidden"`` ones."""
+    fields: list[FieldMeta] = []
     for fname in model_admin.calculated_fields:
         perm = perms.get(fname, "write")
         if perm == "hidden":
@@ -612,43 +600,99 @@ def build_field_metadata(
                 field_permission="read",  # calculated fields are inherently read-only
             )
         )
+    return fields
 
-    # Conditional-visibility rules (Roadmap 5.4). Stamped after the field
-    # list exists so a rule can only reference a field that's actually in
-    # the contract; dangling / malformed rules are dropped.
+
+def _stamp_field_conditions(fields: list[FieldMeta], model_admin: ModelAdmin) -> None:
+    """Conditional-visibility rules (Roadmap 5.4). Stamped after the field list
+    exists so a rule can only reference a field that's actually in the contract;
+    dangling / malformed rules are dropped."""
     conditions = dict(getattr(model_admin, "field_conditions", {}) or {})
-    if conditions:
-        valid_names = {f.name for f in fields}
-        for f in fields:
-            raw = conditions.get(f.name)
-            if raw is None:
-                continue
-            norm = _normalize_condition(raw, valid_names)
-            if norm is not None:
-                f.condition = norm
+    if not conditions:
+        return
+    valid_names = {f.name for f in fields}
+    for f in fields:
+        raw = conditions.get(f.name)
+        if raw is None:
+            continue
+        norm = _normalize_condition(raw, valid_names)
+        if norm is not None:
+            f.condition = norm
 
-    # Per-field widget override (Roadmap 5.4) — replaces the adapter's
-    # widget hint when the admin names a real field.
+
+def _stamp_widget_overrides(fields: list[FieldMeta], model_admin: ModelAdmin) -> None:
+    """Per-field widget override (Roadmap 5.4) — replaces the adapter's widget
+    hint when the admin names a real field."""
     widget_overrides = dict(getattr(model_admin, "widgets", {}) or {})
-    if widget_overrides:
-        for f in fields:
-            override = widget_overrides.get(f.name)
-            if isinstance(override, str) and override:
-                f.widget = override
+    if not widget_overrides:
+        return
+    for f in fields:
+        override = widget_overrides.get(f.name)
+        if isinstance(override, str) and override:
+            f.widget = override
 
-    # Dependent-choice rules (Roadmap 5.4) — stamped after the field list
-    # exists so the controlling field can be validated against it.
+
+def _stamp_field_dependencies(fields: list[FieldMeta], model_admin: ModelAdmin) -> None:
+    """Dependent-choice rules (Roadmap 5.4) — stamped after the field list exists
+    so the controlling field can be validated against it."""
     dependencies = dict(getattr(model_admin, "field_dependencies", {}) or {})
-    if dependencies:
-        valid_names = {f.name for f in fields}
-        for f in fields:
-            raw = dependencies.get(f.name)
-            if raw is None:
-                continue
-            norm = _normalize_dependency(raw, valid_names)
-            if norm is not None:
-                f.dependency = norm
+    if not dependencies:
+        return
+    valid_names = {f.name for f in fields}
+    for f in fields:
+        raw = dependencies.get(f.name)
+        if raw is None:
+            continue
+        norm = _normalize_dependency(raw, valid_names)
+        if norm is not None:
+            f.dependency = norm
 
+
+def build_field_metadata(
+    model_admin: ModelAdmin,
+    *,
+    registry: FieldRegistry | None = None,
+    field_permissions: dict[str, str] | None = None,
+) -> list[FieldMeta]:
+    """Build the list of :class:`FieldMeta` for one admin.
+
+    ``registry`` defaults to a fresh
+    :func:`~asterion.fields.build_default_registry` — sufficient for
+    every column type used in core. Routers that have an
+    extension-augmented registry on the runtime pass it in to expose
+    extension-contributed adapters.
+
+    ``field_permissions`` (Roadmap 2.4) maps column name → ``"read" |
+    "write" | "hidden"`` (the string values of
+    :class:`asterion.admin.policy.FieldPermission`). Columns mapped
+    to ``"hidden"`` are dropped from the output entirely — same shape
+    as a protected field. Other fields receive the value in
+    :attr:`FieldMeta.field_permission`; ``"read"`` also forces
+    ``read_only=True``. ``None`` means "no per-caller policy was run"
+    and every field falls through to the default ``"write"``.
+
+    Assembled in two phases: build the column + calculated fields, then stamp the
+    post-hoc rules (conditions / widget overrides / dependencies) that may only
+    reference fields already present.
+    """
+    if registry is None:
+        registry = build_default_registry()
+    perms = field_permissions or {}
+    readonly_set = set(model_admin.readonly_fields)
+    placeholders = dict(getattr(model_admin, "placeholders", {}) or {})
+
+    fields = _column_field_metas(
+        model_admin,
+        registry=registry,
+        perms=perms,
+        readonly_set=readonly_set,
+        placeholders=placeholders,
+    )
+    fields.extend(_calculated_field_metas(model_admin, perms=perms, placeholders=placeholders))
+
+    _stamp_field_conditions(fields, model_admin)
+    _stamp_widget_overrides(fields, model_admin)
+    _stamp_field_dependencies(fields, model_admin)
     return fields
 
 

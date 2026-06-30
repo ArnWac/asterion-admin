@@ -16,7 +16,24 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
-## [0.1.46] - 2026-07-01
+## [0.1.47] - 2026-07-01
+
+Code-quality pass. No API, contract, or behaviour changes.
+
+### Changed
+- **Decomposed `contract.service.build_field_metadata`** (cyclomatic complexity
+  D-26 → A-4) into focused helpers — `_column_field_metas`,
+  `_calculated_field_metas`, and the `_stamp_*` rule passes. Pure refactor; the
+  emitted `FieldMeta` list is byte-identical (verified by the contract suite).
+
+### Fixed
+- **Flaky CI teardown ("Event loop is closed").** A session-scoped autouse
+  fixture now disposes every still-live `AsyncEngine` at session end while the
+  loop is alive. Tests that build an app via `create_admin(...)` without
+  disposing its `DatabaseManager` left aiosqlite connections to be finalised when
+  the session-scoped event loop was torn down, which on Linux deterministically
+  raised `RuntimeError: Event loop is closed` and failed the otherwise-green
+  sqlite CI job. Test-infrastructure only.
 
 Optional observability — OpenTelemetry tracing + Prometheus metrics (roadmap
 G20). No breaking API changes; off by default; no new runtime dependency.
