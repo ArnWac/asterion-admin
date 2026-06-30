@@ -425,9 +425,7 @@ async def password_reset_request(
                 runtime.db,
                 action=PASSWORD_RESET_REQUEST,
                 changes={"email": payload.email, "issued": False, "reason": "rate_limited"},
-                **request_audit_kwargs(
-                    request, status_code=status.HTTP_429_TOO_MANY_REQUESTS
-                ),
+                **request_audit_kwargs(request, status_code=status.HTTP_429_TOO_MANY_REQUESTS),
             )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

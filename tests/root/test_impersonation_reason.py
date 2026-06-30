@@ -73,7 +73,10 @@ def _make_app(tmp_path, *, require_reason: bool):
 def _superadmin_token(state) -> str:
     su = state["superadmin"]
     return create_access_token(
-        su.id, secret_key=SECRET, algorithm=ALG, expires_minutes=10,
+        su.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=10,
         token_version=su.token_version,
     )
 

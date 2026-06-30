@@ -82,9 +82,7 @@ async def _seed_user(db, *, email, days_deactivated=None, active=True):
 
     factory = async_sessionmaker(db.engine, expire_on_commit=False)
     deactivated_at = (
-        None
-        if days_deactivated is None
-        else datetime.now(UTC) - timedelta(days=days_deactivated)
+        None if days_deactivated is None else datetime.now(UTC) - timedelta(days=days_deactivated)
     )
     async with factory() as session:
         async with session.begin():

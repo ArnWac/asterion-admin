@@ -23,9 +23,7 @@ from asterion.models.base import GUID, GlobalModel
 
 class DataSubjectRequest(GlobalModel):
     __tablename__ = "data_subject_requests"
-    __table_args__ = (
-        Index("ix_dsar_subject_created", "subject_user_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_dsar_subject_created", "subject_user_id", "created_at"),)
 
     #: The data subject the request is about (a ``users.id``). Kept as an
     #: FK-less column for the same reason the audit actor is: an external

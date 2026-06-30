@@ -44,9 +44,7 @@ class Tenant(GlobalModel):
     #: Set when the tenant is offboarded (roadmap G6). ``None`` means the tenant
     #: is live. In ``archive`` mode the row survives as a tombstone with this set
     #: + ``is_active=False`` (slug stays reserved); ``drop`` mode deletes the row.
-    offboarded_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    offboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     language: Mapped[str | None] = mapped_column(String(16), nullable=True)

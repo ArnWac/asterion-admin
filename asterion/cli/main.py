@@ -1234,8 +1234,7 @@ def audit_prune(
         None,
         "--days",
         min=1,
-        help="Delete audit rows older than this many days "
-        "(default: config audit_retention_days).",
+        help="Delete audit rows older than this many days (default: config audit_retention_days).",
     ),
     all_tenants: bool = typer.Option(
         False,
@@ -1325,7 +1324,9 @@ async def _privacy_retention_run(config) -> None:
         )
         anonymized = results.pop("anonymized_users", 0)
         pruned = sum(results.values())
-        typer.echo(f"Retention run complete: pruned {pruned} audit row(s), anonymised {anonymized} user(s).")
+        typer.echo(
+            f"Retention run complete: pruned {pruned} audit row(s), anonymised {anonymized} user(s)."
+        )
         for scope, count in results.items():
             typer.echo(f"  audit[{scope}]: {count}")
     finally:

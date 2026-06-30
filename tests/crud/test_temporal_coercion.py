@@ -48,9 +48,7 @@ def test_casts_iso_strings_for_each_temporal_type():
     }
     coerce_temporal_fields(cleaned, _Shift)
     assert cleaned["employment_start"] == dt.date(2024, 2, 1)
-    assert cleaned["occurred_at"] == dt.datetime(
-        2024, 2, 1, 8, 30, tzinfo=dt.UTC
-    )
+    assert cleaned["occurred_at"] == dt.datetime(2024, 2, 1, 8, 30, tzinfo=dt.UTC)
     assert cleaned["clock_in"] == dt.time(8, 30)
 
 
@@ -58,9 +56,7 @@ def test_accepts_trailing_z_datetime():
     # The shape ``new Date(...).toISOString()`` emits from the admin UI.
     cleaned = {"occurred_at": "2024-02-01T08:30:00Z"}
     coerce_temporal_fields(cleaned, _Shift)
-    assert cleaned["occurred_at"] == dt.datetime(
-        2024, 2, 1, 8, 30, tzinfo=dt.UTC
-    )
+    assert cleaned["occurred_at"] == dt.datetime(2024, 2, 1, 8, 30, tzinfo=dt.UTC)
 
 
 def test_tolerates_datetime_string_in_date_column():

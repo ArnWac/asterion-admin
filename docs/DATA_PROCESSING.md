@@ -83,6 +83,7 @@ deployment.
 | Auditability | Audit trail (`audit_logs` + per-tenant) | Retention schedule; off-box log shipping; restrict DB write to prevent tampering (G16 pending) |
 | Data minimisation | Behavioural suppression (G5); PII redaction (G7) | Classify app PII; don't enable `audit_behavioral_detail` without cause |
 | Restricted support access | Impersonation requires a reason (G9); logged | Review impersonation logs |
+| Supply-chain security | CI secret scan (gitleaks, gating), dependency advisory scan (pip-audit), CycloneDX SBOM artefact, PII-free-fixtures tripwire (G12) | Review the pip-audit report; pin/upgrade deps; archive the SBOM for your release |
 
 ## See also
 

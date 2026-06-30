@@ -230,9 +230,7 @@ def test_user_detail_rejects_normal_user(app_state):
 def test_subject_export_rejects_normal_user(app_state):
     app, state = app_state
     uid = state["user"].id
-    resp = _client(app).get(
-        f"/api/v1/root/users/{uid}/export", headers=_bearer(_user_token(state))
-    )
+    resp = _client(app).get(f"/api/v1/root/users/{uid}/export", headers=_bearer(_user_token(state)))
     assert resp.status_code == 403
 
 
@@ -257,9 +255,11 @@ def test_subject_export_returns_bundle_and_logs_dsar(app_state):
     assert "hashed_password" not in bundle["subject"]
 
     # The export auto-logged a completed 'access' DSAR row.
-    dsar = _client(app).get(
-        f"/api/v1/root/users/{uid}/dsar", headers=_bearer(_superadmin_token(state))
-    ).json()
+    dsar = (
+        _client(app)
+        .get(f"/api/v1/root/users/{uid}/dsar", headers=_bearer(_superadmin_token(state)))
+        .json()
+    )
     assert any(r["request_type"] == "access" and r["status"] == "completed" for r in dsar)
 
 

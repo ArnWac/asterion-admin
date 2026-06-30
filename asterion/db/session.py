@@ -57,9 +57,7 @@ class DatabaseManager:
                 # asyncpg-level knob (authoritative): no server-side prepared
                 # statements when 0, so a pooled connection can switch tenant
                 # search_path without serving a stale cached plan.
-                engine_kwargs["connect_args"] = {
-                    "statement_cache_size": statement_cache_size
-                }
+                engine_kwargs["connect_args"] = {"statement_cache_size": statement_cache_size}
         elif is_sqlite:
             # GlobalModel.metadata declares schema="public" for Postgres.
             # SQLite has no schemas — transparently drop the qualifier.

@@ -79,9 +79,7 @@ def _registry_with_behavioral() -> PIIFieldRegistry:
 
 def test_suppress_behavioral_masks_values_by_default():
     reg = _registry_with_behavioral()
-    out = suppress_behavioral(
-        {"punch_time": "08:59", "note": "ok"}, detail=False, registry=reg
-    )
+    out = suppress_behavioral({"punch_time": "08:59", "note": "ok"}, detail=False, registry=reg)
     assert out["punch_time"] == SUPPRESSED_BEHAVIORAL
     assert out["note"] == "ok"
 

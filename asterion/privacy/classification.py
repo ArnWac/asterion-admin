@@ -86,8 +86,7 @@ class PIIFieldRegistry:
         """
         if self._frozen:
             raise RegistryFrozenError(
-                "PIIFieldRegistry is frozen — contribute fields before "
-                "create_admin finishes setup."
+                "PIIFieldRegistry is frozen — contribute fields before create_admin finishes setup."
             )
         if not isinstance(name, str) or not name:
             raise ValueError(f"PII field name must be a non-empty str, got {name!r}")

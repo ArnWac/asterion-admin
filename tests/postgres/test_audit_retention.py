@@ -54,12 +54,20 @@ async def test_apply_retention_prunes_public_and_each_tenant(pg_schemas, pg_sess
                         Tenant(slug="a", name="A", schema_name=pg_schemas["a"], is_active=True),
                         Tenant(slug="b", name="B", schema_name=pg_schemas["b"], is_active=True),
                         AuditLog(
-                            method="POST", path="/x", status_code=200, action="probe",
-                            created_at=_old(), updated_at=_old(),
+                            method="POST",
+                            path="/x",
+                            status_code=200,
+                            action="probe",
+                            created_at=_old(),
+                            updated_at=_old(),
                         ),
                         AuditLog(
-                            method="POST", path="/y", status_code=200, action="probe",
-                            created_at=_recent(), updated_at=_recent(),
+                            method="POST",
+                            path="/y",
+                            status_code=200,
+                            action="probe",
+                            created_at=_recent(),
+                            updated_at=_recent(),
                         ),
                     ]
                 )
@@ -80,16 +88,12 @@ async def test_apply_retention_prunes_public_and_each_tenant(pg_schemas, pg_sess
 
         # The recent row survives everywhere.
         async with pg_sessionmaker() as session:
-            public_count = (
-                await session.execute(select(func.count(AuditLog.id)))
-            ).scalar_one()
+            public_count = (await session.execute(select(func.count(AuditLog.id)))).scalar_one()
             assert public_count == 1
         for key in ("a", "b"):
             async with pg_sessionmaker() as session:
                 await set_search_path(session, pg_schemas[key])
-                count = (
-                    await session.execute(select(func.count(TenantAuditLog.id)))
-                ).scalar_one()
+                count = (await session.execute(select(func.count(TenantAuditLog.id)))).scalar_one()
                 assert count == 1
     finally:
         await db.dispose()

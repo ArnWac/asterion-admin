@@ -30,10 +30,7 @@ async def _schema_exists(sessionmaker, schema_name: str) -> bool:
     async with sessionmaker() as session:
         return (
             await session.execute(
-                text(
-                    "SELECT 1 FROM information_schema.schemata "
-                    "WHERE schema_name = :s"
-                ),
+                text("SELECT 1 FROM information_schema.schemata WHERE schema_name = :s"),
                 {"s": schema_name},
             )
         ).scalar_one_or_none() is not None
@@ -56,12 +53,18 @@ async def test_offboard_drop_removes_schema_and_public_rows(pg_schemas, pg_sessi
                     [
                         TenantMembership(user_id=user.id, tenant_id=tenant_id),
                         AuditLog(
-                            method="POST", path="/x", status_code=200,
-                            action="probe", tenant_id=tenant_id,
+                            method="POST",
+                            path="/x",
+                            status_code=200,
+                            action="probe",
+                            tenant_id=tenant_id,
                         ),
                         SavedFilter(
-                            user_id=str(user.id), tenant_id=str(tenant_id),
-                            resource="posts", name="mine", payload={},
+                            user_id=str(user.id),
+                            tenant_id=str(tenant_id),
+                            resource="posts",
+                            name="mine",
+                            payload={},
                         ),
                     ]
                 )
@@ -71,9 +74,7 @@ async def test_offboard_drop_removes_schema_and_public_rows(pg_schemas, pg_sessi
             async with session.begin():
                 await set_search_path(session, schema)
                 session.add(
-                    TenantAuditLog(
-                        method="POST", path="/y", status_code=200, action="probe"
-                    )
+                    TenantAuditLog(method="POST", path="/y", status_code=200, action="probe")
                 )
 
         # Export bundle dumps every schema table (incl. the seeded audit row).
@@ -101,10 +102,14 @@ async def test_offboard_drop_removes_schema_and_public_rows(pg_schemas, pg_sessi
             ).scalar_one() == 0
             # The offboard audit row (tenant_id NULL) survives the cleanup.
             offboard_rows = (
-                await session.execute(
-                    select(AuditLog).where(AuditLog.action == "tenant_offboard")
+                (
+                    await session.execute(
+                        select(AuditLog).where(AuditLog.action == "tenant_offboard")
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(offboard_rows) == 1
     finally:
         await db.dispose()
@@ -117,9 +122,7 @@ async def test_offboard_archive_keeps_tombstone_but_drops_schema(pg_schemas, pg_
     try:
         async with pg_sessionmaker() as session:
             async with session.begin():
-                session.add(
-                    Tenant(slug="archpg", name="Arch", schema_name=schema, is_active=True)
-                )
+                session.add(Tenant(slug="archpg", name="Arch", schema_name=schema, is_active=True))
 
         result = await offboard_tenant(db, "archpg", mode="archive")
         assert result["schema_dropped"] is True

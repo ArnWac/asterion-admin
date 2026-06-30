@@ -50,13 +50,19 @@ async def _seed_subject(db: DatabaseManager) -> uuid.UUID:
                 [
                     TenantMembership(user_id=uid, tenant_id=tenant.id),
                     AuditLog(
-                        method="POST", path="/x", status_code=200,
-                        action="crud_update", actor_user_id=uid,
+                        method="POST",
+                        path="/x",
+                        status_code=200,
+                        action="crud_update",
+                        actor_user_id=uid,
                         actor_label="subject@example.com",
                     ),
                     SavedFilter(
-                        user_id=str(uid), tenant_id=str(tenant.id),
-                        resource="posts", name="mine", payload={},
+                        user_id=str(uid),
+                        tenant_id=str(tenant.id),
+                        resource="posts",
+                        name="mine",
+                        payload={},
                     ),
                 ]
             )
@@ -123,5 +129,8 @@ async def test_record_rejects_unknown_status(db):
     uid = await _seed_subject(db)
     with pytest.raises(ValueError, match="Unknown status"):
         await record_subject_request(
-            db, subject_user_id=uid, request_type="access", status="weird"  # type: ignore[arg-type]
+            db,
+            subject_user_id=uid,
+            request_type="access",
+            status="weird",  # type: ignore[arg-type]
         )

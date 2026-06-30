@@ -58,9 +58,7 @@ def _membership_email_stmt():
     label resolver and FK-options picker; each call site adds its own
     ``WHERE`` / ordering so the join definition lives in one place.
     """
-    return select(TenantMembership.id, User.email).join(
-        User, User.id == TenantMembership.user_id
-    )
+    return select(TenantMembership.id, User.email).join(User, User.id == TenantMembership.user_id)
 
 
 class TenantRolePermissionInline(InlineAdmin):
