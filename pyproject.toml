@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asterion-admin"
-version = "0.1.45"
+version = "0.1.46"
 description = "FastAPI admin framework with built-in UI, JWT auth, RBAC, and multi-tenancy"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -85,6 +85,16 @@ email-ses = ["boto3>=1.34"]
 # locally to reproduce the scans.
 security = ["pip-audit>=2.7", "cyclonedx-bom>=4.0"]
 
+# Observability (G20): per-request OpenTelemetry span + Prometheus /metrics.
+# Both are optional — core degrades to a no-op without them. opentelemetry-api
+# is enough to create spans (the operator wires an SDK + exporter); the sdk is
+# included so a deployment can configure export out of the box.
+observability = [
+    "prometheus-client>=0.20",
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+]
+
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
@@ -101,6 +111,10 @@ dev = [
     "ruff>=0.15,<0.16",
     "mypy>=1.11",
     "build>=1.2.0",
+    # Observability extra (G20) — so CI exercises the active metrics/tracing path.
+    "prometheus-client>=0.20",
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
     # Static analysis aids for local cleanup passes (not CI gates):
     # vulture finds dead code, radon reports cyclomatic complexity /
     # maintainability. See docs/roadmap.md.

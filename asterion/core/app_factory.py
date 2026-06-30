@@ -13,6 +13,7 @@ from asterion.core.config import CoreAdminConfig
 from asterion.core.errors import register_error_handlers
 from asterion.core.installers import install_middleware, install_routes
 from asterion.core.logging import configure_logging
+from asterion.core.observability import build_observability
 from asterion.core.runtime import AdminRuntime, ProviderSet
 from asterion.db.session import DatabaseManager
 from asterion.extensions import AdminExtension, ExtensionContext
@@ -144,6 +145,10 @@ def create_admin(
         tenant_rate_limiter=InMemoryLoginRateLimiter(
             max_failures=config.tenant_rate_limit_max,
             window_seconds=config.tenant_rate_limit_window_seconds,
+        ),
+        observability=build_observability(
+            enabled=config.observability_enabled,
+            service_name=config.app_title,
         ),
     )
 

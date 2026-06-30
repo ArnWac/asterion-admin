@@ -104,6 +104,10 @@ class AdminRuntime:
     #: the ``rate_limit_redis`` extension) for multi-worker deployments. Only
     #: consulted when ``CoreAdminConfig.tenant_rate_limit_enabled``.
     tenant_rate_limiter: Any = None
+    #: Optional observability backend (G20) — per-request span + Prometheus
+    #: metrics. ``None`` unless ``CoreAdminConfig.observability_enabled``; a no-op
+    #: for whichever of opentelemetry-api / prometheus-client isn't installed.
+    observability: Any = None
     #: Typed-notifier registry (Roadmap P4.5). Apps and extensions
     #: register implementations keyed by their Protocol type; publishers
     #: look them up with :meth:`NotifierRegistry.get` and treat ``None``

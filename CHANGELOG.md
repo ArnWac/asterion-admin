@@ -16,6 +16,25 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.46] - 2026-07-01
+
+Optional observability — OpenTelemetry tracing + Prometheus metrics (roadmap
+G20). No breaking API changes; off by default; no new runtime dependency.
+
+### Added
+- **Observability (G20).** New `asterion/core/observability.py`: when
+  `observability_enabled`, an `ObservabilityMiddleware` opens an OpenTelemetry
+  span per request (`http.*` / `tenant.slug` / `actor.user_id` attributes) and
+  records a Prometheus request counter + duration histogram (labelled
+  `method`/`route`/`status` — deliberately **not** by tenant, to bound
+  cardinality), exposed at `/metrics` (`metrics_path`). Both backends are
+  **optional** (`[observability]` extra: `prometheus-client`,
+  `opentelemetry-api/sdk`); enabling without them is a graceful no-op, and
+  `/metrics` returns `503` when the Prometheus backend is absent. Each app owns a
+  private `CollectorRegistry`, so multiple apps in one process don't collide.
+- New config `observability_enabled` (default **False**) and `metrics_path`
+  (default `/metrics`).
+
 ## [0.1.45] - 2026-06-30
 
 Per-tenant request rate limiting (roadmap G19, noisy-neighbour protection). No

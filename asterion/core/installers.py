@@ -53,6 +53,13 @@ def install_middleware(
 
         app.add_middleware(TenantRateLimitMiddleware)
 
+    # Observability (G20): per-request span + metrics. Registered only when
+    # enabled; inert when neither optional backend is installed.
+    if config.observability_enabled:
+        from asterion.core.observability import ObservabilityMiddleware
+
+        app.add_middleware(ObservabilityMiddleware)
+
     # CORS only if origins are configured. Validate already rejected the
     # unsafe ``["*"]`` + credentials=True combination.
     if config.cors_origins:
@@ -100,6 +107,13 @@ def install_routes(
     # Liveness + readiness probes — no auth, no prefix, no tags so they
     # don't pollute the OpenAPI schema.
     app.include_router(health_router)
+
+    # Prometheus metrics endpoint (G20) — only when observability is enabled.
+    # Unauthenticated like the health probes; restrict at the network layer.
+    if config.observability_enabled:
+        from asterion.core.observability import build_metrics_router
+
+        app.include_router(build_metrics_router(config.metrics_path))
 
     app.include_router(
         auth_router,

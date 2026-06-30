@@ -70,7 +70,7 @@ bereits abgedeckt (R1–R17); die hier gelisteten Punkte schließen die
 | **Sollte** | G12 | Security-CI-Härtung (Dependency-/Secret-Scan, SBOM, PII-freie Testdaten) | mittel | ✅ erledigt |
 | **Sollte** | G13 | IDOR-/Tenant-Leak-Testsuite ausbauen | mittel | ✅ erledigt |
 | **Sollte** | G19 | Per-Tenant Rate-Limiting / Quotas (Noisy-Neighbor) | mittel | ✅ erledigt |
-| **Sollte** | G20 | Observability: OpenTelemetry-Tracing + Metriken (Core, optional) | mittel | geplant |
+| **Sollte** | G20 | Observability: OpenTelemetry-Tracing + Metriken (Core, optional) | mittel | ✅ erledigt |
 | **Sollte** | G21 | Passwort-Policy nach NIST 800-63B (inkl. Breach-Check) | klein | ✅ erledigt |
 | **Kann** | G23 | WebAuthn/Passkey-Authentifizierung (Extension, phishing-resistent) | groß | geplant |
 | **Später** | G14 | Globale RBAC / Support-Rollen | groß | geplant (Design s. u.) |
@@ -411,7 +411,17 @@ bereits abgedeckt (R1–R17); die hier gelisteten Punkte schließen die
 - **Betroffene Dateien:** [core/middleware.py](../asterion/core/middleware.py);
   neu z. B. `asterion/core/observability.py`;
   [core/config.py](../asterion/core/config.py) (Schalter).
-- **Aufwand:** mittel. **Status:** geplant.
+- **Aufwand:** mittel. **Status:** ✅ erledigt (v0.1.46). Neu
+  [core/observability.py](../asterion/core/observability.py): `Observability`
+  (eigene Prometheus-`CollectorRegistry` pro App → keine Global-Registry-Kollision),
+  `ObservabilityMiddleware` (Span pro Request mit `http.*`/`tenant.slug`/
+  `actor.user_id`-Attributen + Request-Counter & Dauer-Histogramm, Labels
+  `method`/`route`/`status` — **kein** Tenant-Label wg. Kardinalität), `/metrics`
+  (Prometheus-Exposition; `503` wenn Backend fehlt). Beide Backends optionale Deps
+  (`[observability]`-Extra); ohne sie sauberer No-op. Config
+  `observability_enabled` (Default aus) / `metrics_path`. Tests:
+  [tests/operations/test_observability.py](../tests/operations/test_observability.py)
+  (No-op-Pfad ohne Deps + aktiver Pfad mit Deps, `skipif`).
 
 ### G21 — Passwort-Policy nach NIST 800-63B (inkl. Breach-Check)
 

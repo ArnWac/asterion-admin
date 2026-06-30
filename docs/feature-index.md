@@ -156,6 +156,7 @@ can_update_object / can_delete_object / field_permission`. `FieldPermission`:
 | `create-superadmin` / `tenant create` / `service-account` | Bootstrap helpers. | — |
 | `doctor` | Verify config + DB connectivity. | Run in the deploy pipeline. |
 | Health | `/healthz` (no DB) vs `/readyz` (`SELECT 1`). | Liveness vs readiness. |
+| Observability (G20) | Opt-in OTel span + Prometheus `/metrics`. | `[observability]` extra; no-op without it; `/metrics` unauthenticated — restrict at network. |
 | Multi-worker | Per-process pool + rate limiter + tenant cache. | Wire a shared rate-limit backend for prod. |
 
 ## Architecture — [architecture.md](architecture.md)

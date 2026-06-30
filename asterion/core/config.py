@@ -192,6 +192,14 @@ class CoreAdminConfig:
     #: Sliding-window length (seconds) for the per-tenant request budget.
     tenant_rate_limit_window_seconds: int = 60
 
+    #: Optional observability (G20): per-request OpenTelemetry span + Prometheus
+    #: metrics at :attr:`metrics_path`. **Off by default.** Both backends are
+    #: optional deps (``opentelemetry-api`` / ``prometheus-client``, the
+    #: ``[observability]`` extra) — enabling without them is a graceful no-op.
+    observability_enabled: bool = False
+    #: Path the Prometheus exposition is served at when observability is enabled.
+    metrics_path: str = "/metrics"
+
     #: Filesystem root for :class:`LocalFileStorage` (Roadmap P4).
     #: When set, ``create_admin`` auto-wires a ``LocalFileStorage`` at
     #: this path as ``runtime.storage`` so :class:`FileField` works
@@ -433,6 +441,11 @@ class CoreAdminConfig:
                 "ASTERION_TENANT_RATE_LIMIT_WINDOW_SECONDS",
                 60,
             ),
+            observability_enabled=_env_bool(
+                "ASTERION_OBSERVABILITY_ENABLED",
+                False,
+            ),
+            metrics_path=os.getenv("ASTERION_METRICS_PATH") or "/metrics",
             enable_builtin_ui=_env_bool(
                 "ASTERION_ENABLE_BUILTIN_UI",
                 True,
@@ -706,6 +719,7 @@ class CoreAdminConfig:
             "password_min_length": self.password_min_length,
             "password_hibp_check": self.password_hibp_check,
             "tenant_rate_limit_enabled": self.tenant_rate_limit_enabled,
+            "observability_enabled": self.observability_enabled,
             "enable_builtin_ui": self.enable_builtin_ui,
             "enable_builtin_admins": self.enable_builtin_admins,
             "enable_multi_tenant": self.enable_multi_tenant,
