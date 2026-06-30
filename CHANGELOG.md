@@ -16,6 +16,21 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.43] - 2026-06-30
+
+Test-only — systematic IDOR / cross-tenant coverage (roadmap G13). No runtime or
+API changes.
+
+### Added
+- **IDOR / cross-tenant-mutation test sweep.** New
+  `tests/postgres/test_idor_crud.py` parametrises GET/PATCH/DELETE against a
+  foreign tenant's record id and asserts **404 for every verb** (not 403, not a
+  silent success) plus that the row stays untouched; a nonexistent id likewise
+  404s per verb, and a positive control proves the owning tenant *can*
+  mutate/delete its own row. Extends the read-only proof in
+  `test_http_tenant_isolation.py` to the full CRUD surface; the generic CRUD
+  router makes one synthetic tenant-local resource representative.
+
 ## [0.1.42] - 2026-06-30
 
 Security-CI hardening (roadmap G12). No runtime/API changes.
