@@ -138,9 +138,7 @@ def upgrade_tenant_schema(
         command.upgrade(app, "head")
 
 
-def exclude_framework_tenant_tables(
-    object_, name, type_, reflected, compare_to
-) -> bool:
+def exclude_framework_tenant_tables(object_, name, type_, reflected, compare_to) -> bool:
     """Alembic ``include_object`` filter for a downstream app's tenant ``env.py``.
 
     Returns ``False`` for asterion-owned tenant tables (:data:`FRAMEWORK_TENANT_TABLES`)

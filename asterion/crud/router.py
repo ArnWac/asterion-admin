@@ -63,9 +63,7 @@ def _require_resource_permission(
     non-superadmin even inside a tenant where an ``admin.*`` grant would
     otherwise match the key — closing a cross-tenant read of a public table.
     """
-    if getattr(admin_class, "superadmin_only", False) and not getattr(
-        ctx, "is_superadmin", False
-    ):
+    if getattr(admin_class, "superadmin_only", False) and not getattr(ctx, "is_superadmin", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Superadmin privileges required.",
@@ -269,9 +267,7 @@ async def _fk_options_impl(
     # membership_id → member email) that the generic target-table query can't
     # express. It also covers columns with no DB-level foreign key, so it runs
     # before the FK-constraint check below.
-    custom = await admin_class.resolve_fk_options(
-        field, session=session, ctx=ctx, q=q, limit=limit
-    )
+    custom = await admin_class.resolve_fk_options(field, session=session, ctx=ctx, q=q, limit=limit)
     if custom is not None:
         return {"options": list(custom)[:limit]}
 

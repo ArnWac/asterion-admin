@@ -145,8 +145,7 @@ async def test_membership_role_fk_options_role_id_falls_back(seeded):
     factory, _ = seeded
     async with factory() as session:
         assert (
-            await TenantMembershipRoleAdmin().resolve_fk_options("role_id", session=session)
-            is None
+            await TenantMembershipRoleAdmin().resolve_fk_options("role_id", session=session) is None
         )
 
 

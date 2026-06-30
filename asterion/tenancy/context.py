@@ -15,9 +15,7 @@ if TYPE_CHECKING:
 # transaction; ``independent_tenant_session`` reads it to scope a *separate*
 # transaction to the same tenant. Set once per request and reset on teardown,
 # so it never leaks onto the next request reusing the same worker task.
-current_tenant_schema: ContextVar[str | None] = ContextVar(
-    "current_tenant_schema", default=None
-)
+current_tenant_schema: ContextVar[str | None] = ContextVar("current_tenant_schema", default=None)
 
 
 @dataclass

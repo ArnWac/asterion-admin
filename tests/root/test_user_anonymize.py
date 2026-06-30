@@ -92,7 +92,10 @@ def _bearer(token: str) -> dict:
 def _superadmin_token(state) -> str:
     su = state["superadmin"]
     return create_access_token(
-        su.id, secret_key=SECRET, algorithm=ALG, expires_minutes=10,
+        su.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=10,
         token_version=su.token_version,
     )
 
@@ -100,7 +103,10 @@ def _superadmin_token(state) -> str:
 def _user_token(state) -> str:
     u = state["alice"]
     return create_access_token(
-        u.id, secret_key=SECRET, algorithm=ALG, expires_minutes=10,
+        u.id,
+        secret_key=SECRET,
+        algorithm=ALG,
+        expires_minutes=10,
         token_version=u.token_version,
     )
 
@@ -170,12 +176,8 @@ def test_anonymize_superadmin_succeeds_and_tombstones(app_state):
     async def _inspect():
         factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
         async with factory() as session:
-            user = (
-                await session.execute(select(User).where(User.id == alice_id))
-            ).scalar_one()
-            audit_rows = (
-                (await session.execute(select(AuditLog))).scalars().all()
-            )
+            user = (await session.execute(select(User).where(User.id == alice_id))).scalar_one()
+            audit_rows = (await session.execute(select(AuditLog))).scalars().all()
             return user, audit_rows
 
     user, audit_rows = asyncio.run(_inspect())

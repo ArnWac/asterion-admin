@@ -16,6 +16,37 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.42] - 2026-06-30
+
+Security-CI hardening (roadmap G12). No runtime/API changes.
+
+### Security
+- **Secret scanning in CI (gitleaks).** New `secret-scan` job + `.gitleaks.toml`
+  (extends the default ruleset; allowlists the synthetic fixtures in `tests/` /
+  `examples/` and `.env.example` placeholders). The wheel build now gates on it.
+- **Dependency advisory scan (pip-audit).** New `security-audit` CI job runs
+  `pip-audit` over the installed dependency tree. **Informational** (does not gate
+  the build): the tree carries transitive advisories that are routinely unfixable
+  without an upstream release, so a hard gate would block unrelated PRs — review
+  the report and bump pins / add a triaged `--ignore-vuln`.
+- **CycloneDX SBOM.** The `security-audit` job emits `sbom.json`
+  (`cyclonedx-py environment`) and uploads it as a build artifact for supply-chain
+  inventory.
+- **PII-free fixtures tripwire.** New `tests/security/test_pii_free_fixtures.py`
+  scans the test + example trees and fails if any e-mail uses a real consumer
+  mail provider (gmail/web.de/…) — catches a real person's address pasted into a
+  fixture, with near-zero false positives (synthetic hosts like `x.com` are fine).
+
+### Added
+- New `[security]` optional-dependency group (`pip-audit`, `cyclonedx-bom`) for
+  reproducing the CI scans locally.
+
+### Changed
+- **Repo formatted with the pinned ruff (0.15).** 29 files were last formatted by
+  an older ruff; ruff 0.15 (the `>=0.15,<0.16` pin) made different wrapping
+  choices, so `ruff format --check .` (the CI lint gate) was failing. Normalised
+  the whole tree — whitespace-only, no behaviour change — so the gate is green.
+
 ## [0.1.41] - 2026-06-30
 
 Second wave of the roadmap's privacy G-block — DSGVO data-subject erasure and

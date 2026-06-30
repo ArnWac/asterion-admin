@@ -1,0 +1,31 @@
+# gitleaks configuration (G12 — secret scanning in CI).
+#
+# Extends the built-in ruleset and allowlists this repo's *synthetic* secrets:
+# the test/example suites are full of deliberately fake keys, tokens and
+# passwords (e.g. `secret_key="test-..."`, `hash_password("hunter2-strong")`),
+# and `.env.example` ships placeholder values. Allowlisting those keeps the scan
+# focused on the real leak surface — application code, workflows and config —
+# where an accidentally committed credential would actually live.
+
+title = "asterion gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic fixtures + documented placeholders are not real credentials."
+# Path-based: the test/example trees only ever hold fabricated secrets, and the
+# .env template ships placeholders by design.
+paths = [
+    '''^tests/''',
+    '''^examples/''',
+    '''^\.env\.example$''',
+]
+# Regex-based: belt-and-braces for the obvious synthetic patterns, in case one
+# appears outside the allowlisted paths (e.g. a docs snippet).
+regexes = [
+    '''test-[a-z0-9-]*(secret|key)''',
+    '''replace-with-[a-z0-9+-]*''',
+    '''hunter2[a-z0-9-]*''',
+    '''change-?me''',
+]

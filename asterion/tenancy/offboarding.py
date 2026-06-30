@@ -190,9 +190,7 @@ async def _delete_public_rows(session: AsyncSession, tenant: Tenant) -> dict[str
             delete(TenantMembership).where(TenantMembership.tenant_id == tenant_id)
         )
     )
-    audit = _count(
-        await session.execute(delete(AuditLog).where(AuditLog.tenant_id == tenant_id))
-    )
+    audit = _count(await session.execute(delete(AuditLog).where(AuditLog.tenant_id == tenant_id)))
     impersonations = _count(
         await session.execute(
             delete(ImpersonationLog).where(ImpersonationLog.tenant_id == tenant_id)
@@ -200,9 +198,7 @@ async def _delete_public_rows(session: AsyncSession, tenant: Tenant) -> dict[str
     )
     # SavedFilter.tenant_id is the stringified tenant UUID (see saved_filter_router).
     saved_filters = _count(
-        await session.execute(
-            delete(SavedFilter).where(SavedFilter.tenant_id == str(tenant_id))
-        )
+        await session.execute(delete(SavedFilter).where(SavedFilter.tenant_id == str(tenant_id)))
     )
     return {
         "memberships": memberships,

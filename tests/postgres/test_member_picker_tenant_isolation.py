@@ -39,14 +39,10 @@ async def two_tenants_with_members(pg_schemas, pg_sessionmaker):
             for key in ("a", "b"):
                 email = f"{key}@example.com"
                 user = User(email=email, hashed_password="x", is_active=True)
-                tenant = Tenant(
-                    slug=f"tn-{key}", name=key.upper(), schema_name=pg_schemas[key]
-                )
+                tenant = Tenant(slug=f"tn-{key}", name=key.upper(), schema_name=pg_schemas[key])
                 session.add_all([user, tenant])
                 await session.flush()
-                session.add(
-                    TenantMembership(user_id=user.id, tenant_id=tenant.id, is_active=True)
-                )
+                session.add(TenantMembership(user_id=user.id, tenant_id=tenant.id, is_active=True))
                 seeded[key] = (str(tenant.id), email)
     return seeded
 
@@ -60,9 +56,7 @@ def _ctx(tenant_id: str, slug: str) -> AdminContext:
 
 
 @pytest.mark.asyncio
-async def test_picker_only_offers_active_tenant_members(
-    two_tenants_with_members, pg_sessionmaker
-):
+async def test_picker_only_offers_active_tenant_members(two_tenants_with_members, pg_sessionmaker):
     a_tenant_id, a_email = two_tenants_with_members["a"]
     _, b_email = two_tenants_with_members["b"]
 

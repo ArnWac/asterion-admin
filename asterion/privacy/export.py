@@ -93,41 +93,61 @@ async def export_subject(db: DatabaseManager, subject_user_id: uuid.UUID) -> dic
             raise SubjectNotFoundError(f"No user with id {subject_user_id}.")
 
         memberships = (
-            await session.execute(
-                select(TenantMembership).where(TenantMembership.user_id == subject_user_id)
-            )
-        ).scalars().all()
-        audit_actions = (
-            await session.execute(
-                select(AuditLog)
-                .where(AuditLog.actor_user_id == subject_user_id)
-                .order_by(AuditLog.created_at)
-            )
-        ).scalars().all()
-        impersonations = (
-            await session.execute(
-                select(ImpersonationLog)
-                .where(
-                    or_(
-                        ImpersonationLog.target_user_id == subject_user_id,
-                        ImpersonationLog.superadmin_id == subject_user_id,
-                    )
+            (
+                await session.execute(
+                    select(TenantMembership).where(TenantMembership.user_id == subject_user_id)
                 )
-                .order_by(ImpersonationLog.created_at)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
+        audit_actions = (
+            (
+                await session.execute(
+                    select(AuditLog)
+                    .where(AuditLog.actor_user_id == subject_user_id)
+                    .order_by(AuditLog.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        impersonations = (
+            (
+                await session.execute(
+                    select(ImpersonationLog)
+                    .where(
+                        or_(
+                            ImpersonationLog.target_user_id == subject_user_id,
+                            ImpersonationLog.superadmin_id == subject_user_id,
+                        )
+                    )
+                    .order_by(ImpersonationLog.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
         saved_filters = (
-            await session.execute(
-                select(SavedFilter).where(SavedFilter.user_id == str(subject_user_id))
+            (
+                await session.execute(
+                    select(SavedFilter).where(SavedFilter.user_id == str(subject_user_id))
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         requests = (
-            await session.execute(
-                select(DataSubjectRequest)
-                .where(DataSubjectRequest.subject_user_id == subject_user_id)
-                .order_by(DataSubjectRequest.created_at)
+            (
+                await session.execute(
+                    select(DataSubjectRequest)
+                    .where(DataSubjectRequest.subject_user_id == subject_user_id)
+                    .order_by(DataSubjectRequest.created_at)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     return {
         "generated_at": datetime.now(UTC).isoformat(),
@@ -160,7 +180,9 @@ async def record_subject_request(
     ``ValueError`` for an unknown ``request_type`` / ``status``.
     """
     if request_type not in _REQUEST_TYPES:
-        raise ValueError(f"Unknown request_type {request_type!r}; expected one of {_REQUEST_TYPES}.")
+        raise ValueError(
+            f"Unknown request_type {request_type!r}; expected one of {_REQUEST_TYPES}."
+        )
     if status not in _REQUEST_STATUSES:
         raise ValueError(f"Unknown status {status!r}; expected one of {_REQUEST_STATUSES}.")
 
@@ -184,10 +206,14 @@ async def list_subject_requests(
     """Return the DSAR log for ``subject_user_id``, oldest first."""
     async with db.session() as session:
         rows = (
-            await session.execute(
-                select(DataSubjectRequest)
-                .where(DataSubjectRequest.subject_user_id == subject_user_id)
-                .order_by(DataSubjectRequest.created_at)
+            (
+                await session.execute(
+                    select(DataSubjectRequest)
+                    .where(DataSubjectRequest.subject_user_id == subject_user_id)
+                    .order_by(DataSubjectRequest.created_at)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     return [_row_to_dict(r) for r in rows]

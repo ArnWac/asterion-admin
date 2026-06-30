@@ -278,9 +278,7 @@ async def export_records(
                 "search": search,
                 "selected_ids": len(ids) if ids else 0,
                 "filters": {
-                    k: v
-                    for k, v in request.query_params.multi_items()
-                    if k.startswith("filter_")
+                    k: v for k, v in request.query_params.multi_items() if k.startswith("filter_")
                 },
             },
             **request_audit_kwargs(request, status_code=200),

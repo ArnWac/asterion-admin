@@ -47,9 +47,7 @@ async def test_sqlite_degrades_to_plain_independent_transaction(db):
     token = current_tenant_schema.set("tenant_demo")
     try:
         async with independent_tenant_session(db) as session:
-            session.add(
-                TenantRole(name="demo", description="demo", is_system=False)
-            )
+            session.add(TenantRole(name="demo", description="demo", is_system=False))
     finally:
         current_tenant_schema.reset(token)
 

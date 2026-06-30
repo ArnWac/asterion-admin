@@ -135,9 +135,7 @@ def test_update_only_contract_hides_create_and_delete_keeps_update():
 
 
 def test_read_only_contract_zeroes_all_writes():
-    contract = build_model_contract(
-        ImpersonationLogAdmin(), permissions=frozenset({"admin.*"})
-    )
+    contract = build_model_contract(ImpersonationLogAdmin(), permissions=frozenset({"admin.*"}))
     assert contract.capabilities.create is False
     assert contract.capabilities.update is False
     assert contract.capabilities.delete is False

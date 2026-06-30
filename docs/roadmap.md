@@ -67,7 +67,7 @@ bereits abgedeckt (R1–R17); die hier gelisteten Punkte schließen die
 | **Sollte** | G9 | Impersonation-`reason` + Governance-Trail | klein | ✅ erledigt |
 | **Sollte** | G10 | XSS-Härtung abschließen (CSP-Nonce / HttpOnly-Cookie) — ex-R14 | mittel | ✅ erledigt |
 | **Sollte** | G11 | Governance-Doku (GOVERNANCE/THREAT_MODEL/ADRs/Berechtigungsmatrix/Shared-Responsibility) | mittel | ✅ erledigt |
-| **Sollte** | G12 | Security-CI-Härtung (Dependency-/Secret-Scan, SBOM, PII-freie Testdaten) | mittel | geplant |
+| **Sollte** | G12 | Security-CI-Härtung (Dependency-/Secret-Scan, SBOM, PII-freie Testdaten) | mittel | ✅ erledigt |
 | **Sollte** | G13 | IDOR-/Tenant-Leak-Testsuite ausbauen | mittel | geplant |
 | **Sollte** | G19 | Per-Tenant Rate-Limiting / Quotas (Noisy-Neighbor) | mittel | geplant |
 | **Sollte** | G20 | Observability: OpenTelemetry-Tracing + Metriken (Core, optional) | mittel | geplant |
@@ -333,7 +333,14 @@ bereits abgedeckt (R1–R17); die hier gelisteten Punkte schließen die
   `pip-audit` (Dependency-Scan), `gitleaks`/`trufflehog` (Secret-Scan) und
   SBOM-Erzeugung (`cyclonedx`) erweitern; Tripwire-Test, dass Fixtures keine
   realen PII-Muster enthalten.
-- **Aufwand:** mittel. **Status:** geplant.
+- **Aufwand:** mittel. **Status:** ✅ erledigt (v0.1.42). CI-Jobs `secret-scan`
+  (gitleaks, **gatend**, mit [.gitleaks.toml](../.gitleaks.toml)-Allowlist für
+  synthetische Fixtures) und `security-audit` (pip-audit **informativ** +
+  CycloneDX-SBOM als Artefakt). Begründung informativ statt gatend: der Tree trägt
+  transitive Advisories, die ohne Upstream-Release nicht fixbar sind — ein harter
+  Gate würde fremde PRs blockieren. Tripwire:
+  [tests/security/test_pii_free_fixtures.py](../tests/security/test_pii_free_fixtures.py)
+  (E-Mail an echtem Consumer-Provider → Fail). Neue `[security]`-Extra.
 
 ### G13 — IDOR-/Tenant-Leak-Testsuite ausbauen
 

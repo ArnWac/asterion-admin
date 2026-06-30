@@ -112,9 +112,7 @@ async def test_offboard_archive_keeps_tombstone_row(db):
 
     factory = async_sessionmaker(db.engine, expire_on_commit=False)
     async with factory() as session:
-        tenant = (
-            await session.execute(select(Tenant).where(Tenant.slug == "acme"))
-        ).scalar_one()
+        tenant = (await session.execute(select(Tenant).where(Tenant.slug == "acme"))).scalar_one()
         assert tenant.is_active is False
         assert tenant.offboarded_at is not None
         # Public child rows are gone.
@@ -142,8 +140,10 @@ async def test_offboard_writes_audit_row(db):
     factory = async_sessionmaker(db.engine, expire_on_commit=False)
     async with factory() as session:
         rows = (
-            await session.execute(select(AuditLog).where(AuditLog.action == TENANT_OFFBOARD))
-        ).scalars().all()
+            (await session.execute(select(AuditLog).where(AuditLog.action == TENANT_OFFBOARD)))
+            .scalars()
+            .all()
+        )
     assert len(rows) == 1
     changes = rows[0].changes
     assert changes["slug"] == "acme"

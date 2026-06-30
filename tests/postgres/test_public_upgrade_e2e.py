@@ -47,7 +47,9 @@ def _shared_head() -> str:
 
 async def _exec(url: str, sql: str, autocommit: bool = False):
     """Run a statement and return scalar rows. AUTOCOMMIT for CREATE/DROP DATABASE."""
-    engine = create_async_engine(url, isolation_level="AUTOCOMMIT" if autocommit else "READ COMMITTED")
+    engine = create_async_engine(
+        url, isolation_level="AUTOCOMMIT" if autocommit else "READ COMMITTED"
+    )
     try:
         async with engine.connect() as conn:
             result = await conn.execute(text(sql))
@@ -63,8 +65,7 @@ def _table_names(url: str, schema: str) -> set[str]:
     rows = asyncio.run(
         _exec(
             url,
-            "SELECT table_name FROM information_schema.tables "
-            f"WHERE table_schema = '{schema}'",
+            f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema}'",
         )
     )
     return set(rows or [])
@@ -87,15 +88,13 @@ def test_fresh_public_upgrade_then_tenant_provisioning(monkeypatch):
         assert result.exit_code == 0, result.output
 
         public_tables = _table_names(fresh_url, "public")
-        assert {"users", "tenants", "audit_logs", "revoked_tokens"}.issubset(
+        assert {"users", "tenants", "audit_logs", "revoked_tokens"}.issubset(public_tables), (
             public_tables
-        ), public_tables
+        )
 
         # The version actually persisted (transaction committed, not rolled back)
         # and matches head.
-        version = asyncio.run(
-            _exec(fresh_url, "SELECT version_num FROM public.alembic_version")
-        )
+        version = asyncio.run(_exec(fresh_url, "SELECT version_num FROM public.alembic_version"))
         assert version == [_shared_head()], version
 
         # 2. tenant create now has public.tenants to write to, and provisions the

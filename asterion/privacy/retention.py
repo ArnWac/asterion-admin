@@ -55,9 +55,7 @@ async def prune_tenant_audit(session: AsyncSession, *, cutoff: datetime) -> int:
     return await _prune(session, TenantAuditLog, cutoff)
 
 
-async def _anonymize_expired_users(
-    db: DatabaseManager, *, cutoff: datetime
-) -> list[uuid.UUID]:
+async def _anonymize_expired_users(db: DatabaseManager, *, cutoff: datetime) -> list[uuid.UUID]:
     """Anonymise every still-PII user whose ``deactivated_at`` is past ``cutoff``.
 
     Tombstones the user row + their **public** audit-actor PII; returns the ids
@@ -69,15 +67,19 @@ async def _anonymize_expired_users(
     async with db.session() as session:
         async with session.begin():
             candidates = (
-                await session.execute(
-                    select(User).where(
-                        User.is_active.is_(False),
-                        User.deactivated_at.is_not(None),
-                        User.deactivated_at < cutoff,
-                        User.email.notlike(f"%@{ANONYMIZED_EMAIL_DOMAIN}"),
+                (
+                    await session.execute(
+                        select(User).where(
+                            User.is_active.is_(False),
+                            User.deactivated_at.is_not(None),
+                            User.deactivated_at < cutoff,
+                            User.email.notlike(f"%@{ANONYMIZED_EMAIL_DOMAIN}"),
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for user in candidates:
                 uid = user.id
                 anonymize_user(user)
@@ -127,8 +129,7 @@ async def apply_retention(
 
     async with db.session() as session:
         tenants = [
-            (t.slug, t.schema_name)
-            for t in (await session.execute(select(Tenant))).scalars().all()
+            (t.slug, t.schema_name) for t in (await session.execute(select(Tenant))).scalars().all()
         ]
 
     for slug, schema_name in tenants:
