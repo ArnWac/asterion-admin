@@ -477,10 +477,17 @@ async def password_reset_confirm(
     invalidated. Returns 400 for an invalid / expired / already-used
     token without revealing which.
     """
-    config = request.app.state.asterion.config
+    runtime = request.app.state.asterion
+    config = runtime.config
 
+    # Pluggable policy (G21): length + opt-in HIBP breach check. Falls back to
+    # the length-only check if a runtime was built without a policy.
+    policy = getattr(runtime, "password_policy", None)
     try:
-        validate_password_strength(payload.new_password, min_length=config.password_min_length)
+        if policy is not None:
+            await policy.validate(payload.new_password)
+        else:
+            validate_password_strength(payload.new_password, min_length=config.password_min_length)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

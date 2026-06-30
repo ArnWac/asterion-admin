@@ -16,6 +16,23 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.44] - 2026-06-30
+
+Pluggable password policy with opt-in breach check (roadmap G21, NIST SP
+800-63B). No breaking API changes.
+
+### Added
+- **Password policy (G21).** New `asterion/auth/password_policy.py`: a
+  `PasswordPolicy` Protocol (plug your own, like Django's
+  `AUTH_PASSWORD_VALIDATORS`) + `DefaultPasswordPolicy` (length + opt-in Have I
+  Been Pwned breach check) + `pwned_password_count` (HIBP range API via
+  **k-anonymity** — only a 5-char SHA-1 prefix leaves the process, never the
+  password or its full hash). Wired as `runtime.password_policy` and applied on
+  the password-reset / member-invite completion path.
+- New config `password_hibp_check` (default **False** — external call, needs
+  httpx) and `password_hibp_timeout_seconds` (default 3.0). The breach check
+  **fails open**: a HIBP outage skips it rather than blocking password resets.
+
 ## [0.1.43] - 2026-06-30
 
 Test-only — systematic IDOR / cross-tenant coverage (roadmap G13). No runtime or

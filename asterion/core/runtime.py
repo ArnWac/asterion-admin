@@ -92,6 +92,12 @@ class AdminRuntime:
     #: deployment can replace it with a shared backend satisfying
     #: :class:`asterion.auth.rate_limiter.RateLimiterBackend`.
     password_reset_rate_limiter: Any = None
+    #: Password acceptance policy (G21). ``create_admin`` builds a
+    #: :class:`asterion.auth.password_policy.DefaultPasswordPolicy` from
+    #: ``CoreAdminConfig.password_min_length`` / ``password_hibp_check``; an app
+    #: can replace it with any object satisfying
+    #: :class:`asterion.auth.password_policy.PasswordPolicy`.
+    password_policy: Any = None
     #: Typed-notifier registry (Roadmap P4.5). Apps and extensions
     #: register implementations keyed by their Protocol type; publishers
     #: look them up with :meth:`NotifierRegistry.get` and treat ``None``

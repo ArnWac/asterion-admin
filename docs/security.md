@@ -52,6 +52,19 @@ The same backend type also throttles the **password-reset request** endpoint
 `_window_seconds`) and the **2FA-login** endpoint (per user), so neither can be
 abused for enumeration / bombing or second-factor brute force.
 
+### Password policy
+
+New passwords (reset + member-invite completion) pass through a pluggable
+`PasswordPolicy` (`runtime.password_policy`). The bundled `DefaultPasswordPolicy`
+applies **length** (`password_min_length`, ≥ 8; no maximum — the SHA-256 pre-hash
+removes bcrypt's 72-byte cap, and NIST SP 800-63B favours length over composition
+rules) plus an **opt-in Have I Been Pwned breach check**
+(`password_hibp_check`, default off). The breach check uses HIBP's **k-anonymity**
+range API — only the first 5 chars of the password's SHA-1 ever leave the process,
+never the password or its full hash — and **fails open** (a HIBP outage skips the
+check rather than blocking resets). Replace `runtime.password_policy` with any
+object satisfying the `PasswordPolicy` Protocol to enforce your own rules.
+
 ## Authorization
 
 Authorization is by **permission key**: `admin.<resource>.<action>`. Wildcards

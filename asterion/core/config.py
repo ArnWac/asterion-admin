@@ -50,6 +50,16 @@ def _env_int(name: str, default: int) -> int:
         raise ValueError(f"Invalid integer value for {name}: {value!r}.") from exc
 
 
+def _env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ValueError(f"Invalid float value for {name}: {value!r}.") from exc
+
+
 def _env_optional_int(name: str) -> int | None:
     """Parse an optional int env var. Unset (or empty) yields ``None``."""
     value = os.getenv(name)
@@ -159,6 +169,14 @@ class CoreAdminConfig:
     #: which also activates the account.
     invite_token_expire_minutes: int = 60 * 24 * 7
     password_min_length: int = 8
+    #: Check new passwords against the Have I Been Pwned breach corpus (G21,
+    #: NIST 800-63B). **Off by default** — it makes an external network call (via
+    #: k-anonymity: only a 5-char SHA-1 prefix leaves the process, never the
+    #: password). Fails open: if HIBP is unreachable the check is skipped, so an
+    #: outage can't block password resets. Needs httpx installed.
+    password_hibp_check: bool = False
+    #: Timeout (seconds) for the HIBP breach lookup when ``password_hibp_check``.
+    password_hibp_timeout_seconds: float = 3.0
 
     #: Filesystem root for :class:`LocalFileStorage` (Roadmap P4).
     #: When set, ``create_admin`` auto-wires a ``LocalFileStorage`` at
@@ -380,6 +398,14 @@ class CoreAdminConfig:
             password_min_length=_env_int(
                 "ASTERION_PASSWORD_MIN_LENGTH",
                 8,
+            ),
+            password_hibp_check=_env_bool(
+                "ASTERION_PASSWORD_HIBP_CHECK",
+                False,
+            ),
+            password_hibp_timeout_seconds=_env_float(
+                "ASTERION_PASSWORD_HIBP_TIMEOUT_SECONDS",
+                3.0,
             ),
             enable_builtin_ui=_env_bool(
                 "ASTERION_ENABLE_BUILTIN_UI",
@@ -652,6 +678,7 @@ class CoreAdminConfig:
             ),
             "invite_token_expire_minutes": self.invite_token_expire_minutes,
             "password_min_length": self.password_min_length,
+            "password_hibp_check": self.password_hibp_check,
             "enable_builtin_ui": self.enable_builtin_ui,
             "enable_builtin_admins": self.enable_builtin_admins,
             "enable_multi_tenant": self.enable_multi_tenant,

@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable
 
 from fastapi import FastAPI
 
+from asterion.auth.password_policy import DefaultPasswordPolicy
 from asterion.auth.rate_limiter import InMemoryLoginRateLimiter
 from asterion.authz.registry import PermissionRegistry
 from asterion.builtins import install_builtin_admins
@@ -134,6 +135,11 @@ def create_admin(
         password_reset_rate_limiter=InMemoryLoginRateLimiter(
             max_failures=config.password_reset_rate_limit_max,
             window_seconds=config.password_reset_rate_limit_window_seconds,
+        ),
+        password_policy=DefaultPasswordPolicy(
+            min_length=config.password_min_length,
+            hibp_check=config.password_hibp_check,
+            hibp_timeout=config.password_hibp_timeout_seconds,
         ),
     )
 

@@ -71,7 +71,7 @@ bereits abgedeckt (R1–R17); die hier gelisteten Punkte schließen die
 | **Sollte** | G13 | IDOR-/Tenant-Leak-Testsuite ausbauen | mittel | ✅ erledigt |
 | **Sollte** | G19 | Per-Tenant Rate-Limiting / Quotas (Noisy-Neighbor) | mittel | geplant |
 | **Sollte** | G20 | Observability: OpenTelemetry-Tracing + Metriken (Core, optional) | mittel | geplant |
-| **Sollte** | G21 | Passwort-Policy nach NIST 800-63B (inkl. Breach-Check) | klein | geplant |
+| **Sollte** | G21 | Passwort-Policy nach NIST 800-63B (inkl. Breach-Check) | klein | ✅ erledigt |
 | **Kann** | G23 | WebAuthn/Passkey-Authentifizierung (Extension, phishing-resistent) | groß | geplant |
 | **Später** | G14 | Globale RBAC / Support-Rollen | groß | geplant (Design s. u.) |
 | **Später** | G15 | PostgreSQL Row Level Security als Defense-in-Depth | groß | zu entscheiden (ADR) |
@@ -419,7 +419,14 @@ bereits abgedeckt (R1–R17); die hier gelisteten Punkte schließen die
   [core/config.py](../asterion/core/config.py).
 - **Test:** zu kurzes/geleaktes Passwort wird abgelehnt; ohne HIBP-Opt-in kein
   Netzaufruf.
-- **Aufwand:** klein. **Status:** geplant.
+- **Aufwand:** klein. **Status:** ✅ erledigt (v0.1.44). Neu
+  [auth/password_policy.py](../asterion/auth/password_policy.py): `PasswordPolicy`-
+  Protocol + `DefaultPasswordPolicy` (Länge + opt-in HIBP) + `pwned_password_count`
+  (k-Anonymity, nur 5-Zeichen-SHA-1-Präfix verlässt den Prozess; fail-open bei
+  HIBP-Ausfall). Verdrahtet als `runtime.password_policy` (aus
+  `password_min_length` / `password_hibp_check`), genutzt im Reset-/Invite-Confirm.
+  Tests: [tests/auth/test_password_policy.py](../tests/auth/test_password_policy.py)
+  (zu kurz → abgelehnt, geleakt → abgelehnt, opt-out → kein Netz, fail-open).
 
 ---
 
