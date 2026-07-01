@@ -44,9 +44,26 @@ export async function renderImpersonateButton(resource, recordId) {
 
   const btn = el("button", { type: "button", class: "btn" }, "Impersonate");
   btn.addEventListener("click", async () => {
+    // Governance (G9): the server requires a documented reason by default
+    // (impersonation_require_reason). Prompt for one so the bundled UI doesn't
+    // dead-end on "A reason is required to impersonate a user".
+    const required = cfg.impersonationRequireReason !== false;
+    const answer = window.prompt(
+      required
+        ? "Reason for impersonating this user (required):"
+        : "Reason for impersonating this user (optional):",
+      "",
+    );
+    if (answer === null) return; // cancelled — leave the button enabled
+    const reason = answer.trim();
+    if (required && !reason) {
+      showToast("A reason is required to impersonate a user.", { type: "error" });
+      return;
+    }
+
     btn.disabled = true;
     try {
-      const resp = await root.impersonate(recordId);
+      const resp = await root.impersonate(recordId, null, reason || null);
       localStorage.setItem(ORIG_KEY, tokenStore.get() || "");
       localStorage.setItem(ORIG_TENANT_KEY, tenantStore.get() || "");
       tokenStore.set(resp.access_token);

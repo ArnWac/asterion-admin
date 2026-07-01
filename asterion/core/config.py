@@ -123,6 +123,13 @@ class CoreAdminConfig:
     app_title: str = "asterion"
     debug: bool = False
 
+    #: Sidebar category order (Roadmap 5.7). Categories listed here render in
+    #: this order; categories in use but not listed fall in **alphabetically**
+    #: after them; the built-in ``"System"`` group sorts **last** unless you place
+    #: it here explicitly. Models set their group via ``ModelAdmin.category``.
+    #: Env: ``ASTERION_SIDEBAR_CATEGORIES`` as a comma-separated list.
+    sidebar_categories: tuple[str, ...] = ()
+
     auth_api_prefix: str = "/api/v1/auth"
     admin_api_prefix: str = "/api/v1/admin"
     root_api_prefix: str = "/api/v1/root"
@@ -370,6 +377,7 @@ class CoreAdminConfig:
             database_url=_env_required("ASTERION_DATABASE_URL"),
             secret_key=_env_required("ASTERION_SECRET_KEY"),
             app_title=_env_optional("ASTERION_APP_TITLE", "asterion"),
+            sidebar_categories=_env_tuple("ASTERION_SIDEBAR_CATEGORIES", ()),
             debug=_env_bool("ASTERION_DEBUG", False),
             auth_api_prefix=_env_optional(
                 "ASTERION_AUTH_API_PREFIX",
@@ -702,6 +710,7 @@ class CoreAdminConfig:
     def to_safe_dict(self) -> dict[str, object]:
         return {
             "app_title": self.app_title,
+            "sidebar_categories": list(self.sidebar_categories),
             "debug": self.debug,
             "auth_api_prefix": self.auth_api_prefix,
             "admin_api_prefix": self.admin_api_prefix,

@@ -214,6 +214,47 @@ class TenantRolePermissionAdmin(ModelAdmin):
 Use this for tables that are managed through a dedicated UI rather than the
 generic list. Defaults to `True`.
 
+### `ModelAdmin.category` / `ModelAdmin.nav_order`
+
+Group and order models in the sidebar (Roadmap 5.7).
+
+* `category` — a group heading. Models sharing a `category` render together
+  under that heading; `None` (default) leaves the model **ungrouped** — it lists
+  flat above the grouped sections, exactly as before.
+* `nav_order` — an ordering hint *within* the sidebar (and within the model's
+  category): lower sorts first, ties break alphabetically by plural label.
+  Default `0` → pure alphabetical.
+
+```python
+class OrderAdmin(ModelAdmin):
+    model = Order
+    category = "Sales"
+    nav_order = 10
+
+class InvoiceAdmin(ModelAdmin):
+    model = Invoice
+    category = "Sales"
+    nav_order = 20
+```
+
+The **order of the categories** themselves is controlled centrally by
+`CoreAdminConfig.sidebar_categories` (a tuple/`ASTERION_SIDEBAR_CATEGORIES`
+comma-list): listed categories come first in that order, unlisted ones fall in
+alphabetically after them. The framework's built-in admins (User, Tenant, audit,
+roles) default to the **`"System"`** category, which sorts **last** unless you
+place it explicitly in `sidebar_categories`.
+
+```python
+CoreAdminConfig(
+    sidebar_categories=("Sales", "Inventory"),  # then alpha, then "System" last
+    ...
+)
+```
+
+Both fields are surfaced in the contract (`category`, `nav_order`); the sidebar
+does the grouping. Custom frontends can read `sidebar_categories` (the ordered
+list) and each model's `category` from `GET /api/v1/admin/_contract`.
+
 ### `ModelAdmin.readonly_fields`
 
 Set `readonly_fields` to columns that are shown but never accepted on writes. A

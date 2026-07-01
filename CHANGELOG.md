@@ -16,6 +16,31 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.48] - 2026-07-01
+
+Sidebar grouping/ordering + impersonation-UI fix. No breaking API changes; the
+two new contract fields are additive (`CONTRACT_VERSION` unchanged).
+
+### Added
+- **Sidebar categories + ordering (Roadmap 5.7).** New `ModelAdmin.category`
+  (group heading) and `ModelAdmin.nav_order` (order within the group; ties break
+  alphabetically). Category order is controlled centrally by
+  `CoreAdminConfig.sidebar_categories` (`ASTERION_SIDEBAR_CATEGORIES`): listed
+  first in that order, unlisted alphabetically after, and the built-in `"System"`
+  group last unless placed explicitly. The framework's built-in admins default to
+  `"System"`. Ungrouped models list flat above the grouped sections (so apps that
+  set no categories look unchanged). Surfaced in the contract (`category`,
+  `nav_order`, plus a top-level ordered `sidebar_categories`); the bundled UI
+  groups the sidebar via a unit-tested pure helper (`groupSidebarModels`).
+
+### Fixed
+- **Impersonation dead-end in the bundled UI.** Since G9 made
+  `impersonation_require_reason` default `True`, the bundled UI's Impersonate
+  button — which never sent a reason — always failed with "A reason is required
+  to impersonate a user." The UI now prompts the superadmin for a reason and
+  sends it (respecting the config flag: optional prompt when reason isn't
+  required). The secure server default is unchanged.
+
 ## [0.1.47] - 2026-07-01
 
 Code-quality pass. No API, contract, or behaviour changes.

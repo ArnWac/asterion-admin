@@ -9,6 +9,7 @@ import {
   composeDateHierarchy,
   conditionSatisfied,
   editIsDirty,
+  groupSidebarModels,
   looseEqual,
   nextSortState,
 } from "../../asterion/ui/static/admin/logic.js";
@@ -91,5 +92,46 @@ describe("editIsDirty", () => {
     expect(editIsDirty(5, "5")).toBe(false);
     expect(editIsDirty("", null)).toBe(false);
     expect(editIsDirty(true, false)).toBe(true);
+  });
+});
+
+describe("groupSidebarModels", () => {
+  const M = (resource, opts = {}) => ({
+    resource,
+    label_plural: opts.label || resource,
+    category: opts.category ?? null,
+    nav_order: opts.nav_order ?? 0,
+    show_in_nav: opts.show_in_nav,
+  });
+
+  it("keeps uncategorized models flat and ordered by nav_order then label", () => {
+    const { ungrouped, groups } = groupSidebarModels(
+      [M("b", { label: "Bravo" }), M("a", { label: "Alpha" }), M("z", { label: "Zulu", nav_order: -1 })],
+      [],
+    );
+    expect(groups).toEqual([]);
+    expect(ungrouped.map((m) => m.resource)).toEqual(["z", "a", "b"]);
+  });
+
+  it("orders groups by the provided categoryOrder; sorts within a group", () => {
+    const models = [
+      M("orders", { category: "Sales", label: "Orders" }),
+      M("items", { category: "Stock", label: "Items", nav_order: 2 }),
+      M("bins", { category: "Stock", label: "Bins", nav_order: 1 }),
+    ];
+    const { groups } = groupSidebarModels(models, ["Stock", "Sales"]);
+    expect(groups.map((g) => g.category)).toEqual(["Stock", "Sales"]);
+    expect(groups[0].models.map((m) => m.resource)).toEqual(["bins", "items"]);
+  });
+
+  it("appends present-but-unlisted categories alphabetically", () => {
+    const models = [M("a", { category: "Zeta" }), M("b", { category: "Alpha" })];
+    const { groups } = groupSidebarModels(models, []);
+    expect(groups.map((g) => g.category)).toEqual(["Alpha", "Zeta"]);
+  });
+
+  it("drops show_in_nav === false", () => {
+    const { ungrouped } = groupSidebarModels([M("a"), M("hidden", { show_in_nav: false })], []);
+    expect(ungrouped.map((m) => m.resource)).toEqual(["a"]);
   });
 });

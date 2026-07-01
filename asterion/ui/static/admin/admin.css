@@ -254,6 +254,15 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
   color: var(--sidebar-fg-muted);
 }
 
+/* Sidebar category heading (Roadmap 5.7) — a touch of top space separates one
+ * group from the previous group's links. The first child needs no gap. */
+.sidebar-nav .nav-category {
+  margin-top: 0.4rem;
+}
+.sidebar-nav .nav-category:first-child {
+  margin-top: 0;
+}
+
 /* Extension-contributed nav items — sit below the models list, do not
  * expand to absorb spare vertical space, and pick up a thin divider so
  * the boundary between framework models and extension surfaces is

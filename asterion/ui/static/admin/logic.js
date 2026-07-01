@@ -55,3 +55,43 @@ export function composeDateHierarchy(year, month, day) {
 export function editIsDirty(value, original) {
   return String(value) !== String(original == null ? "" : original);
 }
+
+// Sidebar grouping (Roadmap 5.7). Split the visible models into an ungrouped
+// list (rendered flat at the top) and ordered category groups. Within every
+// list, sort by nav_order then alphabetically by label_plural. `categoryOrder`
+// (from the contract: config order → alphabetical → "System" last) drives the
+// group order; any present category not in it falls in alphabetically after.
+export function groupSidebarModels(models, categoryOrder = []) {
+  const sortFn = (a, b) =>
+    (a.nav_order || 0) - (b.nav_order || 0) ||
+    String(a.label_plural).localeCompare(String(b.label_plural));
+
+  const ungrouped = [];
+  const byCat = new Map();
+  for (const m of models) {
+    if (m.show_in_nav === false) continue;
+    const cat = m.category || null;
+    if (cat === null) {
+      ungrouped.push(m);
+    } else {
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat).push(m);
+    }
+  }
+
+  const ordered = [];
+  const seen = new Set();
+  for (const c of categoryOrder) {
+    if (byCat.has(c) && !seen.has(c)) {
+      ordered.push(c);
+      seen.add(c);
+    }
+  }
+  for (const c of [...byCat.keys()].filter((c) => !seen.has(c)).sort((a, b) => a.localeCompare(b))) {
+    ordered.push(c);
+  }
+
+  ungrouped.sort(sortFn);
+  const groups = ordered.map((c) => ({ category: c, models: byCat.get(c).slice().sort(sortFn) }));
+  return { ungrouped, groups };
+}

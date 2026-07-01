@@ -130,6 +130,7 @@ class TenantMembershipRoleInline(InlineAdmin):
 
 class TenantRoleAdmin(ModelAdmin):
     model = TenantRole
+    category = "System"
 
     label = "Tenant Role"
     label_plural = "Tenant Roles"
@@ -147,6 +148,7 @@ class TenantRoleAdmin(ModelAdmin):
 
 class TenantRolePermissionAdmin(ModelAdmin):
     model = TenantRolePermission
+    category = "System"
 
     label = "Tenant Role Permission"
     label_plural = "Tenant Role Permissions"
@@ -166,6 +168,7 @@ class TenantRolePermissionAdmin(ModelAdmin):
 
 class TenantMembershipRoleAdmin(ModelAdmin):
     model = TenantMembershipRole
+    category = "System"
 
     label = "Tenant Membership Role"
     label_plural = "Tenant Membership Roles"
@@ -246,6 +249,7 @@ class AuditLogAdmin(ModelAdmin):
     """
 
     model = AuditLog
+    category = "System"
 
     label = "Audit Log"
     label_plural = "Audit Logs"
@@ -315,6 +319,7 @@ class TenantAuditLogAdmin(ModelAdmin):
     """
 
     model = TenantAuditLog
+    category = "System"
 
     label = "Audit Log"
     label_plural = "Audit Logs"
@@ -379,6 +384,7 @@ class UserAdmin(ModelAdmin):
     """
 
     model = User
+    category = "System"
 
     label = "User"
     label_plural = "Users"
@@ -420,6 +426,7 @@ class TenantAdmin(ModelAdmin):
     """
 
     model = Tenant
+    category = "System"
 
     label = "Tenant"
     label_plural = "Tenants"
@@ -446,6 +453,7 @@ class ImpersonationLogAdmin(ModelAdmin):
     """
 
     model = ImpersonationLog
+    category = "System"
 
     label = "Impersonation Log"
     label_plural = "Impersonation Logs"

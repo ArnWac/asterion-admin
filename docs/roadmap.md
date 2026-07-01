@@ -596,6 +596,67 @@ datenschutzfreundlichem Default:
 
 # Offene Follow-ups (kein 1.0-Blocker)
 
+### Sidebar-Kategorien + -Sortierung (5.7) — ✅ erledigt
+
+Sidebar-Modelle lassen sich gruppieren + ordnen: `ModelAdmin.category` (Gruppe) +
+`ModelAdmin.nav_order` (Reihenfolge in der Gruppe); Kategorie-Reihenfolge zentral
+über `CoreAdminConfig.sidebar_categories` (dann alphabetisch, `"System"` zuletzt).
+Framework-Built-ins landen per Default unter `"System"`. Contract liefert
+`category`/`nav_order` je Modell + die geordnete `sidebar_categories`-Liste; die
+Gruppierung passiert in [logic.js](../asterion/ui/static/admin/logic.js)
+(`groupSidebarModels`, unit-getestet). Umgesetzt in `registry/admin.py`,
+`contract/service.py` (+`order_sidebar_categories`), `contract/router.py`,
+`core/config.py`, `builtins/admin.py`, `ui/static/admin/{logic,admin}.js` + CSS.
+
+### i18n / Mehrsprachigkeit (Übersetzung von UI + Contract-Labels)
+
+- **Problem:** UI-Chrome („Save"/„Delete"/…) und die Contract-Labels
+  (`label`/`label_plural`/`description`/Feld-Labels/Validierungsmeldungen) sind
+  aktuell einsprachig (Englisch). Für nicht-englische Deployments (z. B.
+  deutschsprachige KMU) fehlt Lokalisierung.
+- **Django-Vorbild (Baseline):** `gettext` + `.po`/`.mo`, `LocaleMiddleware`,
+  Sprache aus `Accept-Language`/Session/Cookie, `{% trans %}` in Templates.
+- **Empfohlene Variante — contract-getriebene i18n (passt besser zur Architektur):**
+  Da die Daten-UI eine **JSON-Contract-getriebene SPA** ist (keine
+  server-gerenderten Daten-Templates), werden **Labels/Help-Text/Validierungs-
+  meldungen serverseitig pro Request-Locale in den Contract übersetzt** — die
+  JS-UI ist damit automatisch lokalisiert, ohne `.po`-Parsing im Browser. Nur das
+  **statische UI-Chrome** braucht einen kleinen JS-Message-Katalog. Locale-Quelle:
+  `Accept-Language` → optional per-Tenant/-User-Preference → `CoreAdminConfig`-
+  Default. Übersetzungs-Seam als Registry/Hook (Apps liefern Kataloge), analog zur
+  PII-/Protected-Field-Registry.
+- **Betroffene Dateien:** neu z. B. `asterion/i18n/` (Katalog + `translate`-Seam +
+  Locale-Resolver-Middleware); [contract/service.py](../asterion/contract/service.py)
+  (Labels durch den Seam); kleiner JS-Katalog für das UI-Chrome;
+  [core/config.py](../asterion/core/config.py) (Default-Locale + erlaubte Locales).
+- **Aufwand:** groß. **Status:** geplant (Variante zu entscheiden — Django-Baseline
+  vs. empfohlene contract-getriebene i18n).
+
+### Performance-Optimierung (Contract-Rebuild + Field-Permission-Berechnung)
+
+Konkrete, code-belegte Hebel (nicht spekulativ):
+
+- **Contract-Skeleton cachen (größter Hebel):** `GET /_contract` wird bei **jedem**
+  Sidebar-/Dashboard-Load aufgerufen und baut für **jedes** registrierte Admin den
+  vollen Contract neu ([contract/router.py](../asterion/contract/router.py) →
+  `build_model_contract`/`build_field_metadata`). Der **statische** Teil pro Admin
+  (Feld-Metadaten, Actions, Relations, Fieldsets, Kategorie/Order) ändert sich nach
+  dem Registry-Freeze nie — er kann **einmal gecacht** und nur der **per-Caller**-
+  Teil (Field-Permissions, `singleton`-Row-Count) pro Request neu gestempelt werden.
+  Erwartet: spürbar weniger CPU pro Seitenaufruf bei vielen Modellen.
+- **Field-Permissions memoisieren:** `compute_field_permissions` läuft pro Admin pro
+  Request; bei identischer Permission-Menge (häufig) innerhalb eines Requests
+  memoisierbar.
+- **`sa_inspect(model)` pro Build:** die Mapper-Inspektion je Contract-Build ist
+  wiederholte Arbeit; mit dem Skeleton-Cache entfällt sie im Hot-Path.
+- **Messen vor Optimieren:** vorher mit dem G20-Tracing (`asterion_http_request_
+  duration_seconds`, Route `/_contract`) ein Baseline-Profil ziehen, dann Cache
+  einbauen und gegen dieselbe Metrik verifizieren.
+- **Abgrenzung:** Datenpfad-Serialisierung (List/Detail) nutzt bereits gebündelte
+  Label-Lookups (`resolve_list_labels`, kein N+1) und den SQLAlchemy-Statement-Cache
+  — dort ist kein offensichtlicher Hebel.
+- **Aufwand:** mittel. **Status:** geplant.
+
 ### Bundled-UI: gemeinsames `widgets.js`-Modul (Schema → Widget)
 
 **Ziel:** Das Schema→Widget-Mapping der **gebündelten** Admin-UI in einem

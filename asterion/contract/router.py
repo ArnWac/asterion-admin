@@ -19,6 +19,7 @@ from asterion.contract.service import (
     ModelContractMeta,
     build_model_contract,
     compute_field_permissions,
+    order_sidebar_categories,
     resolve_model_scope,
 )
 from asterion.db.dependencies import get_async_session
@@ -81,9 +82,17 @@ async def get_full_contract(
                 singleton_full=await _singleton_full(session, admin),
             ).model_dump()
         )
+    # Sidebar category order (Roadmap 5.7): only categories actually present in
+    # this scope, ordered by config (then alphabetical, then "System" last). The
+    # UI groups the models by category and follows this order for the headings.
+    present_categories = {m["category"] for m in models if m.get("category")}
+    sidebar_categories = order_sidebar_categories(
+        present_categories, runtime.config.sidebar_categories
+    )
     return {
         "contract_version": CONTRACT_VERSION,
         "models": models,
+        "sidebar_categories": sidebar_categories,
         # Extension contributions land under a namespaced top-level key.
         # Each extension owns its namespace (typically the extension name);
         # the UI / API clients iterate over this dict to discover features

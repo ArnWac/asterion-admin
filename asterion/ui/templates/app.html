@@ -60,6 +60,7 @@
       rootPrefix: {{ config.root_api_prefix | tojson }},
       multiTenant: {{ config.enable_multi_tenant | tojson }},
       enableImpersonation: {{ config.enable_impersonation | tojson }},
+      impersonationRequireReason: {{ config.impersonation_require_reason | tojson }},
       tenantResolution: {{ config.tenant_resolution | tojson }},
       tenantHeaderName: {{ config.tenant_header_name | tojson }},
       view: {{ view | tojson }},

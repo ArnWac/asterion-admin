@@ -333,6 +333,12 @@ class ModelContractMeta(BaseModel):
     #: Whether the resource appears in the sidebar nav. ``False`` hides it
     #: while keeping it routable (e.g. a table managed via a dedicated UI).
     show_in_nav: bool = True
+    #: Sidebar group label (Roadmap 5.7). ``None`` → ungrouped (lists flat above
+    #: the grouped sections). Built-in admins default to ``"System"``.
+    category: str | None = None
+    #: Sidebar ordering hint within the model's category (and the flat list):
+    #: lower first, ties alphabetical by ``label_plural``.
+    nav_order: int = 0
     #: "Exactly one row per tenant" resource (e.g. an organization profile /
     #: settings page). When ``True`` the UI renders a settings page and the nav
     #: entry jumps straight into the single row's detail instead of a one-row
@@ -1067,6 +1073,39 @@ def build_relation_metadata(
     return relations
 
 
+#: Default sidebar category for the framework's built-in admins (Roadmap 5.7).
+#: Pinned to the end of the category order unless an app lists it explicitly in
+#: ``CoreAdminConfig.sidebar_categories``.
+SYSTEM_CATEGORY = "System"
+
+
+def order_sidebar_categories(
+    present: Collection[str], config_order: Collection[str] = ()
+) -> list[str]:
+    """Order the sidebar's category headings (Roadmap 5.7).
+
+    ``present`` is the set of categories actually in use. Ordering:
+
+    1. categories listed in ``config_order`` (``CoreAdminConfig.sidebar_categories``),
+       in that order — only those actually present;
+    2. the remaining categories alphabetically (excluding ``System``);
+    3. ``System`` last — unless the app placed it explicitly in ``config_order``.
+    """
+    present_set = set(present)
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for cat in config_order:
+        if cat in present_set and cat not in seen:
+            ordered.append(cat)
+            seen.add(cat)
+    rest = sorted(c for c in present_set if c not in seen and c != SYSTEM_CATEGORY)
+    ordered.extend(rest)
+    seen.update(rest)
+    if SYSTEM_CATEGORY in present_set and SYSTEM_CATEGORY not in seen:
+        ordered.append(SYSTEM_CATEGORY)
+    return ordered
+
+
 def build_model_contract(
     model_admin: ModelAdmin,
     *,
@@ -1107,6 +1146,8 @@ def build_model_contract(
         description=model_admin.description,
         scope=resolve_model_scope(model_admin),
         show_in_nav=bool(getattr(model_admin, "show_in_nav", True)),
+        category=getattr(model_admin, "category", None),
+        nav_order=int(getattr(model_admin, "nav_order", 0) or 0),
         singleton=bool(getattr(model_admin, "singleton", False)),
         fields=field_metas,
         crud_actions=list(CRUD_ACTIONS),

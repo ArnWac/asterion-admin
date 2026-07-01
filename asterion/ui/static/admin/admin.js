@@ -12,6 +12,7 @@
 import { admin, APIError, auth, root, tenantStore, tokenStore } from "./api.js";
 import { getFullContract } from "./contract.js";
 import { el, mount, showToast } from "./dom.js";
+import { groupSidebarModels } from "./logic.js";
 import { renderImpersonationBanner } from "./impersonation.js";
 import { openTenant } from "./tenant_access.js";
 
@@ -171,23 +172,39 @@ async function populateTenantSwitcher() {
   host.hidden = false;
 }
 
+function _navModelItem(m) {
+  const link = el("a", { href: `${cfg.uiPath}/${m.resource}` }, m.label_plural);
+  if (cfg.resource === m.resource) {
+    link.setAttribute("aria-current", "page");
+    link.classList.add("active");
+  }
+  return el("li", {}, link);
+}
+
 async function populateSidebarNav() {
   const nav = document.getElementById("sidebar-nav");
   if (!nav) return;
   const contract = await getFullContract();
-  const models = (contract.models || [])
-    .filter((m) => m.show_in_nav !== false)
-    .slice()
-    .sort((a, b) => a.label_plural.localeCompare(b.label_plural));
+  // Group into an ungrouped (flat, top) list + ordered category sections
+  // (Roadmap 5.7). The server already ordered the categories (config →
+  // alphabetical → "System" last) in contract.sidebar_categories.
+  const { ungrouped, groups } = groupSidebarModels(
+    contract.models || [],
+    contract.sidebar_categories || [],
+  );
 
-  const items = models.map((m) => {
-    const link = el("a", { href: `${cfg.uiPath}/${m.resource}` }, m.label_plural);
-    if (cfg.resource === m.resource) {
-      link.setAttribute("aria-current", "page");
-      link.classList.add("active");
-    }
-    return el("li", {}, link);
-  });
+  const items = [];
+  for (const m of ungrouped) items.push(_navModelItem(m));
+  for (const group of groups) {
+    items.push(
+      el(
+        "li",
+        { class: "nav-category" },
+        el("span", { class: "nav-section-label" }, group.category),
+      ),
+    );
+    for (const m of group.models) items.push(_navModelItem(m));
+  }
 
   if (items.length === 0) {
     nav.replaceChildren(el("li", {}, el("span", { class: "placeholder" }, "No models")));

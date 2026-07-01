@@ -108,3 +108,44 @@ def test_admin_action_meta_carries_icon_bulk_and_input_schema():
     assert action.icon == "pencil"
     assert action.input_schema is not None
     assert "reason" in action.input_schema.get("properties", {})
+
+
+# --- sidebar grouping / ordering (Roadmap 5.7) ---
+
+
+def test_contract_surfaces_category_and_nav_order_defaults():
+    meta = build_model_contract(ArticleAdmin())
+    assert meta.category is None
+    assert meta.nav_order == 0
+
+
+def test_contract_surfaces_explicit_category_and_nav_order():
+    class CategorizedAdmin(ModelAdmin):
+        model = Article
+        category = "Content"
+        nav_order = 5
+
+    meta = build_model_contract(CategorizedAdmin())
+    assert meta.category == "Content"
+    assert meta.nav_order == 5
+
+
+def test_order_sidebar_categories_config_then_alpha_then_system_last():
+    from asterion.contract.service import order_sidebar_categories
+
+    present = {"Sales", "Stock", "System", "Admin"}
+    # Config pins Stock first; Admin/Sales fall in alphabetically; System last.
+    assert order_sidebar_categories(present, ("Stock",)) == ["Stock", "Admin", "Sales", "System"]
+
+
+def test_order_sidebar_categories_system_can_be_placed_explicitly():
+    from asterion.contract.service import order_sidebar_categories
+
+    assert order_sidebar_categories({"System", "Sales"}, ("System", "Sales")) == ["System", "Sales"]
+
+
+def test_order_sidebar_categories_ignores_absent_config_entries():
+    from asterion.contract.service import order_sidebar_categories
+
+    # "Ghost" is configured but not present → skipped; only present ones returned.
+    assert order_sidebar_categories({"Sales"}, ("Ghost", "Sales")) == ["Sales"]

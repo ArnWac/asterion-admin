@@ -226,6 +226,21 @@ class ModelAdmin:
     #: create/delete behavior when no custom policy owns those decisions.
     singleton: bool = False
 
+    #: Sidebar group label (Roadmap 5.7). Models sharing a ``category`` render
+    #: together under a heading in the sidebar; ``None`` (default) leaves the
+    #: model ungrouped (it lists flat above the grouped sections). Category
+    #: *order* is controlled centrally by ``CoreAdminConfig.sidebar_categories``;
+    #: the built-in framework admins default to the ``"System"`` category, which
+    #: sorts last unless that config places it elsewhere. Surfaced in the
+    #: contract; the sidebar does the grouping.
+    category: str | None = None
+
+    #: Ordering hint *within* the sidebar (and within the model's category):
+    #: lower sorts first; ties break alphabetically by plural label. Default
+    #: ``0`` keeps every model at the same rank → pure alphabetical, as before.
+    #: Surfaced in the contract.
+    nav_order: int = 0
+
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
         for attr in (
