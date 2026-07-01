@@ -113,6 +113,19 @@ def test_full_contract_includes_registered_model(client):
     assert "projects" in resources
 
 
+def test_full_contract_carries_sidebar_categories_with_system_last(client):
+    """The built-in admins are category 'System' (Roadmap 5.7); the registered
+    ProjectAdmin is uncategorized, so 'System' is the only category and lands
+    last in the ordered list."""
+    body = client.get("/api/v1/admin/_contract").json()
+    assert "sidebar_categories" in body
+    assert body["sidebar_categories"][-1] == "System"
+    # The uncategorized app model carries category=None.
+    projects = next(m for m in body["models"] if m["resource"] == "projects")
+    assert projects["category"] is None
+    assert projects["nav_order"] == 0
+
+
 def test_full_contract_includes_builtin_tenant_admins(client):
     resp = client.get("/api/v1/admin/_contract")
     resources = {m["resource"] for m in resp.json()["models"]}

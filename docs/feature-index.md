@@ -41,6 +41,7 @@ Full reference: [model-admin.md](model-admin.md). Resource name = model
 | `policy` | `AdminPolicy` object/field gates. | Can only tighten, never loosen, static field perms. |
 | `superadmin_only` | Restrict all routes to superadmins. | Closes the in-tenant `admin.*` → global-resource cross-tenant read. |
 | `singleton` | One-row-per-tenant settings page. | Counts via the request session (per-tenant); **no** DB constraint; explicit `policy` wins. |
+| `category` / `nav_order` | Sidebar grouping + ordering (5.7). | Category order via `CoreAdminConfig.sidebar_categories`; built-ins default to `"System"` (sorts last); ungrouped models list flat on top. |
 
 ### ModelAdmin methods/hooks
 
