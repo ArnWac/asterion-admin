@@ -84,6 +84,70 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
   padding: 1rem;
 }
 
+/* Mobile top bar + hamburger + drawer backdrop. All three are desktop-hidden
+ * by default and only revealed inside the ≤720px media query below, where the
+ * sidebar turns into an off-canvas drawer. */
+.topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  z-index: 1040;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.6rem;
+  background: var(--sidebar-bg);
+  color: #fff;
+}
+.topbar-title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--sidebar-divider);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+}
+.nav-toggle:hover { background: var(--sidebar-hover); }
+/* Three-bar hamburger drawn from the middle bar + two box-shadow bars. */
+.nav-toggle-bars,
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+}
+.nav-toggle-bars { position: relative; }
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+.nav-toggle-bars::before { top: -6px; }
+.nav-toggle-bars::after { top: 6px; }
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: rgba(0, 0, 0, 0.45);
+}
+
 .app-logo {
   display: flex;
   flex-direction: column;
@@ -262,6 +326,12 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
 .sidebar-nav .nav-category:first-child {
   margin-top: 0;
 }
+/* Models under a category heading are indented so the heading reads as their
+ * parent. Only the left padding grows (base is 0.4rem 0.7rem) — hover/active
+ * still fills the full row width. */
+.sidebar-nav .nav-model--grouped > a {
+  padding-left: 1.4rem;
+}
 
 /* Extension-contributed nav items — sit below the models list, do not
  * expand to absorb spare vertical space, and pick up a thin divider so
@@ -378,6 +448,22 @@ h3 { font-size: 0.95rem; margin: 0 0 0.5rem; font-weight: 600; }
   font-size: 0.82rem;
   font-weight: 400;
 }
+/* Dashboard category heading (Roadmap 5.7) — mirrors the sidebar's
+ * .nav-section-label styling and groups resource lists on the dashboard.
+ * The first heading (when there are no ungrouped models above it) needs no
+ * extra top gap. */
+.resource-category {
+  margin: 1.25rem 0 0;
+  padding: 0.75rem 1rem 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.resource-category:first-child {
+  margin-top: 0;
+}
 
 /* --- toolbar --- */
 .toolbar {
@@ -432,6 +518,23 @@ tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: #fafbfc; }
 td.actions { text-align: right; white-space: nowrap; }
 td a { color: var(--accent); }
+
+/* Horizontal scroll container for wide tables (list view). CSS scroll-shadow
+ * trick: two solid "cover" gradients pinned to the card (background-attachment:
+ * local) mask two shadow gradients pinned to the viewport (scroll). When there
+ * is more table off to a side, that side's shadow peeks out; scrolling fully to
+ * an edge slides the cover over its shadow. Signals overflow without any JS. */
+.table-scroll {
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--card) 30%, rgba(255, 255, 255, 0)) left center,
+    linear-gradient(to left, var(--card) 30%, rgba(255, 255, 255, 0)) right center,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0)) left center,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0)) right center;
+  background-repeat: no-repeat;
+  background-size: 32px 100%, 32px 100%, 14px 100%, 14px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
 
 /* --- pagination --- */
 .pagination {
@@ -926,16 +1029,44 @@ body.is-impersonating .toast {
 }
 
 /* --- mobile fallback --- */
+/* Tablet / narrow desktop: keep the two-column layout but slim the sidebar
+ * and tighten the main padding rather than jumping straight to the drawer. */
+@media (max-width: 1024px) {
+  .sidebar { width: 180px; padding: 0.85rem; }
+  .main { padding: 1.25rem 1.5rem; }
+}
+
+/* Phone: sidebar becomes an off-canvas drawer opened from the top bar. The
+ * drawer and backdrop are fixed (out of flow), so .main spans the full width;
+ * a top offset clears the fixed top bar. Toggled by admin.js via the
+ * `sidebar--open` class on <body>. */
 @media (max-width: 720px) {
-  .layout { flex-direction: column; }
-  .sidebar {
-    position: static;
-    width: 100%;
-    height: auto;
-    padding: 0.75rem 1rem;
-  }
-  .sidebar-nav { max-height: 50vh; }
+  .topbar { display: flex; }
+  .layout { padding-top: 48px; }
   .main { padding: 1rem; }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 260px;
+    max-width: 82vw;
+    z-index: 1060;
+    padding: 1rem;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    overflow-y: auto;
+  }
+  body.sidebar--open .sidebar { transform: translateX(0); }
+  body.sidebar--open .sidebar-backdrop { display: block; }
+
+  .sidebar-nav { max-height: none; }
+}
+
+/* Respect reduced-motion: skip the drawer slide animation. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
 }
 
 /* --- list-view badges (Roadmap 5.5) --- */

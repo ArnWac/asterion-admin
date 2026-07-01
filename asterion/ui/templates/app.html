@@ -15,7 +15,23 @@
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
   <div class="layout">
-    <aside class="sidebar" aria-label="Admin navigation">
+    <header class="topbar">
+      <button
+        id="nav-toggle"
+        type="button"
+        class="nav-toggle"
+        aria-label="Toggle navigation"
+        aria-controls="sidebar"
+        aria-expanded="false"
+      >
+        <span class="nav-toggle-bars" aria-hidden="true"></span>
+      </button>
+      <span class="topbar-title">{{ admin_title }}</span>
+    </header>
+
+    <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
+
+    <aside id="sidebar" class="sidebar" aria-label="Admin navigation">
       <a href="{{ admin_ui_path }}/dashboard" class="app-logo app-logo--sidebar">
         <span class="app-name">{{ admin_title }}</span>
         <span class="app-admin-label">Admin</span>

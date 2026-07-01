@@ -300,7 +300,7 @@ export async function mountList(root, resource) {
         dateBar,
         displayControls,
       ]),
-      el("div", { style: "overflow-x:auto" }, table),
+      el("div", { class: "table-scroll" }, table),
       paginationBar,
     ]),
   ]);

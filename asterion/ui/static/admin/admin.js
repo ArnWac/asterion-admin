@@ -66,6 +66,7 @@ async function main() {
   }
 
   wireSignout();
+  wireNavToggle();
   // Sidebar nav + user line are non-essential; failure shouldn't break the view.
   renderImpersonationBanner().catch(() => {});
   populateTenantSwitcher().catch(() => {});
@@ -109,6 +110,33 @@ function wireSignout() {
     } finally {
       tokenStore.clear();
       window.location.href = `${cfg.uiPath}/login`;
+    }
+  });
+}
+
+function wireNavToggle() {
+  // Mobile off-canvas sidebar. The drawer + backdrop are shown purely by the
+  // `sidebar--open` class on <body> (see admin.css); here we own that class
+  // plus the accessibility state. Nav links are full-page loads, so a click
+  // navigates away and the drawer resets closed on its own — we only need to
+  // handle the explicit open/close affordances (button, backdrop, Escape).
+  const button = document.getElementById("nav-toggle");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (!button || !backdrop) return;
+
+  const setOpen = (open) => {
+    document.body.classList.toggle("sidebar--open", open);
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+    backdrop.hidden = !open;
+  };
+
+  button.addEventListener("click", () => {
+    setOpen(!document.body.classList.contains("sidebar--open"));
+  });
+  backdrop.addEventListener("click", () => setOpen(false));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.body.classList.contains("sidebar--open")) {
+      setOpen(false);
     }
   });
 }
@@ -172,13 +200,13 @@ async function populateTenantSwitcher() {
   host.hidden = false;
 }
 
-function _navModelItem(m) {
+function _navModelItem(m, { grouped = false } = {}) {
   const link = el("a", { href: `${cfg.uiPath}/${m.resource}` }, m.label_plural);
   if (cfg.resource === m.resource) {
     link.setAttribute("aria-current", "page");
     link.classList.add("active");
   }
-  return el("li", {}, link);
+  return el("li", grouped ? { class: "nav-model--grouped" } : {}, link);
 }
 
 async function populateSidebarNav() {
@@ -203,7 +231,7 @@ async function populateSidebarNav() {
         el("span", { class: "nav-section-label" }, group.category),
       ),
     );
-    for (const m of group.models) items.push(_navModelItem(m));
+    for (const m of group.models) items.push(_navModelItem(m, { grouped: true }));
   }
 
   if (items.length === 0) {
