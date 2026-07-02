@@ -438,10 +438,12 @@ async def password_reset_request(
     ).scalar_one_or_none()
 
     issued = False
-    # Service / machine accounts are token-only and passwordless — never issue
-    # them a reset token (it would let a reset turn them into a login-capable
-    # account). The response is identical on every branch (no enumeration).
-    if user is not None and user.is_active and not user.is_service_account:
+    # Password-login-disabled accounts (machine accounts, ADR-0005) are
+    # token-only — never issue them a reset token (it would let a reset turn them
+    # into a login-capable account). Note this is NOT the same as "passwordless":
+    # an invited human is passwordless yet reset-eligible. The response is
+    # identical on every branch (no enumeration).
+    if user is not None and user.is_active and not user.password_login_disabled:
         raw_token = await create_password_reset(
             session,
             user=user,

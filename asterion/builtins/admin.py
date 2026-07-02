@@ -424,7 +424,6 @@ class UserAdmin(ModelAdmin):
         "full_name",
         "is_active",
         "is_superadmin",
-        "is_service_account",
         "created_at",
     ]
     search_fields = ["email", "full_name"]
@@ -436,7 +435,9 @@ class UserAdmin(ModelAdmin):
         "totp_enabled",
         "token_version",
         "is_superadmin",
-        "is_service_account",
+        # Generic auth mechanism (ADR-0005); the "service account" concept and
+        # its management live in the service_accounts extension, not here.
+        "password_login_disabled",
         "created_at",
         "updated_at",
     ]

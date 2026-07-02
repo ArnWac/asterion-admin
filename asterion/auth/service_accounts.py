@@ -119,7 +119,7 @@ async def create_service_account(
         raise ValueError(f"A tenant role named {role_name!r} already exists — pick a unique label.")
 
     user = await create_passwordless_user(
-        session, email=email, full_name=label, is_active=True, is_service_account=True
+        session, email=email, full_name=label, is_active=True, password_login_disabled=True
     )
     membership = await ensure_membership(session, user_id=user.id, tenant_id=tenant_id)
 
@@ -150,7 +150,7 @@ async def delete_service_account(
     helper refuses to delete a normal user.
     """
     user = await session.get(User, user_id)
-    if user is None or not user.is_service_account:
+    if user is None or not user.password_login_disabled:
         raise ValueError(f"No service account with id {user_id}.")
 
     membership = (

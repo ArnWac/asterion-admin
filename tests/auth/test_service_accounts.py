@@ -64,10 +64,10 @@ async def test_provisions_passwordless_active_user_with_role(factory):
             )
             uid = user.id
             # Active, non-superadmin, passwordless (hash set but unusable),
-            # flagged as a service account.
+            # password-login-disabled (machine account, ADR-0005).
             assert user.is_active is True
             assert user.is_superadmin is False
-            assert user.is_service_account is True
+            assert user.password_login_disabled is True
             assert user.hashed_password
             assert user.email.endswith("@service.invalid")
 
@@ -185,7 +185,7 @@ async def test_delete_refuses_non_service_user(factory):
                 hashed_password="x",
                 is_active=True,
                 is_superadmin=False,
-                is_service_account=False,
+                password_login_disabled=False,
             )
             s.add(user)
             await s.flush()

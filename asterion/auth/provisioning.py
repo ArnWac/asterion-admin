@@ -41,16 +41,22 @@ async def create_passwordless_user(
     email: str,
     full_name: str | None = None,
     is_active: bool,
-    is_service_account: bool = False,
+    password_login_disabled: bool = False,
 ) -> User:
-    """Create a passwordless, non-superadmin :class:`User` and flush it."""
+    """Create a passwordless, non-superadmin :class:`User` and flush it.
+
+    ``password_login_disabled`` (ADR-0005) locks the account out of password
+    login + reset entirely (a machine account). Left ``False`` for an invited
+    human, who is passwordless *now* but must still receive a reset token to set
+    their first password.
+    """
     user = User(
         email=email,
         hashed_password=unusable_password_hash(),
         full_name=full_name,
         is_active=is_active,
         is_superadmin=False,
-        is_service_account=is_service_account,
+        password_login_disabled=password_login_disabled,
     )
     session.add(user)
     await session.flush()
