@@ -39,7 +39,7 @@ Full reference: [model-admin.md](model-admin.md). Resource name = model
 | `actions` | `[AdminAction(...)]` bulk ops. | Permission key = `admin.<resource>.<action.name>`. |
 | `inlines` | `[InlineAdmin]` child rows. | Inline writes share the parent transaction (all-or-nothing). `widget="dual_list"` → transfer widget over `value_field`, options from `resolve_options` via `/{resource}/_inline_options/{inline}`. |
 | `policy` | `AdminPolicy` object/field gates. | Can only tighten, never loosen, static field perms. |
-| `superadmin_only` | Platform-tier resource: authorize against `platform.<res>.<action>`. | Closes the in-tenant `admin.*` → global-resource cross-tenant read; a scoped `PlatformRole` grant can reach it (ADR-0004). |
+| `platform_only` | Platform-tier resource: authorize against `platform.<res>.<action>`. | Closes the in-tenant `admin.*` → global-resource cross-tenant read; a scoped `PlatformRole` grant can reach it (ADR-0004). |
 | `singleton` | One-row-per-tenant settings page. | Counts via the request session (per-tenant); **no** DB constraint; explicit `policy` wins. |
 | `category` / `nav_order` | Sidebar grouping + ordering (5.7). | Category order via `CoreAdminConfig.sidebar_categories`; built-ins default to `"System"` (sorts last); ungrouped models list flat on top. |
 

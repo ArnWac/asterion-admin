@@ -16,18 +16,18 @@ Two namespaces, two tiers ([ADR-0004](adr/0004-platform-tier-rbac.md)):
 
 - **`admin.*`** — the **tenant tier**: per-resource keys assignable to tenant
   roles by a tenant owner.
-- **`platform.*`** — the **platform tier**: keys for `superadmin_only` global
+- **`platform.*`** — the **platform tier**: keys for `platform_only` global
   resources, assignable only to `PlatformRole`s by a superadmin, **never** to a
   tenant role. A superadmin holds both `admin.*` and `platform.*`.
 
 For every registered resource the catalog generates the five default CRUD
 actions plus one key per declared custom admin action, in the namespace that
-matches the admin's tier (`platform` for `superadmin_only`, else `admin`):
+matches the admin's tier (`platform` for `platform_only`, else `admin`):
 
 ```
 admin.<resource>.{list, read, create, update, delete}      # tenant-tier resource
 admin.<resource>.<custom_action>                            # per @action
-platform.<resource>.{list, read, …}                        # superadmin_only resource
+platform.<resource>.{list, read, …}                        # platform_only resource
 ```
 
 Extensions contribute their own namespaced keys (e.g.

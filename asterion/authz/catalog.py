@@ -100,11 +100,11 @@ def _crud_actions_for(admin: ModelAdmin) -> list[str]:
 def _namespace_for(admin: ModelAdmin) -> str:
     """Which permission namespace this admin's keys live in (ADR-0004).
 
-    A ``superadmin_only`` admin is a platform-tier resource: its keys are
+    A ``platform_only`` admin is a platform-tier resource: its keys are
     ``platform.<res>.<action>`` (assignable to platform roles, never to tenant
     roles). Every other admin is tenant-tier (``admin.*``).
     """
-    return "platform" if getattr(admin, "superadmin_only", False) else "admin"
+    return "platform" if getattr(admin, "platform_only", False) else "admin"
 
 
 def _crud_keys(resource: str, admin: ModelAdmin) -> list[str]:
@@ -142,7 +142,7 @@ def generate_permission_keys(
       always; ``create`` / ``update`` / ``delete`` only when the policy leaves
       that action reachable via a permission key — see :func:`_crud_actions_for`)
       plus one ``<ns>.<resource>.<action>`` per declared admin action. The
-      namespace ``<ns>`` is ``platform`` for a ``superadmin_only`` admin and
+      namespace ``<ns>`` is ``platform`` for a ``platform_only`` admin and
       ``admin`` otherwise (ADR-0004): platform keys are assignable to
       ``PlatformRole``s, never to tenant roles — tenant seeding filters them out
       (see ``seed_default_tenant_roles``).

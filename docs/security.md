@@ -100,7 +100,7 @@ Keys live in two namespaces, distinguished by **who may assign them**
 ([ADR-0004](adr/0004-platform-tier-rbac.md)):
 
 - **`admin.*`** (tenant tier) — assignable to tenant roles by a tenant owner.
-- **`platform.*`** (platform tier) — for `superadmin_only` global resources;
+- **`platform.*`** (platform tier) — for `platform_only` global resources;
   assignable only to `PlatformRole`s by a superadmin, and **excluded from tenant
   seeding**, so a tenant owner can never mint platform authority. A superadmin's
   effective grant is `admin.*` + `platform.*`; the flag `User.is_superadmin`

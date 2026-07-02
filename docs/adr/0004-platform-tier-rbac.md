@@ -10,7 +10,7 @@ resolved by a swappable `PermissionProvider` and consumed uniformly as
 
 Alongside it lived a **second, parallel axis**: the global `is_superadmin`
 boolean on `public.users`, checked ad-hoc in ~6 decision sites (the CRUD
-`superadmin_only` gate, the single-tenant gate, the root-route dependency, the
+`platform_only` gate, the single-tenant gate, the root-route dependency, the
 navigation bypass, and `SuperadminDeletablePolicy`'s delete gate). The boolean
 existed because the default provider mapped a superadmin to `admin.*` — the
 **same** grant a tenant `owner` holds. The two were indistinguishable at the
@@ -50,7 +50,7 @@ but separated by which authority administers it**:
   `has_permission(...)`. No router or policy reads `is_superadmin`.
   `SuperadminDeletablePolicy` becomes an ordinary key-gated policy
   (`has_permission("platform.<resource>.delete")`); the special case dissolves.
-  `superadmin_only` becomes "this admin authorizes against the `platform.*`
+  `platform_only` becomes "this admin authorizes against the `platform.*`
   namespace" rather than a boolean short-circuit.
 - **The `PermissionProvider` is the one place identity becomes keys.** A
   superadmin maps to `{"admin.*", "platform.*"}` (keeps `admin.*` so they can

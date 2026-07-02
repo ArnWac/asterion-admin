@@ -133,7 +133,7 @@ FastAPI(lifespan=composed)
      │  app.state.asterion = runtime
      │  register_error_handlers(app)                       # consistent envelope
      │  install_middleware(app, config)                    # request_id ▸ access_log ▸ security_headers ▸ cors ▸ tenant
-     │  install_builtin_admins(registry)                   # tenant RBAC + audit + global (users/tenants/impersonation_logs, superadmin_only)
+     │  install_builtin_admins(registry)                   # tenant RBAC + audit + global (users/tenants/impersonation_logs, platform_only)
      │  register(registry)                                 # your ModelAdmins
      │  run_setup_phase(extensions, ExtensionContext, app) # configure → register_* → freeze registries
      │  install_routes(app, config)                        # /healthz ▸ /auth ▸ /admin/_contract ▸ /admin/_navigation ▸ /root ▸ /admin (UI) ▸ /admin/_actions ▸ /admin/{resource}

@@ -57,7 +57,7 @@ def _require_resource_permission(
 ) -> None:
     """Authorize ``action`` on ``admin_class`` for the caller.
 
-    A ``superadmin_only`` admin (global/public-schema models such as ``User`` /
+    A ``platform_only`` admin (global/public-schema models such as ``User`` /
     ``Tenant`` / ``ImpersonationLog``) is a pure **platform-tier** resource: it
     authorizes solely against ``platform.<resource>.<action>`` (ADR-0004), not
     the tenant ``admin.*`` namespace. A superadmin holds ``platform.*`` and
@@ -69,7 +69,7 @@ def _require_resource_permission(
     Every other admin authorizes against the tenant tier via
     :func:`require_resource_access`.
     """
-    if getattr(admin_class, "superadmin_only", False):
+    if getattr(admin_class, "platform_only", False):
         if not ctx.has_permission(platform_key(admin_class.model_name, action)):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

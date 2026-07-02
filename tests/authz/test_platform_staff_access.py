@@ -1,7 +1,7 @@
 """Platform staff can log in at shared scope with graded rights (ADR-0004).
 
 A user with a ``PlatformRole`` holding a scoped ``platform.*`` key reaches a
-``superadmin_only`` admin for exactly the actions that key allows — no full
+``platform_only`` admin for exactly the actions that key allows — no full
 ``is_superadmin`` needed. A plain authenticated user (no platform role) is still
 refused. Runs the real auth path (login -> token -> request) so the provider's
 shared-scope platform-role lookup is exercised end to end.
@@ -36,7 +36,7 @@ class StaffPostAdmin(ModelAdmin):
     """A platform-tier resource: only the platform tier may reach it."""
 
     model = StaffPost
-    superadmin_only = True
+    platform_only = True
     list_display = ["id", "title"]
 
 

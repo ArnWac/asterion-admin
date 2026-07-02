@@ -789,7 +789,7 @@ def _has(
     Returns ``True`` when ``permissions`` is None (no caller context —
     we cannot narrow). Otherwise consults the wildcard-aware matcher
     from :mod:`asterion.authz.permissions`. ``namespace`` is ``platform`` for a
-    ``superadmin_only`` (platform-tier) resource so the contract matches the
+    ``platform_only`` (platform-tier) resource so the contract matches the
     route gate for platform staff (ADR-0004).
     """
     if permissions is None:
@@ -806,11 +806,11 @@ def _build_capabilities(
     singleton_full: bool = False,
 ) -> CapabilitiesMeta:
     resource = model_admin.model_name
-    # Platform-tier (``superadmin_only``) resources authorize against
+    # Platform-tier (``platform_only``) resources authorize against
     # ``platform.*``; every other admin against ``admin.*`` (ADR-0004). Match the
     # namespace the route gate uses so a platform-staff caller's capabilities are
     # reported correctly rather than always False.
-    ns = "platform" if getattr(model_admin, "superadmin_only", False) else "admin"
+    ns = "platform" if getattr(model_admin, "platform_only", False) else "admin"
     bulk_actions: list[str] = []
     for action in model_admin.actions:
         action_name = getattr(action, "name", None)

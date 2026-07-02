@@ -416,7 +416,7 @@ class UserAdmin(ModelAdmin):
     label_plural = "Users"
     description = "Global user accounts. Tenant membership is managed separately."
 
-    superadmin_only = True
+    platform_only = True
     policy = NoCreateDeletePolicy()
 
     list_display = [
@@ -460,7 +460,7 @@ class TenantAdmin(ModelAdmin):
     label_plural = "Tenants"
     description = "Tenant rows. Per-tenant schema provisioning is handled by tenancy.bootstrap."
 
-    superadmin_only = True
+    platform_only = True
     policy = NoCreateDeletePolicy()
 
     list_display = ["slug", "name", "is_active", "schema_name", "created_at"]
@@ -487,7 +487,7 @@ class ImpersonationLogAdmin(ModelAdmin):
     label_plural = "Impersonation Logs"
     description = "Record of superadmin → user impersonation sessions."
 
-    superadmin_only = True
+    platform_only = True
     policy = ReadOnlyPolicy()
 
     list_display = [
@@ -591,7 +591,7 @@ class PlatformRoleAdmin(ModelAdmin):
     label_plural = "Platform Roles"
     description = "Platform-tier roles (platform.* keys) for shared-scope staff."
 
-    superadmin_only = True
+    platform_only = True
 
     list_display = ["name", "description", "is_system", "created_at"]
     search_fields = ["name", "description"]
@@ -608,7 +608,7 @@ class PlatformRolePermissionAdmin(ModelAdmin):
     label_plural = "Platform Role Permissions"
     description = "platform.* keys assigned to platform roles."
 
-    superadmin_only = True
+    platform_only = True
 
     list_display = ["role_id", "permission_key", "created_at"]
     search_fields = ["permission_key"]
@@ -629,7 +629,7 @@ class PlatformUserRoleAdmin(ModelAdmin):
     label_plural = "Platform Operators"
     description = "Direct assignment of a global user to a platform role."
 
-    superadmin_only = True
+    platform_only = True
 
     list_display = ["user_id", "role_id", "created_at"]
     ordering = ["user_id"]

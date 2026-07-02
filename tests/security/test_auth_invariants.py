@@ -135,7 +135,7 @@ def app_with_user(tmp_path):
         return {"id": str(current.id), "email": current.email}
 
     @app.get("/superadmin-only")
-    async def superadmin_only(
+    async def platform_only(
         current=__import__("fastapi").Depends(require_superadmin),
     ):
         return {"id": str(current.id)}

@@ -1,6 +1,6 @@
 """Platform-tier keys use the ``platform.*`` namespace in the catalog (ADR-0004).
 
-A ``superadmin_only`` admin is a platform-tier resource: its permission keys are
+A ``platform_only`` admin is a platform-tier resource: its permission keys are
 ``platform.<res>.<action>`` (assignable to platform roles), never
 ``admin.<res>.<action>`` (which tenant seeding would hand to a tenant owner).
 Every other admin stays tenant-tier.
@@ -37,7 +37,7 @@ class _PostAdmin(ModelAdmin):
 
 class _SecretAdmin(ModelAdmin):
     model = _Secret
-    superadmin_only = True
+    platform_only = True
 
 
 def _keys() -> set[str]:
@@ -55,7 +55,7 @@ def test_tenant_admin_emits_admin_namespace_keys():
     assert not any(k.startswith("platform.cat_posts") for k in keys)
 
 
-def test_superadmin_only_admin_emits_platform_namespace_keys():
+def test_platform_only_admin_emits_platform_namespace_keys():
     keys = _keys()
     assert "platform.cat_secrets.list" in keys
     assert "platform.cat_secrets.read" in keys

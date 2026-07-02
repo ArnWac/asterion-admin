@@ -153,7 +153,7 @@ both expressed as permission keys so every gate is a `has_permission` check:
 
 - A user with `is_superadmin=True` gets `frozenset({"admin.*", "platform.*"})`.
   `admin.*` matches every tenant-tier `admin.<resource>.<action>`; `platform.*`
-  is the god-mode grant for `superadmin_only` global resources. `is_superadmin`
+  is the god-mode grant for `platform_only` global resources. `is_superadmin`
   is **CLI-only** (not settable through `UserAdmin`), since `platform.*` is
   minted from it.
 - **Platform staff** hold a scoped subset of `platform.*` via a `PlatformRole`

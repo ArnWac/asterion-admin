@@ -23,6 +23,14 @@ authority becomes a second permission-key tier (`platform.*`) instead of an
 ad-hoc `is_superadmin` boolean, and graded platform staff can now log in at
 shared scope. `CONTRACT_VERSION` unchanged (wire shape identical).
 
+### Breaking
+- **`ModelAdmin.superadmin_only` renamed to `platform_only`.** The flag never
+  meant "full superadmin only" after this release — it marks a *platform-tier*
+  resource that any caller holding the matching `platform.<res>.<action>` key can
+  reach (a scoped `PlatformRole` staff member included), so the name was
+  misleading. No alias is kept (pre-1.0). Apps setting `superadmin_only = True`
+  on a `ModelAdmin` must rename the attribute to `platform_only = True`.
+
 ### Added
 - **Platform-tier RBAC store.** New public-schema tables `platform_roles` /
   `platform_role_permissions` / `platform_user_roles` (migration
@@ -33,7 +41,7 @@ shared scope. `CONTRACT_VERSION` unchanged (wire shape identical).
   membership indirection). The `BuiltinPermissionProvider` resolves a
   no-tenant caller's `platform.*` keys from their platform roles (public-schema
   lookup — works on any backend, unlike the Postgres-only tenant lookup).
-- **`superadmin_only` admins authorize against `platform.*`.** Their catalog
+- **`platform_only` admins authorize against `platform.*`.** Their catalog
   keys are emitted in the `platform` namespace and are assignable only to
   platform roles; a scoped staff grant (`platform.tenants.read`) now reaches
   exactly the actions it allows.
@@ -42,7 +50,7 @@ shared scope. `CONTRACT_VERSION` unchanged (wire shape identical).
 - **Platform authority is a permission-key tier, not an `is_superadmin` branch
   (ADR-0004).** A superadmin's effective grant is `admin.*` + `platform.*`; a
   tenant `owner` holds only `admin.*`. Every authorization *decision* goes
-  through `has_permission(...)`: the CRUD `superadmin_only` gate, the no-tenant
+  through `has_permission(...)`: the CRUD `platform_only` gate, the no-tenant
   gate, and the navigation bypass check `platform.*` keys.
   `SuperadminDeletablePolicy` gates delete on `platform.<resource>.delete` (the
   policy is bound to its resource at registration). `is_superadmin` remains only
