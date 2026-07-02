@@ -56,6 +56,27 @@ export function editIsDirty(value, original) {
   return String(value) !== String(original == null ? "" : original);
 }
 
+// JSON widget (v0.1.50): render a dict/JSON column value as pretty text for a
+// <textarea>. A null/empty value renders empty; a string is passed through
+// verbatim (it may be a raw JSON fragment the user is mid-editing); anything
+// else is stringified with 2-space indent so nested objects stay readable.
+export function serializeJsonWidget(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+// JSON widget (v0.1.50): parse the textarea text back into the value sent to
+// the API. Empty input maps to null (nullable field) or {} (non-nullable) so a
+// dict column always receives an object. Invalid JSON throws SyntaxError — the
+// form's submit handler catches it and surfaces a per-field error rather than
+// letting a bad payload reach (and 500) the server.
+export function parseJsonWidget(text, nullable) {
+  const trimmed = String(text == null ? "" : text).trim();
+  if (trimmed === "") return nullable ? null : {};
+  return JSON.parse(trimmed);
+}
+
 // Sidebar grouping (Roadmap 5.7). Split the visible models into an ungrouped
 // list (rendered flat at the top) and ordered category groups. Within every
 // list, sort by nav_order then alphabetically by label_plural. `categoryOrder`

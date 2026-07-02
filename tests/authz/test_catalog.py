@@ -171,6 +171,73 @@ def test_generate_unchanged_when_permission_registry_omitted():
     assert keys == keys_explicit
 
 
+# --- policy-aware CRUD keys (v0.1.50) ---
+
+
+def test_read_only_admin_emits_only_list_and_read():
+    from asterion.admin.policy import ReadOnlyPolicy
+
+    class ReadOnlyProjectAdmin(ModelAdmin):
+        model = Project
+        policy = ReadOnlyPolicy()
+
+    registry = AdminRegistry()
+    registry.register(ReadOnlyProjectAdmin)
+    keys = generate_permission_keys(registry)
+    assert keys - _BUILTINS == {"admin.projects.list", "admin.projects.read"}
+    for dead in ("create", "update", "delete"):
+        assert f"admin.projects.{dead}" not in keys
+
+
+def test_no_create_delete_admin_drops_create_and_delete_keeps_update():
+    from asterion.admin.policy import NoCreateDeletePolicy
+
+    class UpdateOnlyAdmin(ModelAdmin):
+        model = Project
+        policy = NoCreateDeletePolicy()
+
+    registry = AdminRegistry()
+    registry.register(UpdateOnlyAdmin)
+    keys = generate_permission_keys(registry)
+    assert keys - _BUILTINS == {
+        "admin.projects.list",
+        "admin.projects.read",
+        "admin.projects.update",
+    }
+
+
+def test_superadmin_deletable_admin_emits_no_write_keys():
+    """Its delete is superadmin-gated (not key-gated) — a superadmin already
+    holds ``admin.*`` — so no concrete CRUD write key belongs in the catalog."""
+    from asterion.admin.policy import SuperadminDeletablePolicy
+
+    class LedgerAdmin(ModelAdmin):
+        model = Project
+        policy = SuperadminDeletablePolicy()
+
+    registry = AdminRegistry()
+    registry.register(LedgerAdmin)
+    keys = generate_permission_keys(registry)
+    assert keys - _BUILTINS == {"admin.projects.list", "admin.projects.read"}
+
+
+def test_declared_action_key_survives_read_only_policy():
+    """A read-only admin still exposes its declared bulk-action keys — only the
+    dead CRUD write keys are dropped."""
+    from asterion.admin.policy import ReadOnlyPolicy
+
+    class ReadOnlyWithAction(ModelAdmin):
+        model = Widget
+        policy = ReadOnlyPolicy()
+        actions = [_Ping()]
+
+    registry = AdminRegistry()
+    registry.register(ReadOnlyWithAction)
+    keys = generate_permission_keys(registry)
+    assert "admin.widgets.ping" in keys
+    assert "admin.widgets.create" not in keys
+
+
 # --- sync_permission_catalog ---
 
 

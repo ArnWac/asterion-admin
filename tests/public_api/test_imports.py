@@ -69,7 +69,9 @@ ADMIN_PUBLIC: set[str] = {
     "Fieldset",
     "InlineAdmin",
     "ModelAdmin",
+    "NoCreateDeletePolicy",
     "ReadOnlyPolicy",
+    "SuperadminDeletablePolicy",
     "build_admin_context",
     "require_admin_context",
 }

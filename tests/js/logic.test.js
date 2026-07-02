@@ -12,6 +12,8 @@ import {
   groupSidebarModels,
   looseEqual,
   nextSortState,
+  parseJsonWidget,
+  serializeJsonWidget,
 } from "../../asterion/ui/static/admin/logic.js";
 
 describe("looseEqual", () => {
@@ -133,5 +135,32 @@ describe("groupSidebarModels", () => {
   it("drops show_in_nav === false", () => {
     const { ungrouped } = groupSidebarModels([M("a"), M("hidden", { show_in_nav: false })], []);
     expect(ungrouped.map((m) => m.resource)).toEqual(["a"]);
+  });
+});
+
+describe("serializeJsonWidget", () => {
+  it("pretty-prints a dict/object", () => {
+    expect(serializeJsonWidget({ a: 1 })).toBe('{\n  "a": 1\n}');
+  });
+  it("renders null/empty as empty string", () => {
+    expect(serializeJsonWidget(null)).toBe("");
+    expect(serializeJsonWidget(undefined)).toBe("");
+    expect(serializeJsonWidget("")).toBe("");
+  });
+  it("passes a string through verbatim", () => {
+    expect(serializeJsonWidget('{"x": 1}')).toBe('{"x": 1}');
+  });
+});
+
+describe("parseJsonWidget", () => {
+  it("round-trips a real object", () => {
+    expect(parseJsonWidget('{"a": 1, "b": [2]}', false)).toEqual({ a: 1, b: [2] });
+  });
+  it("empty → null when nullable, {} when not", () => {
+    expect(parseJsonWidget("   ", true)).toBe(null);
+    expect(parseJsonWidget("", false)).toEqual({});
+  });
+  it("throws SyntaxError on malformed JSON", () => {
+    expect(() => parseJsonWidget("{not json", false)).toThrow(SyntaxError);
   });
 });
