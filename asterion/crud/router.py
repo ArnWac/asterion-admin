@@ -15,7 +15,7 @@ from asterion.audit import (
     record_audit_in_session,
     request_audit_kwargs,
 )
-from asterion.authz.permissions import require_resource_access
+from asterion.authz.permissions import platform_key, require_resource_access
 from asterion.crud.services import (
     create_record,
     delete_record,
@@ -59,14 +59,20 @@ def _require_resource_permission(
 
     Layers the admin's ``superadmin_only`` scope on top of the per-resource
     permission-key check: a superadmin-only admin (global/public-schema models
-    such as ``User`` / ``Tenant`` / ``ImpersonationLog``) is unreachable by a
-    non-superadmin even inside a tenant where an ``admin.*`` grant would
-    otherwise match the key — closing a cross-tenant read of a public table.
+    such as ``User`` / ``Tenant`` / ``ImpersonationLog``) is authorized against
+    the **platform tier** — the caller must hold ``platform.<resource>.<action>``
+    (ADR-0004). A superadmin holds ``platform.*`` and passes; a tenant ``owner``
+    holds only ``admin.*`` and does not, so an ``admin.*`` grant inside a tenant
+    can never reach a public table (closing a cross-tenant read). Checked via
+    keys, not ``is_superadmin`` — one authorization channel; from Phase 2 a
+    scoped platform-staff grant clears it too.
     """
-    if getattr(admin_class, "superadmin_only", False) and not getattr(ctx, "is_superadmin", False):
+    if getattr(admin_class, "superadmin_only", False) and not ctx.has_permission(
+        platform_key(admin_class.model_name, action)
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Superadmin privileges required.",
+            detail="Platform privileges required.",
         )
     require_resource_access(ctx, admin_class.model_name, action)
 

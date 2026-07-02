@@ -6,7 +6,8 @@ without changing any of that logic.
 
 Rules implemented here:
 
-* superadmin → effective ``admin.*`` (full access).
+* superadmin → effective ``admin.*`` + ``platform.*`` (full access, both
+  tiers — see ADR-0004).
 * no tenant context → empty set (matches v1 single-tenant behaviour
   where non-superadmin requests aren't gated by role keys at all).
 * tenant context + non-superadmin → tenant-local role keys.
@@ -44,7 +45,11 @@ class BuiltinPermissionProvider:
         request: Request | None = None,
     ) -> frozenset[str]:
         if user.is_superadmin:
-            return frozenset({"admin.*"})
+            # The one place identity becomes keys (ADR-0004). ``admin.*`` lets a
+            # superadmin act inside any tenant; ``platform.*`` is the god-mode
+            # grant every platform-tier gate authorizes against. A tenant
+            # ``owner`` holds only ``admin.*``, so the two stay distinguishable.
+            return frozenset({"admin.*", "platform.*"})
         if tenant is None or request is None:
             return frozenset()
 

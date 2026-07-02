@@ -796,7 +796,6 @@ def _build_capabilities(
     model_admin: ModelAdmin,
     *,
     permissions: Collection[str] | None,
-    is_superadmin: bool = False,
     singleton_full: bool = False,
 ) -> CapabilitiesMeta:
     resource = model_admin.model_name
@@ -810,17 +809,21 @@ def _build_capabilities(
 
     # A policy's ``capability_flags`` resolves the object-independent
     # create/update/delete decision — including any that depend on the caller
-    # (e.g. SuperadminDeletablePolicy allows delete only for a real superadmin,
-    # which no permission key can express since a tenant owner also holds
-    # ``admin.*``). This keeps the contract in step with the route gates so the
-    # UI never shows a control a click would 403. The default flags derive from
-    # the static ``read_only`` / ``disable_*`` markers, so policies that don't
-    # override behave exactly as before.
+    # (e.g. SuperadminDeletablePolicy allows delete only for the platform tier,
+    # which a plain ``admin.<res>.delete`` key can't express since a tenant owner
+    # also holds ``admin.*``). We fold that in via the caller's *platform* keys
+    # (ADR-0004), not ``is_superadmin`` — one authorization channel. This keeps
+    # the contract in step with the route gates so the UI never shows a control
+    # a click would 403. The default flags derive from the static ``read_only`` /
+    # ``disable_*`` markers, so policies that don't override behave as before.
     policy = getattr(model_admin, "policy", None)
     read_only = bool(getattr(policy, "read_only", False))
     if policy is not None and hasattr(policy, "capability_flags"):
+        from asterion.authz.permissions import has_permission, platform_key
+
+        has_platform = has_permission(permissions or (), platform_key(resource, "delete"))
         allow_create, allow_update, allow_delete = policy.capability_flags(
-            is_superadmin=is_superadmin
+            has_platform=has_platform
         )
     else:
         allow_create = allow_update = allow_delete = True
@@ -1118,7 +1121,6 @@ def build_model_contract(
     *,
     registry: FieldRegistry | None = None,
     permissions: Collection[str] | None = None,
-    is_superadmin: bool = False,
     admin_registry: AdminRegistry | None = None,
     field_permissions: dict[str, str] | None = None,
     singleton_full: bool = False,
@@ -1131,11 +1133,12 @@ def build_model_contract(
     can do; when ``None``, all capabilities default to True so cache-
     friendly schema-only consumers still get a usable shape.
 
-    ``is_superadmin`` (typically ``ctx.is_superadmin``) lets a policy's
-    ``capability_flags`` fold the caller's superadmin status into the
-    create/update/delete answer — needed because a tenant ``owner`` and a
-    real superadmin both carry ``admin.*`` yet a policy may only let the
-    latter delete (see :class:`~asterion.admin.policy.SuperadminDeletablePolicy`).
+    A policy's ``capability_flags`` folds the caller's *platform* authority
+    (derived here from ``permissions`` via the ``platform.<res>.delete`` key,
+    ADR-0004) into the create/update/delete answer — needed because a tenant
+    ``owner`` and a platform operator both carry ``admin.*`` yet a policy may
+    only let the latter delete (see
+    :class:`~asterion.admin.policy.SuperadminDeletablePolicy`).
 
     ``field_permissions`` (Roadmap 2.4) is a pre-computed map of
     column name → ``"read" | "write" | "hidden"``. Routers compute it
@@ -1169,7 +1172,6 @@ def build_model_contract(
         capabilities=_build_capabilities(
             model_admin,
             permissions=permissions,
-            is_superadmin=is_superadmin,
             singleton_full=singleton_full,
         ),
         relations=build_relation_metadata(model_admin, admin_registry=admin_registry),

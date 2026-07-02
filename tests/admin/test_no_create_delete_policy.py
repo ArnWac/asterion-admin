@@ -28,7 +28,9 @@ def _ctx() -> AdminContext:
         request=None,
         principal=AdminPrincipal(id="root", email="root@example.com", is_superadmin=True),
         tenant=None,
-        permissions=frozenset({"admin.*"}),
+        # A superadmin's effective grant is both tiers (ADR-0004); the
+        # ``platform.*`` half is what clears a ``superadmin_only`` gate.
+        permissions=frozenset({"admin.*", "platform.*"}),
     )
 
 
@@ -97,7 +99,8 @@ def test_superadmin_only_allows_superadmin():
         request=None,
         principal=AdminPrincipal(id="root", email="root@x.test", is_superadmin=True),
         tenant=AdminTenant(id="22222222-2222-2222-2222-222222222222", slug="acme"),
-        permissions=frozenset({"admin.*"}),
+        # ``platform.*`` is what clears the superadmin_only (platform-tier) gate.
+        permissions=frozenset({"admin.*", "platform.*"}),
     )
     # Must not raise.
     _require_resource_permission(ctx, UserAdmin(), "list")

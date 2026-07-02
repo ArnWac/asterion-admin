@@ -72,12 +72,14 @@ def _crud_actions_for(admin: ModelAdmin) -> list[str]:
     A permission key is only worth emitting if a normal (non-superadmin) tenant
     role could ever be *granted* it and have it take effect. list + read are
     always enforceable. For the write actions we ask the admin's policy for its
-    object-independent ``capability_flags`` with ``is_superadmin=False`` — the
-    catalog is the universe of keys assignable to tenant roles, and a superadmin
-    already holds ``admin.*`` so never needs a concrete key. A read-only admin
-    therefore emits no create/update/delete key; a ``SuperadminDeletablePolicy``
-    admin emits none either (its delete is superadmin-gated, not key-gated),
-    keeping dead, unenforceable keys out of the catalog and the rights matrix.
+    object-independent ``capability_flags`` with ``has_platform=False`` — the
+    catalog is the universe of keys assignable to *tenant* roles, and platform
+    authority (``platform.*``) is never assignable there (ADR-0004). A read-only
+    admin therefore emits no create/update/delete key; a
+    ``SuperadminDeletablePolicy`` admin emits none either (its delete is
+    platform-key-gated, so the tenant-assignable ``admin.<res>.delete`` key
+    would be dead), keeping unenforceable keys out of the catalog and the rights
+    matrix.
 
     Policies predate ``capability_flags``; a policy object without it (or a
     non-standard duck-typed policy) falls back to all five keys, matching the
@@ -86,7 +88,7 @@ def _crud_actions_for(admin: ModelAdmin) -> list[str]:
     actions = list(_READ_CRUD_ACTIONS)
     policy = getattr(admin, "policy", None)
     if policy is not None and hasattr(policy, "capability_flags"):
-        flags = policy.capability_flags(is_superadmin=False)
+        flags = policy.capability_flags(has_platform=False)
     else:
         flags = (True, True, True)
     for action, slot in _WRITE_CRUD_ACTIONS:

@@ -6,10 +6,11 @@ reach the wire as a per-user filtered list. Three axes are exercised:
 1. **Empty state** — an app with no extensions returns ``{"items": []}``.
 2. **Permission filtering** — a principal sees only the items whose
    ``permission`` key they actually hold.
-3. **Superadmin bypass** — ``is_superadmin=True`` sees every registered
-   item regardless of permission key (the built-in permission provider
-   only grants ``admin.*``, which wouldn't otherwise match extension
-   namespaces like ``oauth.identities.list``).
+3. **Platform bypass** — a full platform operator (holds ``platform.*``,
+   ADR-0004) sees every registered item regardless of permission key. The
+   built-in provider grants a superadmin ``admin.*`` + ``platform.*``, neither
+   of which would otherwise match extension namespaces like
+   ``oauth.identities.list``.
 
 A 4th test guards the auth gate: anonymous callers get 401, not the
 empty list — the endpoint name leaks "things exist that you might
@@ -111,19 +112,20 @@ def test_navigation_hides_all_items_for_principal_with_no_permissions(tmp_path):
 
 
 def test_navigation_superadmin_sees_all_items(tmp_path):
-    """Superadmins bypass the per-item permission check.
+    """A full platform operator bypasses the per-item permission check.
 
-    The built-in permission provider only grants superadmins ``admin.*``,
-    which would NOT match ``navtest.*.view`` under a strict permission
-    match. The endpoint's ``is_superadmin`` short-circuit is what makes
-    the platform-owner role usable across extension namespaces.
+    Holding ``platform.*`` (ADR-0004) does NOT match ``navtest.*.view`` under a
+    strict permission match, yet every item is visible — the endpoint's
+    ``platform.*`` short-circuit is what makes the platform-operator role usable
+    across extension namespaces.
     """
     app = create_admin(config=_config(tmp_path), extensions=[_NavExtension()])
     override_admin_context(
         app,
         principal=make_admin_principal(is_superadmin=True),
-        # Intentionally NO permissions — proving the bypass, not the match.
-        permissions=frozenset(),
+        # Only the god-mode grant — no ``navtest.*`` keys — proving the bypass,
+        # not a key match.
+        permissions=frozenset({"platform.*"}),
     )
     with TestClient(app, raise_server_exceptions=False) as c:
         body = c.get("/api/v1/admin/_navigation").json()

@@ -18,3 +18,4 @@ Format: **Status · Context · Decision · Consequences**.
 | [0001](0001-schema-per-tenant.md) | Schema-per-tenant instead of Row-Level Security | Accepted |
 | [0002](0002-privacy-as-core-module.md) | Privacy as a core module, not an extension | Accepted |
 | [0003](0003-bearer-token-not-cookie.md) | Bearer tokens instead of cookie sessions | Accepted |
+| [0004](0004-platform-tier-rbac.md) | Platform authority as a second RBAC tier, not a superadmin boolean | Accepted |

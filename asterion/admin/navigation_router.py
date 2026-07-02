@@ -14,11 +14,13 @@ client genuinely cannot decide what to hide. Filtering here also keeps
 the navigation "what could I click on" answer authoritative — the same
 source of truth that route-level permission checks consult.
 
-Superadmin bypass: superadmins (``ctx.is_superadmin``) see every
-registered item regardless of permission key. The built-in permission
-provider only grants ``admin.*`` to superadmins, which wouldn't match
-extension-owned namespaces like ``oauth.identities.list`` without this
-explicit short-circuit.
+Platform bypass: a full platform operator (holds ``platform.*``, ADR-0004)
+sees every registered item regardless of permission key. The built-in
+permission provider grants a superadmin ``admin.*`` + ``platform.*``, neither
+of which matches extension-owned namespaces like ``oauth.identities.list``
+without this explicit short-circuit. Checked via the ``platform.*`` key, not
+``is_superadmin`` — so a *scoped* platform-staff grant does NOT get the god-mode
+bypass and sees only the items its keys allow.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 
 from asterion.admin.context import AdminContext, require_admin_context
+from asterion.authz.permissions import PLATFORM_WILDCARD
 
 router = APIRouter()
 
@@ -41,6 +44,6 @@ async def get_navigation(
     visible = [
         {"id": item.id, "label": item.label, "path": item.path}
         for item in items
-        if ctx.is_superadmin or ctx.has_permission(item.permission)
+        if ctx.has_permission(PLATFORM_WILDCARD) or ctx.has_permission(item.permission)
     ]
     return {"items": visible}

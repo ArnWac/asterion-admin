@@ -16,6 +16,25 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+### Changed
+- **Platform authority is now a permission-key tier, not an `is_superadmin`
+  branch (ADR-0004, Phase 1).** A superadmin's effective grant is
+  `admin.*` + `platform.*`; a tenant `owner` still holds only `admin.*`, so the
+  two are distinguishable at the key level. Every authorization *decision* goes
+  through `has_permission(...)`: the CRUD `superadmin_only` gate, the no-tenant
+  gate, and the navigation bypass now check `platform.*` keys instead of the
+  boolean. `SuperadminDeletablePolicy` gates delete on
+  `platform.<resource>.delete` (the policy is bound to its resource at
+  registration); `is_superadmin` remains only as identity (impersonation flip,
+  display) and as the god-mode gate on root/impersonation routes.
+- **Contract capabilities derive platform authority from permission keys.**
+  `build_model_contract` / `_build_capabilities` no longer take an
+  `is_superadmin` argument; the delete capability for a platform-gated policy is
+  computed from the caller's `platform.*` keys. `AdminPolicy.capability_flags`
+  takes `has_platform=` instead of `is_superadmin=`. `platform.*` keys are never
+  emitted into the tenant-assignable `PermissionCatalog`, so a tenant `owner`
+  cannot mint them. `CONTRACT_VERSION` unchanged (wire shape identical).
+
 ## [0.1.50] - 2026-07-02
 
 Framework-gap fixes surfaced by an embedding app (JSON-column editing +
