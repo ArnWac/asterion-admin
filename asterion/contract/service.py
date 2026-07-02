@@ -796,6 +796,7 @@ def _build_capabilities(
     model_admin: ModelAdmin,
     *,
     permissions: Collection[str] | None,
+    is_superadmin: bool = False,
     singleton_full: bool = False,
 ) -> CapabilitiesMeta:
     resource = model_admin.model_name
@@ -807,30 +808,36 @@ def _build_capabilities(
         if _has(permissions, resource, action_name):
             bulk_actions.append(action_name)
 
-    # A resource-level read-only policy (e.g. ReadOnlyPolicy on audit /
-    # impersonation admins) overrides the permission-key answer: the write
-    # gates 403 at the route regardless of the caller's keys, so the contract
-    # must report no create/update/delete and the UI hides those controls.
-    # ``disable_create`` / ``disable_delete`` (NoCreateDeletePolicy) tighten
-    # only their own capability — an editable admin that still hides New/Delete.
+    # A policy's ``capability_flags`` resolves the object-independent
+    # create/update/delete decision — including any that depend on the caller
+    # (e.g. SuperadminDeletablePolicy allows delete only for a real superadmin,
+    # which no permission key can express since a tenant owner also holds
+    # ``admin.*``). This keeps the contract in step with the route gates so the
+    # UI never shows a control a click would 403. The default flags derive from
+    # the static ``read_only`` / ``disable_*`` markers, so policies that don't
+    # override behave exactly as before.
     policy = getattr(model_admin, "policy", None)
     read_only = bool(getattr(policy, "read_only", False))
-    no_create = read_only or bool(getattr(policy, "disable_create", False))
-    no_delete = read_only or bool(getattr(policy, "disable_delete", False))
+    if policy is not None and hasattr(policy, "capability_flags"):
+        allow_create, allow_update, allow_delete = policy.capability_flags(
+            is_superadmin=is_superadmin
+        )
+    else:
+        allow_create = allow_update = allow_delete = True
 
     # Singleton default (only when no explicit policy owns the decision): delete
     # is always hidden, and create is hidden once the single row exists
     # (``singleton_full`` — resolved by the contract router via a row count). The
     # route enforces the same; this just keeps the UI controls in sync.
     if getattr(model_admin, "singleton", False) and policy is None:
-        no_delete = True
+        allow_delete = False
         if singleton_full:
-            no_create = True
+            allow_create = False
 
     return CapabilitiesMeta(
-        create=(not no_create) and _has(permissions, resource, "create"),
-        update=(not read_only) and _has(permissions, resource, "update"),
-        delete=(not no_delete) and _has(permissions, resource, "delete"),
+        create=allow_create and _has(permissions, resource, "create"),
+        update=allow_update and _has(permissions, resource, "update"),
+        delete=allow_delete and _has(permissions, resource, "delete"),
         bulk_actions=[] if read_only else bulk_actions,
     )
 
@@ -1111,6 +1118,7 @@ def build_model_contract(
     *,
     registry: FieldRegistry | None = None,
     permissions: Collection[str] | None = None,
+    is_superadmin: bool = False,
     admin_registry: AdminRegistry | None = None,
     field_permissions: dict[str, str] | None = None,
     singleton_full: bool = False,
@@ -1122,6 +1130,12 @@ def build_model_contract(
     When supplied, the ``capabilities`` block reflects what THIS caller
     can do; when ``None``, all capabilities default to True so cache-
     friendly schema-only consumers still get a usable shape.
+
+    ``is_superadmin`` (typically ``ctx.is_superadmin``) lets a policy's
+    ``capability_flags`` fold the caller's superadmin status into the
+    create/update/delete answer — needed because a tenant ``owner`` and a
+    real superadmin both carry ``admin.*`` yet a policy may only let the
+    latter delete (see :class:`~asterion.admin.policy.SuperadminDeletablePolicy`).
 
     ``field_permissions`` (Roadmap 2.4) is a pre-computed map of
     column name → ``"read" | "write" | "hidden"``. Routers compute it
@@ -1153,7 +1167,10 @@ def build_model_contract(
         crud_actions=list(CRUD_ACTIONS),
         admin_actions=[_admin_action_meta(a) for a in model_admin.actions],
         capabilities=_build_capabilities(
-            model_admin, permissions=permissions, singleton_full=singleton_full
+            model_admin,
+            permissions=permissions,
+            is_superadmin=is_superadmin,
+            singleton_full=singleton_full,
         ),
         relations=build_relation_metadata(model_admin, admin_registry=admin_registry),
         fieldsets=build_fieldset_metadata(model_admin),

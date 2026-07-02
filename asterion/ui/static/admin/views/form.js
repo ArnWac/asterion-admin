@@ -6,9 +6,27 @@
 import { APIError, admin } from "../api.js";
 import { getResourceContract } from "../contract.js";
 import { el, mount, setBreadcrumb, showToast } from "../dom.js";
-import { allowedDependencyOptions, conditionSatisfied } from "../logic.js";
+import {
+  allowedDependencyOptions,
+  conditionSatisfied,
+  parseJsonWidget,
+  serializeJsonWidget,
+} from "../logic.js";
 
 const cfg = window.ASTERION || {};
+
+// Raised by collectPayload when a widget's client-side parse fails (e.g. a
+// json textarea holding invalid JSON). Carries a { fieldName: message } map so
+// the submit handler can render per-field errors through the same errorBoxes
+// path used for server-side 422s — instead of letting the exception tear the
+// submit apart with an uncaught error.
+class FormInputError extends Error {
+  constructor(fields) {
+    super("Please fix the highlighted fields.");
+    this.name = "FormInputError";
+    this.fields = fields;
+  }
+}
 
 export async function mountForm(root, resource, mode, recordId) {
   const isEdit = mode === "edit";
@@ -193,7 +211,18 @@ export async function mountForm(root, resource, mode, recordId) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     clearErrors(errorBoxes, summary);
-    const payload = collectPayload(editableFields, inputs, isEdit, hiddenByCondition);
+    let payload;
+    try {
+      payload = collectPayload(editableFields, inputs, isEdit, hiddenByCondition);
+    } catch (err) {
+      // A client-side parse failure (e.g. malformed JSON in a json widget)
+      // never reaches the network — surface it as a field error and abort.
+      if (err instanceof FormInputError) {
+        applyLocalErrors(err.fields, errorBoxes, summary);
+        return;
+      }
+      throw err;
+    }
     const inlinePayload = collectInlines();
     if (Object.keys(inlinePayload).length) payload.inlines = inlinePayload;
     submitBtn.disabled = true;
@@ -671,6 +700,19 @@ function buildInput(field, id, initial, disabled) {
     return el("textarea", { ...baseAttrs, rows: 4 }, initial == null ? "" : String(initial));
   }
 
+  // JSON widget (v0.1.50): a dict/JSON column (contract type "string",
+  // widget "json") renders as a <textarea> holding pretty-printed JSON —
+  // never a text <input>, which would coerce a dict to "[object Object]" and
+  // round-trip the literal string back to the API (500). collectPayload parses
+  // it back to an object on submit.
+  if (field.widget === "json") {
+    return el(
+      "textarea",
+      { ...baseAttrs, rows: 8, class: "json-widget", spellcheck: "false" },
+      serializeJsonWidget(initial)
+    );
+  }
+
   // Foreign-key picker: render a <select> that populateForeignKey() fills with
   // {value, label} options after mount. Start with a placeholder plus (when
   // editing) a provisional option for the current raw id, so the value is
@@ -719,20 +761,36 @@ function buildInput(field, id, initial, disabled) {
 
 function collectPayload(fields, inputs, isEdit, hiddenSet) {
   const payload = {};
+  const errors = {};
   for (const field of fields) {
     // A field hidden by a conditional rule submits no value.
     if (hiddenSet && hiddenSet.has(field.name)) continue;
     const input = inputs.get(field.name);
     if (!input || input.disabled) continue;
-    const value = readInputValue(input, field);
+    let value;
+    try {
+      value = readInputValue(input, field);
+    } catch (err) {
+      // Only json widgets parse on read and can throw; treat the failure as a
+      // field-level validation error rather than aborting the whole payload.
+      if (field.widget === "json") {
+        errors[field.name] = `Invalid JSON: ${err.message}`;
+        continue;
+      }
+      throw err;
+    }
     if (!isEdit && value === null && !field.nullable) continue;
     payload[field.name] = value;
   }
+  if (Object.keys(errors).length) throw new FormInputError(errors);
   return payload;
 }
 
 function readInputValue(input, field) {
   if (field.type === "boolean") return !!input.checked;
+  // JSON widget: parse the textarea back to an object (throws SyntaxError on
+  // malformed input — caught by collectPayload). Empty → null/{} by nullable.
+  if (field.widget === "json") return parseJsonWidget(input.value, field.nullable);
   const raw = input.value;
   if (raw === "") return field.nullable ? null : "";
   if (field.type === "integer") {
@@ -773,6 +831,24 @@ function applyErrors(err, errorBoxes, summary) {
   }
   if (placed === 0 || err.fields.length === 0) {
     summary.textContent = err.message;
+    summary.hidden = false;
+  }
+}
+
+// Render client-side field errors (e.g. a json parse failure raised by
+// collectPayload) through the same per-field boxes used for server 422s.
+function applyLocalErrors(fieldMap, errorBoxes, summary) {
+  let placed = 0;
+  for (const [name, message] of Object.entries(fieldMap)) {
+    const box = errorBoxes.get(name);
+    if (box) {
+      box.textContent = message;
+      box.hidden = false;
+      placed += 1;
+    }
+  }
+  if (placed === 0) {
+    summary.textContent = "Please fix the highlighted fields.";
     summary.hidden = false;
   }
 }

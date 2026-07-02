@@ -26,6 +26,18 @@ from asterion.security.validation import (
 REGISTRY_SOURCE = "registry"
 DEFAULT_CRUD_ACTIONS: tuple[str, ...] = ("list", "read", "create", "update", "delete")
 
+#: CRUD actions that are always enforceable regardless of an admin's policy —
+#: read-only admins still expose list + detail.
+_READ_CRUD_ACTIONS: tuple[str, ...] = ("list", "read")
+
+#: Write CRUD actions, paired with the ``capability_flags`` slot that decides
+#: whether a policy leaves the action reachable via a permission key.
+_WRITE_CRUD_ACTIONS: tuple[tuple[str, int], ...] = (
+    ("create", 0),
+    ("update", 1),
+    ("delete", 2),
+)
+
 #: Framework-owned permission keys with no backing ``ModelAdmin``. Tenant
 #: member-management (``asterion.admin.member_router``) acts on the global
 #: ``TenantMembership`` table — deliberately NOT exposed as a generic CRUD
@@ -54,9 +66,38 @@ class SyncResult:
         return self.added + self.kept
 
 
-def _crud_keys(resource: str) -> list[str]:
+def _crud_actions_for(admin: ModelAdmin) -> list[str]:
+    """CRUD actions worth a catalog key for this admin, given its policy.
+
+    A permission key is only worth emitting if a normal (non-superadmin) tenant
+    role could ever be *granted* it and have it take effect. list + read are
+    always enforceable. For the write actions we ask the admin's policy for its
+    object-independent ``capability_flags`` with ``is_superadmin=False`` — the
+    catalog is the universe of keys assignable to tenant roles, and a superadmin
+    already holds ``admin.*`` so never needs a concrete key. A read-only admin
+    therefore emits no create/update/delete key; a ``SuperadminDeletablePolicy``
+    admin emits none either (its delete is superadmin-gated, not key-gated),
+    keeping dead, unenforceable keys out of the catalog and the rights matrix.
+
+    Policies predate ``capability_flags``; a policy object without it (or a
+    non-standard duck-typed policy) falls back to all five keys, matching the
+    pre-v0.1.50 behaviour.
+    """
+    actions = list(_READ_CRUD_ACTIONS)
+    policy = getattr(admin, "policy", None)
+    if policy is not None and hasattr(policy, "capability_flags"):
+        flags = policy.capability_flags(is_superadmin=False)
+    else:
+        flags = (True, True, True)
+    for action, slot in _WRITE_CRUD_ACTIONS:
+        if flags[slot]:
+            actions.append(action)
+    return actions
+
+
+def _crud_keys(resource: str, admin: ModelAdmin) -> list[str]:
     resource = validate_resource_name(resource)
-    return [f"admin.{resource}.{action}" for action in DEFAULT_CRUD_ACTIONS]
+    return [f"admin.{resource}.{action}" for action in _crud_actions_for(admin)]
 
 
 def _action_keys(resource: str, admin: ModelAdmin) -> list[str]:
@@ -82,8 +123,10 @@ def generate_permission_keys(
 
     Combines two sources:
 
-    * **Auto-derived CRUD keys** — for each registered ``ModelAdmin``,
-      five keys (``admin.<resource>.{list,read,create,update,delete}``)
+    * **Auto-derived CRUD keys** — for each registered ``ModelAdmin``, the
+      enforceable CRUD keys given its policy (``admin.<resource>.{list,read}``
+      always; ``create`` / ``update`` / ``delete`` only when the policy leaves
+      that action reachable via a permission key — see :func:`_crud_actions_for`)
       plus one ``admin.<resource>.<action>`` per declared admin action.
     * **Extension-contributed keys** — if ``permission_registry`` is
       passed, every key that any extension registered via
@@ -102,7 +145,7 @@ def generate_permission_keys(
         keys.add(validate_permission_key(key))
     for admin in registry.all():
         resource = admin.model_name
-        for key in _crud_keys(resource):
+        for key in _crud_keys(resource, admin):
             keys.add(validate_permission_key(key))
         for key in _action_keys(resource, admin):
             keys.add(validate_permission_key(key))

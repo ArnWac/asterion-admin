@@ -16,6 +16,56 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.50] - 2026-07-02
+
+Framework-gap fixes surfaced by an embedding app (JSON-column editing +
+read-only-model delete semantics). No breaking API changes; the new policy
+markers and the `is_superadmin` contract argument are additive and default to
+the prior behaviour (`CONTRACT_VERSION` unchanged).
+
+### Fixed
+- **JSON/dict columns are editable in the bundled UI again (data-loss bug).**
+  A column mapped to `widget: "json"` (contract `type: "string"`, e.g. a
+  `sa.JSON` column defaulting to `{}`) rendered through a plain text input,
+  which stringified a dict to the literal `"[object Object]"` and posted that
+  string back — 500-ing the write. The form now renders a json `<textarea>`
+  with pretty-printed JSON and parses it back to an object on submit. Malformed
+  JSON is caught client-side and shown as a per-field error instead of tearing
+  the submit apart with an uncaught exception. Empty input maps to `null`
+  (nullable) or `{}` (non-nullable). Parsing/serialization live in the
+  unit-tested pure helpers `parseJsonWidget` / `serializeJsonWidget`.
+
+### Added
+- **`AdminPolicy.disable_update` capability marker.** Mirrors the existing
+  `disable_create` / `disable_delete`: a writable admin can now hide the Edit
+  control independently of `read_only`. The contract's `update` capability is
+  `False` when set. Backward-compatible (default `False`).
+- **Contract capabilities are superadmin-aware.** `build_model_contract` takes
+  an `is_superadmin` argument (threaded from `AdminContext.is_superadmin` by the
+  contract router) so a policy can fold the caller's superadmin status into the
+  create/update/delete answer. This closes the gap where a tenant `owner` and a
+  real superadmin both carry `admin.*` and were indistinguishable at the
+  permission-key level, causing a visible-but-403 control. Resolved through a
+  new `AdminPolicy.capability_flags(is_superadmin=...)` hook whose default
+  derives from the static `read_only` / `disable_*` markers.
+- **`SuperadminDeletablePolicy`.** A reusable policy: list/read for everyone,
+  create/update blocked for all, delete only for a *real* superadmin (tenant
+  `owner` included in the block; blocked during impersonation since
+  `is_superadmin` is `False` there). Generic capability shape, no domain
+  vocabulary in the core. Exported from `asterion.admin` alongside
+  `NoCreateDeletePolicy` (now also re-exported).
+
+### Changed
+- **Permission catalog is policy-aware.** `generate_permission_keys` no longer
+  emits dead CRUD write keys for restricted admins: `list`/`read` always, but
+  `create`/`update`/`delete` only when the admin's policy leaves that action
+  reachable via a permission key. A `ReadOnlyPolicy` admin emits only
+  `list`/`read`; `NoCreateDeletePolicy` drops `create`/`delete`; a
+  `SuperadminDeletablePolicy` admin emits no CRUD write key (its delete is
+  superadmin-gated). This keeps unenforceable keys out of the catalog and the
+  rights matrix. `sync_permission_catalog` prunes by `source`, so the removed
+  keys are cleaned up on the next `asterion permissions sync`.
+
 ## [0.1.48] - 2026-07-01
 
 Sidebar grouping/ordering + impersonation-UI fix. No breaking API changes; the
