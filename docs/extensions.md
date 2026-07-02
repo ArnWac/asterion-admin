@@ -313,6 +313,7 @@ All live in `asterion.extensions.errors`.
 | `import_export` | `asterion.extensions.import_export` | CSV + XLSX import/export, per-admin |
 | `auth_oauth` | `asterion.extensions.auth_oauth` | OIDC sign-in (Google ships; others via subclass) — see [OAuth / OIDC sign-in](auth-oauth.md) |
 | `email` | `asterion.extensions.email` | SMTP / Resend / SES delivery + outbox — see [Email](email.md) |
+| `service_accounts` | `asterion.extensions.service_accounts` | Token-only machine accounts (own `service_accounts` table) — see [ADR-0005](adr/0005-service-accounts-as-extension.md) |
 | `rate_limit_redis` | `asterion.extensions.rate_limit_redis` | Distributed login rate limiter |
 
 The first two are reference implementations of the "right way" to do

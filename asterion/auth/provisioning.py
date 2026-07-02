@@ -1,9 +1,10 @@
 """Shared account-provisioning primitives.
 
 Used by the member-onboarding router (:mod:`asterion.admin.member_router`) and
-the public service-account helper (:mod:`asterion.auth.service_accounts`) so
-the "passwordless user + tenant membership" creation lives in ONE place instead
-of being re-stitched from auth/RBAC internals per caller.
+the service-accounts extension
+(:mod:`asterion.extensions.service_accounts`) so the "passwordless user + tenant
+membership" creation lives in ONE place instead of being re-stitched from
+auth/RBAC internals per caller.
 
 These helpers touch the GLOBAL tables (``User``, ``TenantMembership``), which
 carry an explicit ``public.`` schema qualifier — so they work on the same

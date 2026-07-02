@@ -15,6 +15,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from typer.testing import CliRunner
 
 from asterion.cli.main import app as cli_app
+
+# Importing the extension attaches its ServiceAccount table to GLOBAL_METADATA
+# BEFORE create_all runs below, so the CLI's insert has a table to write to.
+from asterion.extensions.service_accounts import ServiceAccount
 from asterion.models.base import GLOBAL_METADATA, TenantBase
 from asterion.models.tenant import Tenant
 from asterion.models.user import User
@@ -59,6 +63,20 @@ def _users(url: str) -> list[User]:
     return asyncio.run(_go())
 
 
+def _service_account_count(url: str) -> int:
+    async def _go():
+        engine = create_async_engine(
+            url, execution_options={"schema_translate_map": {"public": None}}
+        )
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as s:
+            rows = (await s.execute(select(ServiceAccount))).scalars().all()
+        await engine.dispose()
+        return len(rows)
+
+    return asyncio.run(_go())
+
+
 def test_create_prints_token_and_provisions_user(env):
     result = CliRunner().invoke(
         cli_app,
@@ -81,6 +99,9 @@ def test_create_prints_token_and_provisions_user(env):
     assert len(users) == 1
     assert users[0].is_active is True
     assert users[0].is_superadmin is False
+    assert users[0].password_login_disabled is True
+    # A ServiceAccount marker row was recorded by the extension.
+    assert _service_account_count(env) == 1
 
 
 def test_create_unknown_tenant_errors(env):

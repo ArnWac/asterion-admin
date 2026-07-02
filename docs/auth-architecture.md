@@ -167,15 +167,19 @@ a full operator see every registered item — see
 [Extensions § NavigationRegistry](extensions.md#navigationregistry). A scoped
 staff grant does **not** trigger that bypass.
 
-## Service / machine accounts
+## Service / machine accounts (extension)
 
 A device or service-to-service caller (e.g. a stationary time-clock terminal)
 needs an account that authenticates **only** via a minted access token, never a
-password. `asterion.auth.service_accounts.create_service_account` provisions one
-in a single call instead of hand-assembling `User` + `TenantMembership` + RBAC:
+password. This is an **optional extension** (ADR-0005), mirroring `auth_oauth` —
+an alternative auth method that owns its own `service_accounts` table rather than
+a column on the core `User`. Wire it with
+`extensions=[ServiceAccountsExtension()]`;
+`create_service_account` provisions one in a single call instead of
+hand-assembling `User` + `TenantMembership` + RBAC:
 
 ```python
-from asterion.auth.service_accounts import create_service_account
+from asterion.extensions.service_accounts import create_service_account
 from asterion.auth.tokens import create_access_token
 
 # `session` MUST be tenant-scoped (SET LOCAL search_path), like get_async_session.
@@ -195,15 +199,20 @@ token = create_access_token(
 ```
 
 It creates an **active, passwordless** user (`is_active=True`,
-`is_superadmin=False`, `is_service_account=True`, with an unusable password hash
-so `POST /auth/login` rejects it), a `TenantMembership`, and a dedicated
-`service:<label>` role granting the permission keys. It does **not** mint tokens
-— that is the caller's job. A token for this account resolves through the normal
-tenant-RBAC path to a principal carrying exactly those keys.
+`is_superadmin=False`, `password_login_disabled=True`, with an unusable password
+hash so `POST /auth/login` rejects it), a `TenantMembership`, a dedicated
+`service:<label>` role granting the permission keys, and a `ServiceAccount`
+marker row. It does **not** mint tokens — that is the caller's job. A token for
+this account resolves through the normal tenant-RBAC path to a principal carrying
+exactly those keys.
 
-The `is_service_account` flag makes the account a first-class type: it is
-excluded from the password-reset flow (so a reset can't turn a token-only
-account into a login-capable one) and is identifiable in queries / UI.
+Core keeps only the generic `User.password_login_disabled` mechanism (ADR-0005):
+a password-login-disabled account is excluded from the password-reset flow (so a
+reset can't turn a token-only account into a login-capable one). Crucially this
+is **not** the same as passwordless — an invited human is passwordless yet
+`password_login_disabled=False`, so they still receive a reset token to set their
+first password. The "service account" concept itself (the `ServiceAccount` table,
+provisioning, teardown) lives in the extension, not core.
 
 **Revocation** is the standard per-user invariant: bump `user.token_version` or
 set `user.is_active = False`. To tear an account down entirely (user + membership

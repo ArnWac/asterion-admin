@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from asterion.auth.service_accounts import create_service_account
+from asterion.extensions.service_accounts import create_service_account
 from asterion.models.tenant import Tenant
 from asterion.providers.base import AdminPrincipal, AdminTenant
 from asterion.providers.permissions import BuiltinPermissionProvider

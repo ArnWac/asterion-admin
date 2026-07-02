@@ -19,8 +19,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from asterion import CoreAdminConfig, create_admin
-from asterion.auth.service_accounts import create_service_account, delete_service_account
 from asterion.auth.tokens import create_access_token
+from asterion.extensions.service_accounts import create_service_account, delete_service_account
 from asterion.models.base import GLOBAL_METADATA, TenantBase
 from asterion.models.password_reset_token import PasswordResetToken
 from asterion.models.tenant_membership import TenantMembership

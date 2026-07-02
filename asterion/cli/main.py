@@ -1394,8 +1394,9 @@ def service_account_create(
     """Provision a token-only service account and print a freshly minted token once.
 
     Creates an active, passwordless user bound to ``--tenant`` with the given
-    permission keys (see :func:`asterion.auth.service_accounts.create_service_account`)
-    and mints one access token. The token is shown ONCE — store it securely.
+    permission keys (see
+    :func:`asterion.extensions.service_accounts.create_service_account`) and
+    mints one access token. The token is shown ONCE — store it securely.
     """
     asyncio.run(_service_account_create(tenant, label, list(permission), email, expires_minutes))
 
@@ -1407,8 +1408,8 @@ async def _service_account_create(
     email: str | None,
     expires_minutes: int | None,
 ) -> None:
-    from asterion.auth.service_accounts import create_service_account
     from asterion.auth.tokens import create_access_token
+    from asterion.extensions.service_accounts import create_service_account
     from asterion.tenancy.schema_names import make_tenant_schema_name
     from asterion.tenancy.schema_strategy import set_search_path
 
@@ -1483,7 +1484,7 @@ def service_account_delete(
 
 
 async def _service_account_delete(slug: str, email: str) -> None:
-    from asterion.auth.service_accounts import delete_service_account
+    from asterion.extensions.service_accounts import delete_service_account
     from asterion.tenancy.schema_names import make_tenant_schema_name
     from asterion.tenancy.schema_strategy import set_search_path
 
