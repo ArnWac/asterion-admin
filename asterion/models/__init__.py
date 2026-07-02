@@ -3,6 +3,11 @@ from asterion.models.data_subject_request import DataSubjectRequest
 from asterion.models.impersonation_log import ImpersonationLog
 from asterion.models.password_reset_token import PasswordResetToken
 from asterion.models.permission_catalog import PermissionCatalog
+from asterion.models.platform_rbac import (
+    PlatformRole,
+    PlatformRolePermission,
+    PlatformUserRole,
+)
 from asterion.models.revoked_token import RevokedToken
 from asterion.models.saved_filter import SavedFilter
 from asterion.models.tenant import Tenant
@@ -22,6 +27,9 @@ __all__ = [
     "ImpersonationLog",
     "PasswordResetToken",
     "PermissionCatalog",
+    "PlatformRole",
+    "PlatformRolePermission",
+    "PlatformUserRole",
     "RevokedToken",
     "SavedFilter",
     "Tenant",

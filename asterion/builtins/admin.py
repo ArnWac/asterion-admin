@@ -8,6 +8,11 @@ from asterion.admin.inline import InlineAdmin
 from asterion.admin.policy import NoCreateDeletePolicy, ReadOnlyPolicy
 from asterion.models.audit_log import AuditLog
 from asterion.models.impersonation_log import ImpersonationLog
+from asterion.models.platform_rbac import (
+    PlatformRole,
+    PlatformRolePermission,
+    PlatformUserRole,
+)
 from asterion.models.tenant import Tenant
 from asterion.models.tenant_audit_log import TenantAuditLog
 from asterion.models.tenant_membership import TenantMembership
@@ -18,6 +23,19 @@ from asterion.models.tenant_rbac import (
 )
 from asterion.models.user import User
 from asterion.registry import ModelAdmin
+
+
+async def _platform_role_name_labels(session: Any, role_ids: set) -> dict[str, str]:
+    """Batched ``role_id`` → platform-role name map (one query)."""
+    role_ids = {r for r in role_ids if r is not None}
+    if not role_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(PlatformRole.id, PlatformRole.name).where(PlatformRole.id.in_(role_ids))
+        )
+    ).all()
+    return {str(rid): name for rid, name in rows}
 
 
 async def _role_name_labels(session: Any, role_ids: set) -> dict[str, str]:
@@ -381,6 +399,14 @@ class UserAdmin(ModelAdmin):
     ``hashed_password`` and ``totp_secret`` are in the global protected-field
     set, so they never reach the client at all; the rest of the security-
     sensitive columns are read-only so the detail form shows them disabled.
+
+    ``is_superadmin`` is **read-only here on purpose** (ADR-0004): platform
+    authority (``platform.*``) is minted only from this flag, so making it
+    settable through the UI would let one superadmin create another with a
+    click. It is visible (so operators can see who is a superadmin) but can be
+    granted/revoked only via the CLI (``asterion user …``), which requires host
+    shell access. Graded, UI-manageable operator access goes through
+    :class:`PlatformRoleAdmin` instead.
     """
 
     model = User
@@ -409,6 +435,8 @@ class UserAdmin(ModelAdmin):
         "totp_secret",
         "totp_enabled",
         "token_version",
+        "is_superadmin",
+        "is_service_account",
         "created_at",
         "updated_at",
     ]
@@ -496,6 +524,126 @@ class ImpersonationLogAdmin(ModelAdmin):
         }
 
 
+class PlatformRolePermissionInline(InlineAdmin):
+    """``platform.*`` keys for a platform role, edited inline (ADR-0004).
+
+    Mirrors :class:`TenantRolePermissionInline` but offers only platform-tier
+    keys — the picker filters the catalog to ``platform.*`` so a platform role
+    can never be handed a tenant ``admin.*`` key (the two stores stay separate)."""
+
+    model = PlatformRolePermission
+    fk_name = "role_id"
+    label = "Permissions"
+    fields = ["permission_key"]
+    ordering = ["permission_key"]
+    extra = 1
+    can_delete = True
+    widget = "dual_list"
+    value_field = "permission_key"
+
+    async def resolve_options(self, *, session, ctx=None, q=None, limit=1000):
+        from asterion.authz.catalog import load_permission_keys
+
+        keys = sorted(k for k in await load_permission_keys(session) if k.startswith("platform."))
+        if q and q.strip():
+            needle = q.strip().lower()
+            keys = [k for k in keys if needle in k.lower()]
+        return [{"value": k, "label": k} for k in keys[:limit]]
+
+
+class PlatformUserRoleInline(InlineAdmin):
+    """User→platform-role assignments, edited inline on the role detail.
+
+    ``user_id`` references a global ``users`` row; the picker offers every user
+    by email (platform roles are global, not tenant-scoped)."""
+
+    model = PlatformUserRole
+    fk_name = "role_id"
+    label = "Operators"
+    fields = ["user_id"]
+    ordering = ["user_id"]
+    extra = 1
+    can_delete = True
+    widget = "dual_list"
+    value_field = "user_id"
+
+    async def resolve_options(self, *, session, ctx=None, q=None, limit=1000):
+        stmt = select(User.id, User.email)
+        if q and q.strip():
+            stmt = stmt.where(User.email.ilike(f"%{q.strip()}%"))
+        stmt = stmt.order_by(User.email.asc()).limit(limit)
+        rows = (await session.execute(stmt)).all()
+        return [{"value": str(uid), "label": email} for uid, email in rows]
+
+
+class PlatformRoleAdmin(ModelAdmin):
+    """Superadmin-managed platform-tier roles (ADR-0004).
+
+    A platform role carries ``platform.*`` keys and is assigned directly to
+    global users, granting them graded operator access at shared scope without
+    full ``is_superadmin``. Superadmin-only: only a platform operator may shape
+    who else becomes one."""
+
+    model = PlatformRole
+    category = "System"
+
+    label = "Platform Role"
+    label_plural = "Platform Roles"
+    description = "Platform-tier roles (platform.* keys) for shared-scope staff."
+
+    superadmin_only = True
+
+    list_display = ["name", "description", "is_system", "created_at"]
+    search_fields = ["name", "description"]
+    ordering = ["name"]
+    readonly_fields = ["id", "created_at", "updated_at"]
+    inlines = [PlatformRolePermissionInline, PlatformUserRoleInline]
+
+
+class PlatformRolePermissionAdmin(ModelAdmin):
+    model = PlatformRolePermission
+    category = "System"
+
+    label = "Platform Role Permission"
+    label_plural = "Platform Role Permissions"
+    description = "platform.* keys assigned to platform roles."
+
+    superadmin_only = True
+
+    list_display = ["role_id", "permission_key", "created_at"]
+    search_fields = ["permission_key"]
+    ordering = ["permission_key"]
+    readonly_fields = ["id", "created_at", "updated_at"]
+    # Managed through the Platform Role detail's "Permissions" inline.
+    show_in_nav = False
+
+    async def resolve_list_labels(self, objs, *, session, ctx=None):
+        return {"role_id": await _platform_role_name_labels(session, {o.role_id for o in objs})}
+
+
+class PlatformUserRoleAdmin(ModelAdmin):
+    model = PlatformUserRole
+    category = "System"
+
+    label = "Platform Operator"
+    label_plural = "Platform Operators"
+    description = "Direct assignment of a global user to a platform role."
+
+    superadmin_only = True
+
+    list_display = ["user_id", "role_id", "created_at"]
+    ordering = ["user_id"]
+    readonly_fields = ["id", "created_at", "updated_at"]
+    # Managed through the Platform Role detail's "Operators" inline.
+    show_in_nav = False
+
+    async def resolve_list_labels(self, objs, *, session, ctx=None):
+        return {
+            "user_id": await _email_labels(session, {o.user_id for o in objs}),
+            "role_id": await _platform_role_name_labels(session, {o.role_id for o in objs}),
+        }
+
+
 BUILTIN_TENANT_ADMINS: tuple[type[ModelAdmin], ...] = (
     TenantRoleAdmin,
     TenantRolePermissionAdmin,
@@ -514,6 +662,9 @@ BUILTIN_GLOBAL_ADMINS: tuple[type[ModelAdmin], ...] = (
     UserAdmin,
     TenantAdmin,
     ImpersonationLogAdmin,
+    PlatformRoleAdmin,
+    PlatformRolePermissionAdmin,
+    PlatformUserRoleAdmin,
 )
 
 #: Read-only admins on framework-owned tables (Roadmap 5.1). Installed
@@ -528,6 +679,9 @@ __all__ = [
     "BUILTIN_TENANT_ADMINS",
     "AuditLogAdmin",
     "ImpersonationLogAdmin",
+    "PlatformRoleAdmin",
+    "PlatformRolePermissionAdmin",
+    "PlatformUserRoleAdmin",
     "TenantAdmin",
     "TenantAuditLogAdmin",
     "TenantMembershipRoleAdmin",

@@ -2,7 +2,7 @@ from asterion.core.app_factory import create_admin
 from asterion.core.config import CoreAdminConfig
 from asterion.registry import AdminRegistry, ModelAdmin
 
-__version__ = "0.1.50"
+__version__ = "0.1.51"
 
 __all__ = [
     "AdminRegistry",

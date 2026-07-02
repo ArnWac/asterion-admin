@@ -131,11 +131,12 @@ async def list_widgets(ctx: AdminContext = Depends(require_admin_context)):
 | `BuiltinJWTAuthProvider` | `providers/auth.py` | Validates `Authorization: Bearer <jwt>`; returns `AuthIdentity(user_id, claims=token_payload)`. Anonymous → `None`. |
 | `BuiltinSQLAlchemyUserProvider` | `providers/users.py` | Loads `User` from the framework's table, converts to `AdminPrincipal`. Inactive → `403`. |
 | `BuiltinTenantProvider` | `providers/tenants.py` | Wraps `TenantMiddleware`; reads `request.state.tenant`. Root/public requests → `None`. |
-| `BuiltinPermissionProvider` | `providers/permissions.py` | Superadmin → `frozenset({"admin.*"})`. Otherwise a tenant-scoped lookup via `TenantMembership` → `TenantRole` → `TenantRolePermission` over a `SET LOCAL search_path` (PostgreSQL only). |
+| `BuiltinPermissionProvider` | `providers/permissions.py` | Superadmin → `frozenset({"admin.*", "platform.*"})`. No tenant → the caller's `platform.*` keys from their `PlatformRole`s (public-schema lookup, any backend). Tenant + non-superadmin → tenant-scoped lookup via `TenantMembership` → `TenantRole` → `TenantRolePermission` over a `SET LOCAL search_path` (PostgreSQL only). |
 
-> **PostgreSQL-only caveat.** Tenant-scoped permission lookup needs
-> `SET LOCAL search_path`, which SQLite doesn't support. On SQLite the built-in
-> provider returns `frozenset()`.
+> **PostgreSQL-only caveat.** The *tenant-scoped* lookup needs
+> `SET LOCAL search_path`, which SQLite doesn't support — on SQLite it returns
+> `frozenset()`. The *platform* lookup reads public-schema tables and works on
+> any backend.
 
 ### Where external auth stops
 
@@ -145,16 +146,26 @@ audit-actor resolution (`audit/service.py`), tenant bootstrap, or the CLI —
 those still import the concrete built-in `User`. So an external IdP runs the
 admin surface, but root/audit/CLI remain built-in-coupled by design for now.
 
-## Superadmin
+## Platform tier & superadmin
 
-A user with `is_superadmin=True` gets `frozenset({"admin.*"})` from
-`BuiltinPermissionProvider`. That key matches every `admin.<resource>.<action>`
-permission via the wildcard rule, but **does not** match permissions in other
-namespaces (e.g. `oauth.identities.list`). For features whose permission key is
-not under `admin.*`, consumers that want "platform owner sees everything" must
-short-circuit on `ctx.is_superadmin` themselves. The `GET /_navigation` endpoint
-already does this — see
-[Extensions § NavigationRegistry](extensions.md#navigationregistry).
+Authority splits into two tiers ([ADR-0004](adr/0004-platform-tier-rbac.md)),
+both expressed as permission keys so every gate is a `has_permission` check:
+
+- A user with `is_superadmin=True` gets `frozenset({"admin.*", "platform.*"})`.
+  `admin.*` matches every tenant-tier `admin.<resource>.<action>`; `platform.*`
+  is the god-mode grant for `superadmin_only` global resources. `is_superadmin`
+  is **CLI-only** (not settable through `UserAdmin`), since `platform.*` is
+  minted from it.
+- **Platform staff** hold a scoped subset of `platform.*` via a `PlatformRole`
+  (public schema, superadmin-administered, linked by `PlatformUserRole`) — the
+  graded shared-scope operator role. Tenant owners can never receive
+  `platform.*` (it is excluded from tenant seeding).
+
+Neither wildcard matches other namespaces (e.g. `oauth.identities.list`), so the
+`GET /_navigation` endpoint still short-circuits on the `platform.*` grant to let
+a full operator see every registered item — see
+[Extensions § NavigationRegistry](extensions.md#navigationregistry). A scoped
+staff grant does **not** trigger that bypass.
 
 ## Service / machine accounts
 

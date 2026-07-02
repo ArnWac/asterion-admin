@@ -8,8 +8,9 @@ Rules implemented here:
 
 * superadmin → effective ``admin.*`` + ``platform.*`` (full access, both
   tiers — see ADR-0004).
-* no tenant context → empty set (matches v1 single-tenant behaviour
-  where non-superadmin requests aren't gated by role keys at all).
+* no tenant context + non-superadmin → the caller's ``platform.*`` keys from
+  their platform roles (ADR-0004); empty if they hold none, which keeps the
+  legacy single-tenant fallback to ``single_tenant_require_superadmin``.
 * tenant context + non-superadmin → tenant-local role keys.
 
 The PostgreSQL-only ``SET LOCAL search_path`` quirk for tenant-schema
@@ -25,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
+from asterion.models.platform_rbac import PlatformRole, PlatformUserRole
 from asterion.models.tenant_membership import TenantMembership
 from asterion.models.tenant_rbac import TenantMembershipRole, TenantRole
 from asterion.providers.base import AdminPrincipal, AdminTenant
@@ -50,8 +52,15 @@ class BuiltinPermissionProvider:
             # grant every platform-tier gate authorizes against. A tenant
             # ``owner`` holds only ``admin.*``, so the two stay distinguishable.
             return frozenset({"admin.*", "platform.*"})
-        if tenant is None or request is None:
+        if request is None:
             return frozenset()
+        if tenant is None:
+            # Shared / no-tenant scope: resolve the caller's *platform* roles
+            # (ADR-0004). A plain authenticated user with no platform role gets
+            # the empty set, so the no-tenant gate still falls back to
+            # ``single_tenant_require_superadmin``. Platform tables are in the
+            # public schema, so this works on SQLite too (no search_path).
+            return await self._platform_permissions(user, request)
 
         runtime = request.app.state.asterion
         if "postgresql" not in runtime.config.database_url:
@@ -86,6 +95,37 @@ class BuiltinPermissionProvider:
                         )
                         .where(TenantMembershipRole.membership_id == membership.id)
                         .options(selectinload(TenantRole.permissions))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+        keys: set[str] = set()
+        for role in roles:
+            for perm in role.permissions:
+                keys.add(perm.permission_key)
+        return frozenset(keys)
+
+    async def _platform_permissions(
+        self, user: AdminPrincipal, request: Request
+    ) -> frozenset[str]:
+        """Resolve a shared-scope caller's ``platform.*`` keys from their
+        platform roles (ADR-0004). Public-schema lookup — no tenant, no
+        search_path — so it runs on any backend."""
+        runtime = request.app.state.asterion
+        factory = async_sessionmaker(runtime.db.engine, expire_on_commit=False)
+        async with factory() as session:
+            roles = (
+                (
+                    await session.execute(
+                        select(PlatformRole)
+                        .join(
+                            PlatformUserRole,
+                            PlatformUserRole.role_id == PlatformRole.id,
+                        )
+                        .where(PlatformUserRole.user_id == user.id)
+                        .options(selectinload(PlatformRole.permissions))
                     )
                 )
                 .scalars()

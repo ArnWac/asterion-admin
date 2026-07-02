@@ -76,8 +76,11 @@ object satisfying the `PasswordPolicy` Protocol to enforce your own rules.
 
 ## Authorization
 
-Authorization is by **permission key**: `admin.<resource>.<action>`. Wildcards
-are allowed **only** at the trailing segment.
+Authorization is by **permission key**: `<namespace>.<resource>.<action>`.
+Wildcards are allowed **only** at the trailing segment. Every access *decision*
+goes through one channel — `AdminContext.has_permission(required)` — there is no
+parallel `is_superadmin` branch in routers or policies
+([ADR-0004](adr/0004-platform-tier-rbac.md)).
 
 | Granted on a role | Required by an endpoint | Match? |
 |---|---|---|
@@ -91,15 +94,33 @@ The CRUD router computes the required key per endpoint and calls
 `AdminContext.has_permission(required)`, which delegates to the wildcard-aware
 matcher.
 
+### Two tiers: tenant vs platform
+
+Keys live in two namespaces, distinguished by **who may assign them**
+([ADR-0004](adr/0004-platform-tier-rbac.md)):
+
+- **`admin.*`** (tenant tier) — assignable to tenant roles by a tenant owner.
+- **`platform.*`** (platform tier) — for `superadmin_only` global resources;
+  assignable only to `PlatformRole`s by a superadmin, and **excluded from tenant
+  seeding**, so a tenant owner can never mint platform authority. A superadmin's
+  effective grant is `admin.*` + `platform.*`; the flag `User.is_superadmin`
+  maps to `platform.*` in the `PermissionProvider` and is **CLI-only** (not
+  UI-settable). Graded platform staff hold a scoped subset via a `PlatformRole`.
+
+Because the distinction is a *key*, not a boolean, the "who is a platform
+operator" decision is customizable by swapping the `PermissionProvider` — the
+correct extension point — not by editing framework gates.
+
 ### Single-tenant / no-tenant scope
 
-Permission keys are a *tenant-role* concept. With no tenant context
-(single-tenant deployments, or root scope) there is no role system to gate by,
-so the admin surface (CRUD, actions, import/export) requires a **superadmin** by
-default — otherwise any authenticated, active account could manage everything.
-This is controlled by `CoreAdminConfig.single_tenant_require_superadmin`
-(default `True`); set it `False` only if you deliberately want every
-authenticated caller to have full access.
+With no tenant context (single-tenant deployments, or shared/root scope) tenant
+roles don't apply. The caller is authorized by their **platform-tier** keys: a
+superadmin (`platform.*`) or platform staff holding a scoped `PlatformRole`
+grant (resolved by the `PermissionProvider` at shared scope). A caller with no
+platform keys falls back to `CoreAdminConfig.single_tenant_require_superadmin`
+(default `True`) — otherwise any authenticated, active account could manage
+everything; set it `False` only if you deliberately want every authenticated
+caller to have full access.
 
 > **Revocation note.** Clearing `is_superadmin` is re-evaluated on the next
 > request, but it does **not** invalidate an already-issued JWT — the token

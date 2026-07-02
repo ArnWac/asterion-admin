@@ -116,13 +116,20 @@ async def seed_default_tenant_roles(
     Idempotent: re-running on an existing tenant only adds missing rows.
     Owner role always receives at least ``admin.*``. Admin role receives
     every key from ``PermissionCatalog`` minus a deny list. Viewer role
-    receives every catalog key ending in ``.list``.
+    receives every catalog key ending in ``.list``. ``platform.*`` keys are
+    excluded from all three — they belong to the platform tier (ADR-0004) and
+    are never assignable to a tenant role.
 
     Returns a mapping ``role_name → TenantRole``.
     """
+    # Platform-tier keys (``platform.*``, ADR-0004) live in the same catalog but
+    # must NEVER be granted to a tenant role — a tenant owner minting platform
+    # authority would break isolation. Filter them out at the source so every
+    # role-key set below is tenant-tier only.
     catalog_keys = {
         validate_permission_key(key)
         for key in (await public_db.execute(select(PermissionCatalog.key))).scalars().all()
+        if not key.startswith("platform.")
     }
 
     role_map: dict[str, TenantRole] = {}

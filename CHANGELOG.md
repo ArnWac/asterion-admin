@@ -16,24 +16,52 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.51] - 2026-07-02
+
+Platform-tier RBAC ([ADR-0004](docs/adr/0004-platform-tier-rbac.md)): platform
+authority becomes a second permission-key tier (`platform.*`) instead of an
+ad-hoc `is_superadmin` boolean, and graded platform staff can now log in at
+shared scope. `CONTRACT_VERSION` unchanged (wire shape identical).
+
+### Added
+- **Platform-tier RBAC store.** New public-schema tables `platform_roles` /
+  `platform_role_permissions` / `platform_user_roles` (migration
+  `0010_platform_rbac`) let a superadmin grant graded `platform.*` access to
+  staff at shared (no-tenant) scope — the least-privilege global "Support" role.
+  Managed through the superadmin-only `PlatformRoleAdmin` (with inline
+  permission + operator pickers). Roles link **directly** to a global user (no
+  membership indirection). The `BuiltinPermissionProvider` resolves a
+  no-tenant caller's `platform.*` keys from their platform roles (public-schema
+  lookup — works on any backend, unlike the Postgres-only tenant lookup).
+- **`superadmin_only` admins authorize against `platform.*`.** Their catalog
+  keys are emitted in the `platform` namespace and are assignable only to
+  platform roles; a scoped staff grant (`platform.tenants.read`) now reaches
+  exactly the actions it allows.
+
 ### Changed
-- **Platform authority is now a permission-key tier, not an `is_superadmin`
-  branch (ADR-0004, Phase 1).** A superadmin's effective grant is
-  `admin.*` + `platform.*`; a tenant `owner` still holds only `admin.*`, so the
-  two are distinguishable at the key level. Every authorization *decision* goes
+- **Platform authority is a permission-key tier, not an `is_superadmin` branch
+  (ADR-0004).** A superadmin's effective grant is `admin.*` + `platform.*`; a
+  tenant `owner` holds only `admin.*`. Every authorization *decision* goes
   through `has_permission(...)`: the CRUD `superadmin_only` gate, the no-tenant
-  gate, and the navigation bypass now check `platform.*` keys instead of the
-  boolean. `SuperadminDeletablePolicy` gates delete on
-  `platform.<resource>.delete` (the policy is bound to its resource at
-  registration); `is_superadmin` remains only as identity (impersonation flip,
-  display) and as the god-mode gate on root/impersonation routes.
+  gate, and the navigation bypass check `platform.*` keys.
+  `SuperadminDeletablePolicy` gates delete on `platform.<resource>.delete` (the
+  policy is bound to its resource at registration). `is_superadmin` remains only
+  as identity (impersonation flip, display) and the god-mode gate on
+  root/impersonation routes.
 - **Contract capabilities derive platform authority from permission keys.**
   `build_model_contract` / `_build_capabilities` no longer take an
-  `is_superadmin` argument; the delete capability for a platform-gated policy is
-  computed from the caller's `platform.*` keys. `AdminPolicy.capability_flags`
-  takes `has_platform=` instead of `is_superadmin=`. `platform.*` keys are never
-  emitted into the tenant-assignable `PermissionCatalog`, so a tenant `owner`
-  cannot mint them. `CONTRACT_VERSION` unchanged (wire shape identical).
+  `is_superadmin` argument; `AdminPolicy.capability_flags` takes `has_platform=`
+  instead of `is_superadmin=`.
+- **Tenant seeding excludes `platform.*` keys.** `seed_default_tenant_roles`
+  filters them out, so a tenant owner can never be granted platform authority
+  even though both tiers share one `PermissionCatalog`.
+
+### Security
+- **`User.is_superadmin` is now CLI-only.** It is read-only in `UserAdmin`
+  (visible, not settable) so one superadmin cannot mint another through the UI;
+  granting/revoking requires `asterion user …` (host shell access). Platform
+  authority (`platform.*`) is minted only from this flag. `is_service_account`
+  is likewise read-only in `UserAdmin`.
 
 ## [0.1.50] - 2026-07-02
 

@@ -57,23 +57,25 @@ def _require_resource_permission(
 ) -> None:
     """Authorize ``action`` on ``admin_class`` for the caller.
 
-    Layers the admin's ``superadmin_only`` scope on top of the per-resource
-    permission-key check: a superadmin-only admin (global/public-schema models
-    such as ``User`` / ``Tenant`` / ``ImpersonationLog``) is authorized against
-    the **platform tier** — the caller must hold ``platform.<resource>.<action>``
-    (ADR-0004). A superadmin holds ``platform.*`` and passes; a tenant ``owner``
-    holds only ``admin.*`` and does not, so an ``admin.*`` grant inside a tenant
-    can never reach a public table (closing a cross-tenant read). Checked via
-    keys, not ``is_superadmin`` — one authorization channel; from Phase 2 a
-    scoped platform-staff grant clears it too.
+    A ``superadmin_only`` admin (global/public-schema models such as ``User`` /
+    ``Tenant`` / ``ImpersonationLog``) is a pure **platform-tier** resource: it
+    authorizes solely against ``platform.<resource>.<action>`` (ADR-0004), not
+    the tenant ``admin.*`` namespace. A superadmin holds ``platform.*`` and
+    passes; a scoped platform-staff grant (``platform.tenants.read``) passes for
+    that resource; a tenant ``owner`` holds only ``admin.*`` and is refused, so
+    an ``admin.*`` grant inside a tenant can never reach a public table (closing
+    a cross-tenant read). One authorization channel — keys, not ``is_superadmin``.
+
+    Every other admin authorizes against the tenant tier via
+    :func:`require_resource_access`.
     """
-    if getattr(admin_class, "superadmin_only", False) and not ctx.has_permission(
-        platform_key(admin_class.model_name, action)
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Platform privileges required.",
-        )
+    if getattr(admin_class, "superadmin_only", False):
+        if not ctx.has_permission(platform_key(admin_class.model_name, action)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Platform privileges required.",
+            )
+        return
     require_resource_access(ctx, admin_class.model_name, action)
 
 
