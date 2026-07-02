@@ -129,9 +129,12 @@ def test_tenant_admin_slug_and_schema_are_readonly():
 
 
 def test_update_only_contract_hides_create_and_delete_keeps_update():
-    """The contract reports update=True but create/delete=False even when the
-    caller holds admin.* — UI shows Edit, hides New/Delete."""
-    contract = build_model_contract(UserAdmin(), permissions=frozenset({"admin.*"}))
+    """The contract reports update=True but create/delete=False for a caller who
+    can reach this platform-tier admin — UI shows Edit, hides New/Delete.
+
+    ``UserAdmin`` is ``superadmin_only`` (platform tier, ADR-0004), so its
+    capabilities authorize against ``platform.*``, not the tenant ``admin.*``."""
+    contract = build_model_contract(UserAdmin(), permissions=frozenset({"platform.*"}))
     assert contract.capabilities.create is False
     assert contract.capabilities.delete is False
     assert contract.capabilities.update is True

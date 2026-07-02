@@ -778,18 +778,25 @@ def _admin_action_meta(action) -> AdminActionMeta:
 # ---------------------------------------------------------------------------
 
 
-def _has(permissions: Collection[str] | None, resource: str, action: str) -> bool:
+def _has(
+    permissions: Collection[str] | None,
+    resource: str,
+    action: str,
+    namespace: str = "admin",
+) -> bool:
     """Permission check for capability computation.
 
     Returns ``True`` when ``permissions`` is None (no caller context —
     we cannot narrow). Otherwise consults the wildcard-aware matcher
-    from :mod:`asterion.authz.permissions`.
+    from :mod:`asterion.authz.permissions`. ``namespace`` is ``platform`` for a
+    ``superadmin_only`` (platform-tier) resource so the contract matches the
+    route gate for platform staff (ADR-0004).
     """
     if permissions is None:
         return True
     from asterion.authz.permissions import has_permission, permission_key
 
-    return has_permission(permissions, permission_key(resource, action))
+    return has_permission(permissions, permission_key(resource, action, namespace))
 
 
 def _build_capabilities(
@@ -799,12 +806,17 @@ def _build_capabilities(
     singleton_full: bool = False,
 ) -> CapabilitiesMeta:
     resource = model_admin.model_name
+    # Platform-tier (``superadmin_only``) resources authorize against
+    # ``platform.*``; every other admin against ``admin.*`` (ADR-0004). Match the
+    # namespace the route gate uses so a platform-staff caller's capabilities are
+    # reported correctly rather than always False.
+    ns = "platform" if getattr(model_admin, "superadmin_only", False) else "admin"
     bulk_actions: list[str] = []
     for action in model_admin.actions:
         action_name = getattr(action, "name", None)
         if not action_name:
             continue
-        if _has(permissions, resource, action_name):
+        if _has(permissions, resource, action_name, ns):
             bulk_actions.append(action_name)
 
     # A policy's ``capability_flags`` resolves the object-independent
@@ -838,9 +850,9 @@ def _build_capabilities(
             allow_create = False
 
     return CapabilitiesMeta(
-        create=allow_create and _has(permissions, resource, "create"),
-        update=allow_update and _has(permissions, resource, "update"),
-        delete=allow_delete and _has(permissions, resource, "delete"),
+        create=allow_create and _has(permissions, resource, "create", ns),
+        update=allow_update and _has(permissions, resource, "update", ns),
+        delete=allow_delete and _has(permissions, resource, "delete", ns),
         bulk_actions=[] if read_only else bulk_actions,
     )
 
