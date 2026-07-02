@@ -89,6 +89,13 @@ class AdminPolicy:
     backward-compatible.
     """
 
+    #: The resource name this policy is bound to, set by
+    #: :meth:`AdminRegistry.register` at registration time. Lets object-level
+    #: hooks build per-resource permission keys (e.g.
+    #: :class:`SuperadminDeletablePolicy`'s ``platform.<resource>.delete`` gate,
+    #: ADR-0004). ``None`` until the admin is registered.
+    resource: str | None = None
+
     #: Resource-level read-only marker. When ``True`` the contract reports
     #: ``create``/``update``/``delete`` capabilities as ``False`` (regardless
     #: of the caller's permission keys), so the UI hides the New/Edit/Delete
@@ -108,26 +115,29 @@ class AdminPolicy:
     disable_update: bool = False
     disable_delete: bool = False
 
-    def capability_flags(self, *, is_superadmin: bool = False) -> tuple[bool, bool, bool]:
+    def capability_flags(self, *, has_platform: bool = False) -> tuple[bool, bool, bool]:
         """Object-independent ``(create, update, delete)`` allow-flags for the
         contract's ``capabilities`` block (Roadmap v0.1.50).
 
         The contract needs to report what THIS caller can actually do so the UI
         never shows a control the route would 403. Permission keys alone can't
         express every rule — a tenant ``owner`` and a real superadmin both carry
-        ``admin.*``, yet a policy may allow only the latter to delete. This hook
-        lets a policy fold the caller's superadmin status into the capability
-        answer without the contract builder hard-coding any policy's logic.
+        ``admin.*``, yet a policy may allow only a platform operator to delete.
+        This hook lets a policy fold the caller's *platform* authority into the
+        capability answer without the contract builder hard-coding any policy's
+        logic.
 
         The default derives purely from the static markers (:attr:`read_only`,
         :attr:`disable_create` / :attr:`disable_update` / :attr:`disable_delete`)
-        and ignores ``is_superadmin`` — so every existing policy keeps its
+        and ignores ``has_platform`` — so every existing policy keeps its
         current contract behaviour. Override to make a capability depend on the
         caller (see :class:`SuperadminDeletablePolicy`).
 
-        ``is_superadmin`` reflects :attr:`AdminContext.is_superadmin`, which is
-        ``False`` during impersonation — an impersonating admin is treated as
-        the impersonated tenant user here, matching the route gates.
+        ``has_platform`` is ``True`` when the caller holds the relevant
+        ``platform.*`` grant (ADR-0004) — computed by the contract builder from
+        the caller's permission keys, not from ``is_superadmin``. It is
+        ``False`` during impersonation, since the impersonating admin carries
+        the impersonated tenant user's keys, matching the route gates.
         """
         read_only = self.read_only
         return (
@@ -243,27 +253,27 @@ class NoCreateDeletePolicy(AdminPolicy):
 
 class SuperadminDeletablePolicy(AdminPolicy):
     """List / read for everyone, but *no* create or update through the
-    framework, and delete only for a real superadmin (Roadmap v0.1.50).
+    framework, and delete only for the platform tier (Roadmap v0.1.50, ADR-0004).
 
     For framework-owned tables whose rows are written by a dedicated path (a
     background job, an import, an event handler) and must stay immutable once
-    written — yet a superadmin still needs an escape hatch to purge a bad row.
-    The canonical shape an embedding app reached for was an audit-style /
+    written — yet a platform operator still needs an escape hatch to purge a bad
+    row. The canonical shape an embedding app reached for was an audit-style /
     ledger table: tenant users may browse it, nobody edits it, and only a
     platform operator can delete.
 
-    Why superadmin and not a permission key: :class:`~asterion.authz`'s builtin
-    provider grants superadmins ``admin.*``, but a tenant ``owner`` carries
-    ``admin.*`` too — the two are indistinguishable at the permission-key level.
-    Gating delete on :attr:`AdminContext.is_superadmin` is the only way to let
-    the platform operator through while keeping every tenant role (owner
-    included) out. Because ``is_superadmin`` is ``False`` during impersonation,
-    an impersonating admin is also blocked — deletes happen as yourself, not as
-    a tenant user.
+    How the delete stays platform-only: delete is gated on the
+    ``platform.<resource>.delete`` permission key (ADR-0004). A superadmin holds
+    ``platform.*`` and matches it; a tenant ``owner`` holds only ``admin.*`` and
+    does not — so the two are cleanly distinguished at the key level, with no
+    ``is_superadmin`` branch. From Phase 2, a scoped platform-staff grant can
+    also authorize the delete. During impersonation the admin carries the
+    impersonated tenant user's keys (no ``platform.*``), so the delete is
+    blocked — deletes happen as yourself, not as a tenant user.
 
     This is a generic capability shape, not a domain concept: the framework
     stays free of any "append-only" / "immutable ledger" vocabulary. Prefer
-    :class:`ReadOnlyPolicy` when even superadmins shouldn't delete, or
+    :class:`ReadOnlyPolicy` when even the platform tier shouldn't delete, or
     :class:`NoCreateDeletePolicy` when the table is freely editable.
     """
 
@@ -273,10 +283,18 @@ class SuperadminDeletablePolicy(AdminPolicy):
     disable_create = True
     disable_update = True
 
-    def capability_flags(self, *, is_superadmin: bool = False) -> tuple[bool, bool, bool]:
-        # create=False, update=False for all; delete only for a real superadmin
-        # so the contract matches what :meth:`can_delete_object` enforces.
-        return (False, False, is_superadmin)
+    def _delete_key(self) -> str | None:
+        if self.resource is None:
+            return None
+        from asterion.authz.permissions import platform_key
+
+        return platform_key(self.resource, "delete")
+
+    def capability_flags(self, *, has_platform: bool = False) -> tuple[bool, bool, bool]:
+        # create=False, update=False for all; delete only when the caller holds
+        # the platform delete grant, so the contract matches what
+        # :meth:`can_delete_object` enforces.
+        return (False, False, has_platform)
 
     async def can_create(self, ctx: AdminContext) -> bool:
         return False
@@ -285,7 +303,11 @@ class SuperadminDeletablePolicy(AdminPolicy):
         return False
 
     async def can_delete_object(self, obj: Any, ctx: AdminContext) -> bool:
-        return ctx.is_superadmin
+        key = self._delete_key()
+        # Unbound policy (not registered) has no resource to key on — fail safe.
+        if key is None:
+            return False
+        return ctx.has_permission(key)
 
 
 # ---------------------------------------------------------------------------

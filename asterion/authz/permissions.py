@@ -13,6 +13,21 @@ from asterion.security.validation import (
 
 DEFAULT_NAMESPACE = "admin"
 
+#: The platform tier's namespace (ADR-0004). Keys under ``platform.*`` express
+#: authority a tenant cannot mint: they are held only by superadmins (mapped in
+#: the ``PermissionProvider``) and — from Phase 2 — by platform staff via the
+#: public-schema ``PlatformRole`` store. They are never assignable through
+#: tenant RBAC, so a tenant ``owner`` (who holds ``admin.*``) can never obtain
+#: them. This is what lets a gate distinguish the platform operator from a
+#: tenant owner, which ``admin.*`` alone cannot.
+PLATFORM_NAMESPACE = "platform"
+
+#: God-mode marker: the grant a full superadmin carries. Gates for
+#: platform-operator-only surfaces (impersonation, cross-tenant tooling) require
+#: this exact key — a scoped staff grant like ``platform.tenants.read`` does not
+#: match it, so staff are kept out of god-mode routes.
+PLATFORM_WILDCARD = f"{PLATFORM_NAMESPACE}.*"
+
 
 def permission_key(resource: str, action: str, namespace: str = DEFAULT_NAMESPACE) -> str:
     """Build a concrete required permission key (no wildcards)."""
@@ -20,6 +35,11 @@ def permission_key(resource: str, action: str, namespace: str = DEFAULT_NAMESPAC
     action = validate_action_name(action)
     key = f"{namespace}.{resource}.{action}"
     return validate_permission_key(key)
+
+
+def platform_key(resource: str, action: str) -> str:
+    """Build a concrete ``platform.<resource>.<action>`` key (ADR-0004)."""
+    return permission_key(resource, action, namespace=PLATFORM_NAMESPACE)
 
 
 def _matches_permission(granted: str, required: str) -> bool:
@@ -112,7 +132,12 @@ def require_resource_access(ctx, resource: str, action: str) -> None:
     if ctx.tenant is None:
         if not single_tenant_superadmin_required(ctx):
             return
-        if getattr(ctx, "is_superadmin", False) or ctx.has_permission(required):
+        # Platform authority (``platform.*``, held by superadmins) or an
+        # explicit ``admin.<res>.<action>`` grant clears the no-tenant gate.
+        # Checked via keys, not ``is_superadmin`` — one authorization channel
+        # (ADR-0004); a superadmin reaches this through the ``platform.*`` grant
+        # the PermissionProvider maps for them.
+        if ctx.has_permission(PLATFORM_WILDCARD) or ctx.has_permission(required):
             return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

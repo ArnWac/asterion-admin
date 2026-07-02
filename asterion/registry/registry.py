@@ -31,6 +31,13 @@ class AdminRegistry:
         if isinstance(admin, type):
             admin = admin()
         key = validate_resource_name(admin.model_name)
+        # Bind the resource onto the policy so object-level hooks can build
+        # per-resource permission keys (e.g. SuperadminDeletablePolicy's
+        # ``platform.<resource>.delete`` gate — ADR-0004). Each admin owns its
+        # own policy instance, so this is a stable 1:1 binding.
+        policy = getattr(admin, "policy", None)
+        if policy is not None and getattr(policy, "resource", None) is None:
+            policy.resource = key
         self._registry[key] = admin
 
     def freeze(self) -> None:

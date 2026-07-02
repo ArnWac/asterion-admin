@@ -467,22 +467,26 @@ A policy can only ever *tighten* access — it can hide rows, forbid an operatio
 or downgrade a field to read-only / hidden, but it can never grant access the
 permission keys didn't.
 
-### `ModelAdmin.superadmin_only`
+### `ModelAdmin.platform_only`
 
-Set `superadmin_only = True` to restrict every CRUD route for this admin to
-superadmins, regardless of the caller's permission keys.
+Set `platform_only = True` to make this admin a **platform-tier** resource
+([ADR-0004](adr/0004-platform-tier-rbac.md)): its CRUD routes authorize against
+`platform.<resource>.<action>` instead of the tenant `admin.*` namespace.
 
 ```python
 class UserAdmin(ModelAdmin):
     model = User
-    superadmin_only = True
+    platform_only = True
 ```
 
-The framework already requires a superadmin in *no-tenant* (root) scope, but
-inside a tenant a caller with an `admin.*` grant would otherwise reach a
-global / public-schema resource and read across tenants. Set this on admins for
-public-schema models that must stay superadmin-only everywhere (the built-in
-`User` / `Tenant` / `ImpersonationLog` admins do). Defaults to `False`.
+This is **not** "full superadmin only". A full superadmin (holds `platform.*`)
+reaches it, and so does *scoped platform staff* holding the matching `platform.*`
+key via a [`PlatformRole`](permission-matrix.md#platform-global-scope) — e.g. a
+support account with `platform.users.read` can read this admin without being a
+superadmin. A tenant `owner` (holds only `admin.*`) is refused, so an in-tenant
+grant can never reach a global / public-schema resource and read across tenants.
+Set this on admins for public-schema models (the built-in `User` / `Tenant` /
+`ImpersonationLog` / `PlatformRole` admins do). Defaults to `False`.
 
 ### `ModelAdmin.singleton`
 
@@ -849,7 +853,7 @@ app can re-register its own variant and win.
 | `TenantRolePermissionAdmin` | `tenant_role_permissions` | Manage role → permission-key assignments. |
 | `TenantMembershipRoleAdmin` | `tenant_membership_roles` | Manage which membership has which role. |
 
-**Global (public-schema) admins** — all `superadmin_only`, so a tenant-scoped
+**Global (public-schema) admins** — all `platform_only`, so a tenant-scoped
 caller with an `admin.*` grant cannot reach them and read across tenants:
 
 | Class | Resource | Write scope |

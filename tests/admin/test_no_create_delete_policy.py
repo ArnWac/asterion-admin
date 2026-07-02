@@ -28,7 +28,9 @@ def _ctx() -> AdminContext:
         request=None,
         principal=AdminPrincipal(id="root", email="root@example.com", is_superadmin=True),
         tenant=None,
-        permissions=frozenset({"admin.*"}),
+        # A superadmin's effective grant is both tiers (ADR-0004); the
+        # ``platform.*`` half is what clears a ``platform_only`` gate.
+        permissions=frozenset({"admin.*", "platform.*"}),
     )
 
 
@@ -65,13 +67,13 @@ def test_impersonation_admin_is_read_only():
     assert isinstance(ImpersonationLogAdmin.policy, ReadOnlyPolicy)
 
 
-def test_global_builtin_admins_are_superadmin_only():
-    assert UserAdmin.superadmin_only is True
-    assert TenantAdmin.superadmin_only is True
-    assert ImpersonationLogAdmin.superadmin_only is True
+def test_global_builtin_admins_are_platform_only():
+    assert UserAdmin.platform_only is True
+    assert TenantAdmin.platform_only is True
+    assert ImpersonationLogAdmin.platform_only is True
 
 
-# --- superadmin_only enforcement -------------------------------------------
+# --- platform_only enforcement -------------------------------------------
 
 
 def _tenant_owner_ctx() -> AdminContext:
@@ -84,27 +86,28 @@ def _tenant_owner_ctx() -> AdminContext:
     )
 
 
-def test_superadmin_only_blocks_tenant_owner_despite_admin_wildcard():
+def test_platform_only_blocks_tenant_owner_despite_admin_wildcard():
     """A tenant owner's ``admin.*`` would match ``admin.users.list``; the
-    superadmin_only scope must still 403 — no cross-tenant read of public.users."""
+    platform_only scope must still 403 — no cross-tenant read of public.users."""
     with pytest.raises(HTTPException) as exc:
         _require_resource_permission(_tenant_owner_ctx(), UserAdmin(), "list")
     assert exc.value.status_code == 403
 
 
-def test_superadmin_only_allows_superadmin():
+def test_platform_only_allows_superadmin():
     ctx = AdminContext(
         request=None,
         principal=AdminPrincipal(id="root", email="root@x.test", is_superadmin=True),
         tenant=AdminTenant(id="22222222-2222-2222-2222-222222222222", slug="acme"),
-        permissions=frozenset({"admin.*"}),
+        # ``platform.*`` is what clears the platform_only (platform-tier) gate.
+        permissions=frozenset({"admin.*", "platform.*"}),
     )
     # Must not raise.
     _require_resource_permission(ctx, UserAdmin(), "list")
 
 
-def test_non_superadmin_only_admin_unaffected():
-    """A normal (non-superadmin_only) admin still authorizes a tenant owner with
+def test_non_platform_only_admin_unaffected():
+    """A normal (non-platform_only) admin still authorizes a tenant owner with
     the matching key — the new scope must not regress the default path."""
 
     class _Thing:
@@ -113,7 +116,7 @@ def test_non_superadmin_only_admin_unaffected():
     class _ThingAdmin(ModelAdmin):
         model = _Thing
 
-    # Must not raise: admin.* matches admin.things.list, superadmin_only is False.
+    # Must not raise: admin.* matches admin.things.list, platform_only is False.
     _require_resource_permission(_tenant_owner_ctx(), _ThingAdmin(), "list")
 
 
@@ -126,9 +129,12 @@ def test_tenant_admin_slug_and_schema_are_readonly():
 
 
 def test_update_only_contract_hides_create_and_delete_keeps_update():
-    """The contract reports update=True but create/delete=False even when the
-    caller holds admin.* — UI shows Edit, hides New/Delete."""
-    contract = build_model_contract(UserAdmin(), permissions=frozenset({"admin.*"}))
+    """The contract reports update=True but create/delete=False for a caller who
+    can reach this platform-tier admin — UI shows Edit, hides New/Delete.
+
+    ``UserAdmin`` is ``platform_only`` (platform tier, ADR-0004), so its
+    capabilities authorize against ``platform.*``, not the tenant ``admin.*``."""
+    contract = build_model_contract(UserAdmin(), permissions=frozenset({"platform.*"}))
     assert contract.capabilities.create is False
     assert contract.capabilities.delete is False
     assert contract.capabilities.update is True

@@ -72,12 +72,14 @@ def _crud_actions_for(admin: ModelAdmin) -> list[str]:
     A permission key is only worth emitting if a normal (non-superadmin) tenant
     role could ever be *granted* it and have it take effect. list + read are
     always enforceable. For the write actions we ask the admin's policy for its
-    object-independent ``capability_flags`` with ``is_superadmin=False`` — the
-    catalog is the universe of keys assignable to tenant roles, and a superadmin
-    already holds ``admin.*`` so never needs a concrete key. A read-only admin
-    therefore emits no create/update/delete key; a ``SuperadminDeletablePolicy``
-    admin emits none either (its delete is superadmin-gated, not key-gated),
-    keeping dead, unenforceable keys out of the catalog and the rights matrix.
+    object-independent ``capability_flags`` with ``has_platform=False`` — the
+    catalog is the universe of keys assignable to *tenant* roles, and platform
+    authority (``platform.*``) is never assignable there (ADR-0004). A read-only
+    admin therefore emits no create/update/delete key; a
+    ``SuperadminDeletablePolicy`` admin emits none either (its delete is
+    platform-key-gated, so the tenant-assignable ``admin.<res>.delete`` key
+    would be dead), keeping unenforceable keys out of the catalog and the rights
+    matrix.
 
     Policies predate ``capability_flags``; a policy object without it (or a
     non-standard duck-typed policy) falls back to all five keys, matching the
@@ -86,7 +88,7 @@ def _crud_actions_for(admin: ModelAdmin) -> list[str]:
     actions = list(_READ_CRUD_ACTIONS)
     policy = getattr(admin, "policy", None)
     if policy is not None and hasattr(policy, "capability_flags"):
-        flags = policy.capability_flags(is_superadmin=False)
+        flags = policy.capability_flags(has_platform=False)
     else:
         flags = (True, True, True)
     for action, slot in _WRITE_CRUD_ACTIONS:
@@ -95,13 +97,25 @@ def _crud_actions_for(admin: ModelAdmin) -> list[str]:
     return actions
 
 
+def _namespace_for(admin: ModelAdmin) -> str:
+    """Which permission namespace this admin's keys live in (ADR-0004).
+
+    A ``platform_only`` admin is a platform-tier resource: its keys are
+    ``platform.<res>.<action>`` (assignable to platform roles, never to tenant
+    roles). Every other admin is tenant-tier (``admin.*``).
+    """
+    return "platform" if getattr(admin, "platform_only", False) else "admin"
+
+
 def _crud_keys(resource: str, admin: ModelAdmin) -> list[str]:
     resource = validate_resource_name(resource)
-    return [f"admin.{resource}.{action}" for action in _crud_actions_for(admin)]
+    ns = _namespace_for(admin)
+    return [f"{ns}.{resource}.{action}" for action in _crud_actions_for(admin)]
 
 
 def _action_keys(resource: str, admin: ModelAdmin) -> list[str]:
     resource = validate_resource_name(resource)
+    ns = _namespace_for(admin)
     keys: list[str] = []
     for action in admin.actions:
         name = getattr(action, "name", None)
@@ -111,7 +125,7 @@ def _action_keys(resource: str, admin: ModelAdmin) -> list[str]:
             validated = validate_action_name(name)
         except Exception:
             continue
-        keys.append(f"admin.{resource}.{validated}")
+        keys.append(f"{ns}.{resource}.{validated}")
     return keys
 
 
@@ -124,10 +138,14 @@ def generate_permission_keys(
     Combines two sources:
 
     * **Auto-derived CRUD keys** — for each registered ``ModelAdmin``, the
-      enforceable CRUD keys given its policy (``admin.<resource>.{list,read}``
+      enforceable CRUD keys given its policy (``<ns>.<resource>.{list,read}``
       always; ``create`` / ``update`` / ``delete`` only when the policy leaves
       that action reachable via a permission key — see :func:`_crud_actions_for`)
-      plus one ``admin.<resource>.<action>`` per declared admin action.
+      plus one ``<ns>.<resource>.<action>`` per declared admin action. The
+      namespace ``<ns>`` is ``platform`` for a ``platform_only`` admin and
+      ``admin`` otherwise (ADR-0004): platform keys are assignable to
+      ``PlatformRole``s, never to tenant roles — tenant seeding filters them out
+      (see ``seed_default_tenant_roles``).
     * **Extension-contributed keys** — if ``permission_registry`` is
       passed, every key that any extension registered via
       ``register_permissions(...)`` is also merged in. This is how

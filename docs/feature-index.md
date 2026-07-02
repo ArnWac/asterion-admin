@@ -39,7 +39,7 @@ Full reference: [model-admin.md](model-admin.md). Resource name = model
 | `actions` | `[AdminAction(...)]` bulk ops. | Permission key = `admin.<resource>.<action.name>`. |
 | `inlines` | `[InlineAdmin]` child rows. | Inline writes share the parent transaction (all-or-nothing). `widget="dual_list"` → transfer widget over `value_field`, options from `resolve_options` via `/{resource}/_inline_options/{inline}`. |
 | `policy` | `AdminPolicy` object/field gates. | Can only tighten, never loosen, static field perms. |
-| `superadmin_only` | Restrict all routes to superadmins. | Closes the in-tenant `admin.*` → global-resource cross-tenant read. |
+| `platform_only` | Platform-tier resource: authorize against `platform.<res>.<action>`. | Closes the in-tenant `admin.*` → global-resource cross-tenant read; a scoped `PlatformRole` grant can reach it (ADR-0004). |
 | `singleton` | One-row-per-tenant settings page. | Counts via the request session (per-tenant); **no** DB constraint; explicit `policy` wins. |
 | `category` / `nav_order` | Sidebar grouping + ordering (5.7). | Category order via `CoreAdminConfig.sidebar_categories`; built-ins default to `"System"` (sorts last); ungrouped models list flat on top. |
 
@@ -83,7 +83,7 @@ can_update_object / can_delete_object / field_permission`. `FieldPermission`:
 | Neutral DTOs | `AuthIdentity`, `AdminPrincipal`, `AdminTenant`. | Framework never sees your `User` ORM row. |
 | `AdminContext` | `require_admin_context` (401) vs `build_admin_context` (anon-ok). | `is_superadmin`, `has_permission(key)`. |
 | Builtin providers | JWT auth + SQLAlchemy user + tenant middleware + RBAC perms. | RBAC perm lookup needs `search_path` → SQLite returns `frozenset()`. |
-| Superadmin | `is_superadmin` → `{"admin.*"}`. | Matches only `admin.*` namespace; other namespaces must check `ctx.is_superadmin`. |
+| Platform tier | `is_superadmin` → `{"admin.*","platform.*"}`; staff hold scoped `platform.*` via `PlatformRole` ([ADR-0004](adr/0004-platform-tier-rbac.md)). | `is_superadmin` is CLI-only; `platform.*` never seeded to tenant roles; every gate is `has_permission`, no `is_superadmin` branch. |
 | Service accounts | `create_service_account` token-only machine user. | Passwordless, `is_service_account=True`, excluded from password reset. |
 | External auth boundary | Covers auth/CRUD/contract. | root/audit/CLI still import builtin `User`. |
 

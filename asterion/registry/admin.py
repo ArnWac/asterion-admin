@@ -151,15 +151,17 @@ class ModelAdmin:
     #: value.
     field_conditions: dict[str, dict] = {}
 
-    #: Restrict every CRUD route for this admin to superadmins, regardless of
-    #: the caller's permission keys. The framework already requires a superadmin
-    #: in *no-tenant* (root) scope, but inside a tenant a caller with an
-    #: ``admin.*`` grant would otherwise reach a global/public-schema resource
-    #: and read across tenants. Set ``True`` on admins for public-schema models
-    #: that must stay superadmin-only everywhere (the built-in ``User`` /
-    #: ``Tenant`` / ``ImpersonationLog`` admins do). Enforced centrally in the
-    #: CRUD router; defaults ``False`` so existing admins are unaffected.
-    superadmin_only: bool = False
+    #: Mark this admin a **platform-tier** resource (ADR-0004): its CRUD routes
+    #: authorize against ``platform.<resource>.<action>`` instead of the tenant
+    #: ``admin.*`` namespace. A full superadmin (holds ``platform.*``) reaches it,
+    #: and so does *scoped platform staff* holding the matching ``platform.*``
+    #: key via a ``PlatformRole`` — this is NOT "full superadmin only". A tenant
+    #: ``owner`` (``admin.*`` only) is refused, so an in-tenant grant can never
+    #: reach a global/public-schema resource and read across tenants. Set ``True``
+    #: on admins for public-schema models (the built-in ``User`` / ``Tenant`` /
+    #: ``ImpersonationLog`` / ``PlatformRole`` admins do). Enforced centrally in
+    #: the CRUD router; defaults ``False`` so tenant-tier admins are unaffected.
+    platform_only: bool = False
 
     #: Optional :class:`~asterion.admin.policy.AdminPolicy` instance
     #: layered on top of the permission-key checks. ``None`` means

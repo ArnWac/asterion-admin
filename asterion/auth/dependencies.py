@@ -84,6 +84,12 @@ async def require_superadmin(
     request: Request,
     current_user: User = Depends(get_current_user),
 ) -> User:
+    # God-mode identity gate for platform-operator-only root routes
+    # (impersonation, cross-tenant tooling). These require the full superadmin
+    # identity — the top of the platform tier (ADR-0004) — not a scoped
+    # ``platform.*`` staff grant, so this stays a direct identity check rather
+    # than a per-resource key lookup. ``is_superadmin`` here is identity, not a
+    # tenant-vs-platform authorization decision.
     payload = getattr(request.state, "token_payload", {})
 
     if is_impersonation_token(payload):
