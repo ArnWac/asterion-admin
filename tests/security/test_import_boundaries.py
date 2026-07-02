@@ -42,8 +42,17 @@ def _concrete_extension_names() -> set[str]:
     }
 
 
-#: Allowlist of intentional exceptions. None for now.
-ALLOWED_EXCEPTIONS: set[tuple[str, str]] = set()
+#: Allowlist of intentional exceptions — ``(posix-relpath, import-target)``.
+ALLOWED_EXCEPTIONS: set[tuple[str, str]] = {
+    # The `asterion service-account` CLI delegates to the service_accounts
+    # extension's provisioning helpers (ADR-0005). The CLI is an ops tool, not
+    # the request-serving runtime: the extension SPI has no CLI hook, and the
+    # router layer stays clean (see test_no_import_of_extensions_in_router_layer,
+    # which does NOT police cli/). So the running app still knows nothing about
+    # service accounts unless it wires the extension — only this CLI command
+    # imports it, lazily, when it runs.
+    ("asterion/cli/main.py", "asterion.extensions.service_accounts"),
+}
 
 
 def _iter_core_python_files() -> list[Path]:
@@ -104,11 +113,11 @@ def test_core_does_not_import_concrete_extensions():
 
     offenders: list[str] = []
     for path in _iter_core_python_files():
-        rel = path.relative_to(PACKAGE_ROOT.parent)
+        rel = path.relative_to(PACKAGE_ROOT.parent).as_posix()
         for lineno, target in _imports_in(path):
             if not _is_forbidden(target, concrete):
                 continue
-            if (str(rel), target) in ALLOWED_EXCEPTIONS:
+            if (rel, target) in ALLOWED_EXCEPTIONS:
                 continue
             offenders.append(f"{rel}:{lineno}: imports {target!r}")
 

@@ -19,8 +19,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from asterion import CoreAdminConfig, create_admin
-from asterion.auth.service_accounts import create_service_account, delete_service_account
 from asterion.auth.tokens import create_access_token
+from asterion.extensions.service_accounts import create_service_account, delete_service_account
 from asterion.models.base import GLOBAL_METADATA, TenantBase
 from asterion.models.password_reset_token import PasswordResetToken
 from asterion.models.tenant_membership import TenantMembership
@@ -64,10 +64,10 @@ async def test_provisions_passwordless_active_user_with_role(factory):
             )
             uid = user.id
             # Active, non-superadmin, passwordless (hash set but unusable),
-            # flagged as a service account.
+            # password-login-disabled (machine account, ADR-0005).
             assert user.is_active is True
             assert user.is_superadmin is False
-            assert user.is_service_account is True
+            assert user.password_login_disabled is True
             assert user.hashed_password
             assert user.email.endswith("@service.invalid")
 
@@ -185,7 +185,7 @@ async def test_delete_refuses_non_service_user(factory):
                 hashed_password="x",
                 is_active=True,
                 is_superadmin=False,
-                is_service_account=False,
+                password_login_disabled=False,
             )
             s.add(user)
             await s.flush()

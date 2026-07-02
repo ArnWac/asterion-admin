@@ -28,7 +28,7 @@ Legend — **Category**: `IDENTITY` / `CONTACT` / `BEHAVIORAL` / `SENSITIVE` (th
 | `users` | `full_name` | IDENTITY | Display name | Nullable. Cleared on anonymisation. |
 | `users` | `hashed_password` | credential | Auth | bcrypt+SHA-256 pre-hash; never exported. |
 | `users` | `totp_secret` | credential | 2FA | Never exported; cleared on anonymisation. |
-| `users` | `is_active`, `is_superadmin`, `is_service_account`, `totp_enabled`, `token_version` | non-personal | Auth/state | — |
+| `users` | `is_active`, `is_superadmin`, `password_login_disabled`, `totp_enabled`, `token_version` | non-personal | Auth/state | — |
 | `users` | `deactivated_at` | non-personal | Retention clock (G2) | Set on disable; starts the anonymisation timer. |
 | `tenants` | `name`, `slug`, `schema_name` | non-personal* | Tenant identity | *Org data; may be personal for a sole-proprietor tenant. |
 | `tenants` | `allowed_cidrs`, `timezone`, `language`, `date_*` | non-personal | Tenant config | — |

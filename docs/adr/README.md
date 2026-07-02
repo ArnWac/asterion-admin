@@ -19,3 +19,4 @@ Format: **Status · Context · Decision · Consequences**.
 | [0002](0002-privacy-as-core-module.md) | Privacy as a core module, not an extension | Accepted |
 | [0003](0003-bearer-token-not-cookie.md) | Bearer tokens instead of cookie sessions | Accepted |
 | [0004](0004-platform-tier-rbac.md) | Platform authority as a second RBAC tier, not a superadmin boolean | Accepted |
+| [0005](0005-service-accounts-as-extension.md) | Service accounts as an extension; core keeps a generic password-login-disabled mechanism | Accepted |

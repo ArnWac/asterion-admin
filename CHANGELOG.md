@@ -16,6 +16,41 @@ shape change bumps `CONTRACT_VERSION`.
 
 ## [Unreleased]
 
+## [0.1.52] - 2026-07-03
+
+Service accounts become an extension ([ADR-0005](docs/adr/0005-service-accounts-as-extension.md));
+core keeps only a generic password-login-disabled auth mechanism.
+
+### Breaking
+- **`User.is_service_account` renamed to `User.password_login_disabled`**
+  (migration `0011`, value-preserving rename). The flag now names a generic auth
+  mechanism — "may not authenticate with a password and never receives a reset
+  token" — not the domain concept "service account". It is explicitly **not**
+  the same as passwordless: an invited human is passwordless yet
+  `password_login_disabled=False`, so still receives a reset token.
+- **Service-account helpers moved** from `asterion.auth.service_accounts` to the
+  new `asterion.extensions.service_accounts` package. Update imports:
+  `from asterion.extensions.service_accounts import create_service_account,
+  delete_service_account`.
+
+### Added
+- **`ServiceAccountsExtension`** (`asterion/extensions/service_accounts/`) —
+  token-only machine accounts as an optional extension, mirroring `auth_oauth`:
+  its own public-schema `ServiceAccount` marker table (via `register_models`; no
+  bundled migration — host apps autogenerate, like `external_identities`), the
+  `create_service_account` / `delete_service_account` helpers, and the extension
+  class. The running app no longer knows about service accounts unless it wires
+  the extension.
+
+### Changed
+- **`create_service_account` records a `ServiceAccount` row** and sets
+  `password_login_disabled=True`; `delete_service_account`'s "refuse a normal
+  user" guard now reads that table (not the old boolean).
+- **`asterion service-account create/delete` CLI stays** in the framework CLI but
+  delegates to the extension helpers (the CLI is an ops tool; the SPI has no CLI
+  hook). `UserAdmin` drops the flag from `list_display` and exposes the generic
+  `password_login_disabled` read-only.
+
 ## [0.1.51] - 2026-07-02
 
 Platform-tier RBAC ([ADR-0004](docs/adr/0004-platform-tier-rbac.md)): platform

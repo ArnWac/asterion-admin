@@ -84,7 +84,7 @@ can_update_object / can_delete_object / field_permission`. `FieldPermission`:
 | `AdminContext` | `require_admin_context` (401) vs `build_admin_context` (anon-ok). | `is_superadmin`, `has_permission(key)`. |
 | Builtin providers | JWT auth + SQLAlchemy user + tenant middleware + RBAC perms. | RBAC perm lookup needs `search_path` → SQLite returns `frozenset()`. |
 | Platform tier | `is_superadmin` → `{"admin.*","platform.*"}`; staff hold scoped `platform.*` via `PlatformRole` ([ADR-0004](adr/0004-platform-tier-rbac.md)). | `is_superadmin` is CLI-only; `platform.*` never seeded to tenant roles; every gate is `has_permission`, no `is_superadmin` branch. |
-| Service accounts | `create_service_account` token-only machine user. | Passwordless, `is_service_account=True`, excluded from password reset. |
+| Service accounts (extension) | `ServiceAccountsExtension` — token-only machine user; own `service_accounts` table ([ADR-0005](adr/0005-service-accounts-as-extension.md)). | Core keeps only generic `User.password_login_disabled` (≠ passwordless: invited humans are passwordless yet reset-eligible). |
 | External auth boundary | Covers auth/CRUD/contract. | root/audit/CLI still import builtin `User`. |
 
 ## Security — [security.md](security.md)

@@ -60,12 +60,14 @@ class User(GlobalModel):
         nullable=True,
     )
 
-    #: Marks a token-only service / machine account (provisioned via
-    #: :func:`asterion.auth.service_accounts.create_service_account`). Such an
-    #: account is active + passwordless and authenticates only with a minted
-    #: token; the framework refuses to issue it a password-reset token so it
-    #: can't be turned into a login-capable account.
-    is_service_account: Mapped[bool] = mapped_column(
+    #: Generic auth mechanism (ADR-0005): when ``True`` the account may not
+    #: authenticate with a password and never receives a password-reset token,
+    #: so it can only authenticate via a minted token (or be provisioned another
+    #: way). Distinct from mere passwordlessness — an invited human is
+    #: passwordless yet ``False`` here, so they still receive a reset token to
+    #: set their first password. Set ``True`` by the service-accounts extension;
+    #: the "service account" concept itself lives in that extension, not core.
+    password_login_disabled: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         nullable=False,
